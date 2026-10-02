@@ -186,6 +186,22 @@ func TestInvalidValues(t *testing.T) {
 	}
 }
 
+func TestTrustedProxies(t *testing.T) {
+	e := with(devEnv(), func(m map[string]string) { m["TRUSTED_PROXIES"] = "10.0.0.0/8, 192.168.1.5, ::1" })
+	c, err := config.LoadFrom(config.RoleAPI, e)
+	require.NoError(t, err)
+
+	var got []string
+	for _, p := range c.TrustedProxyPrefixes() {
+		got = append(got, p.String())
+	}
+	require.Equal(t, []string{"10.0.0.0/8", "192.168.1.5/32", "::1/128"}, got)
+
+	_, err = config.LoadFrom(config.RoleAPI, with(devEnv(), func(m map[string]string) { m["TRUSTED_PROXIES"] = "10.0.0.0/8, bukan-cidr" }))
+	require.Error(t, err)
+	require.Contains(t, strings.Join(problems(t, err), "|"), "TRUSTED_PROXIES")
+}
+
 func TestUnparseablePortFailsLoad(t *testing.T) {
 	_, err := config.LoadFrom(config.RoleAPI, with(devEnv(), func(m map[string]string) { m["PORT"] = "abc" }))
 	require.Error(t, err)

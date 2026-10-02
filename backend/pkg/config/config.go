@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"net/url"
 	"slices"
 	"strings"
@@ -159,6 +160,13 @@ func (c *Config) validateRuntime(role Role) []string {
 		}
 	}
 
+	for _, cidr := range c.TrustedProxies {
+		if _, err := parseProxy(cidr); err != nil {
+			p = append(p, "TRUSTED_PROXIES harus berisi daftar CIDR atau alamat IP yang valid")
+			break
+		}
+	}
+
 	p = append(p, checkURL("PUBLIC_BASE_URL", c.PublicBaseURL, "http", "https")...)
 	if c.IsProduction() {
 		if !c.CookieSecure {
@@ -169,6 +177,30 @@ func (c *Config) validateRuntime(role Role) []string {
 		}
 	}
 	return p
+}
+
+// TrustedProxyPrefixes mengembalikan TRUSTED_PROXIES sebagai prefix jaringan. Hanya dipanggil
+// setelah Validate berhasil, jadi entri yang tak valid sudah ditolak.
+func (c *Config) TrustedProxyPrefixes() []netip.Prefix {
+	out := make([]netip.Prefix, 0, len(c.TrustedProxies))
+	for _, s := range c.TrustedProxies {
+		if p, err := parseProxy(s); err == nil {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// parseProxy menerima CIDR ("10.0.0.0/8") atau satu alamat IP ("10.0.0.1" -> /32 atau /128).
+func parseProxy(s string) (netip.Prefix, error) {
+	if p, err := netip.ParsePrefix(s); err == nil {
+		return p.Masked(), nil
+	}
+	a, err := netip.ParseAddr(s)
+	if err != nil {
+		return netip.Prefix{}, err
+	}
+	return netip.PrefixFrom(a, a.BitLen()), nil
 }
 
 // checkURL memeriksa bahwa nilai berupa URL absolut dengan salah satu skema yang diizinkan.
