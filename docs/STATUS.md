@@ -1,13 +1,13 @@
 # STATUS
 
-**Terakhir diperbarui:** (isi saat M00 selesai)
+**Terakhir diperbarui:** 2026-10-03 oleh sesi M00 (CP1)
 **Milestone aktif:** M00 — Foundation & Tooling
 **Branch:** milestone/m00-foundation
-**Kesehatan `make verify`:** belum ada kode
+**Kesehatan `make verify`:** BELUM DIJALANKAN (butuh go.sum, tool pin, dan T6; lihat handover)
 
 | M | Nama | Status | Tag | Handover |
 |---|---|---|---|---|
-| M00 | Foundation & Tooling | TODO | – | – |
+| M00 | Foundation & Tooling | IN PROGRESS (T5/T7, CP1 lewat) | – | handover/HANDOVER-M00-partial-1.md |
 | M01 | Database Schema | TODO | – | – |
 | M02 | Kernel (tx, outbox, audit, HTTP toolkit) | TODO | – | – |
 | M03 | Authentication | TODO | – | – |
@@ -25,10 +25,10 @@
 | M15 | Hardening & Release v1.0.0 | TODO | – | – |
 
 ## Versi yang dipatok
-Isi persis di docs/adr/0001-stack.md pada M00 (PostgreSQL 18.x, Redis 8.x, Go, Node LTS).
+Go 1.26.5 · Node 24 · PostgreSQL 18.x (`postgres:18`) · Redis 8.x (`redis:8`) — patch PG/Redis terbuka; lihat adr/0001 dan adr/0002.
 
 ## Dokumen
-Rev 1.1 berlaku. Penyimpangan dari dokumen yang sudah disinkronkan: (belum ada) · Doc-sync tertunda: (belum ada)
+Rev 1.1 berlaku. Penyimpangan: ADR-0002, ADR-0003 · Doc-sync tertunda: docs/15 §2.1, docs/10 §8
 
 ## Blocker / catatan lintas milestone
 - (kosong)

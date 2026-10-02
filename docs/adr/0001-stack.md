@@ -30,8 +30,8 @@
 ## Catatan lisensi
 Redis 8 dirilis dengan opsi lisensi RSALv2/SSPLv1/AGPLv3; Valkey adalah fork berlisensi BSD. Jelaskan pilihan di README.
 
-## Versi patok (ISI SAAT M00)
-- PostgreSQL: 18.x.x
-- Redis: 8.x.x
-- Go: 1.x.x
-- Node: 24.x.x
+## Versi patok (diisi M00, lihat ADR-0002)
+- Go: 1.26.5 (di go.mod)
+- Node: 24 (`.nvmrc`; target 24.21.0)
+- PostgreSQL: 18.x — tag image `postgres:18`; patch persis TERBUKA (ADR-0002)
+- Redis: 8.x — tag image `redis:8`; patch persis TERBUKA (ADR-0002)
