@@ -1,0 +1,9 @@
+.env
+node_modules/
+bin/
+dist/
+tmp/
+*.zip
+data/
+coverage/
+.air/
