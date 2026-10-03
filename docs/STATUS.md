@@ -1,13 +1,13 @@
 # STATUS
 
-**Terakhir diperbarui:** 2026-10-03 oleh sesi M00 (CP1)
+**Terakhir diperbarui:** 2026-10-03 oleh sesi M00
 **Milestone aktif:** M00 — Foundation & Tooling
 **Branch:** milestone/m00-foundation
-**Kesehatan `make verify`:** BELUM DIJALANKAN (butuh go.sum, tool pin, dan T6; lihat handover)
+**Kesehatan `make verify`:** hijau sampai `M00 smoke OK` (log pengembang 2026-10-03); kode keluar penuh pada clone bersih menunggu V1
 
 | M | Nama | Status | Tag | Handover |
 |---|---|---|---|---|
-| M00 | Foundation & Tooling | IN PROGRESS (T5/T7, CP1 lewat) | – | handover/HANDOVER-M00-partial-1.md |
+| M00 | Foundation & Tooling | IN REVIEW (kode selesai; menunggu V1–V3) | – | handover/HANDOVER-M00.md |
 | M01 | Database Schema | TODO | – | – |
 | M02 | Kernel (tx, outbox, audit, HTTP toolkit) | TODO | – | – |
 | M03 | Authentication | TODO | – | – |
@@ -25,10 +25,10 @@
 | M15 | Hardening & Release v1.0.0 | TODO | – | – |
 
 ## Versi yang dipatok
-Go 1.26.5 · Node 24 · PostgreSQL 18.x (`postgres:18`) · Redis 8.x (`redis:8`) — patch PG/Redis terbuka; lihat adr/0001 dan adr/0002.
+Go 1.26.5 · Node 24 (v24.21.0) · PostgreSQL 18.x (`postgres:18`, teramati 18.6) · Redis 8.x (`redis:8`, teramati 8.10.2); lihat adr/0001 dan adr/0002.
 
 ## Dokumen
-Rev 1.1 berlaku. Penyimpangan: ADR-0002, ADR-0003 · Doc-sync tertunda: docs/15 §2.1, docs/10 §8
+Rev 1.1 berlaku. Penyimpangan: ADR-0002, ADR-0003 · Doc-sync tertunda: (tidak ada)
 
 ## Blocker / catatan lintas milestone
-- (kosong)
+- Putuskan di awal M01: path modul Go (`platform` vs path GitHub) dan sumber PostgreSQL untuk `migrate-roundtrip` di `make verify` (handover M00 §8–§9).

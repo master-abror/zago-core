@@ -1,25 +1,24 @@
 # ADR-0002 — Versi yang dipatok (M00)
 
-**Status:** Diterima (sebagian TERBUKA, lihat bawah)
-**Tanggal:** 2026-10-03
+**Status:** Diterima · **Tanggal:** 2026-10-03
 
 ## Konteks
-ADR-0001 meminta versi patch persis dipatok saat M00. Sandbox sesi M00 tidak punya Docker,
-sehingga tag image tidak bisa diverifikasi dengan `docker pull`.
+ADR-0001 meminta versi persis dipatok saat M00. Kebutuhan: build yang bisa diulang, tanpa menahan upgrade keamanan.
 
 ## Keputusan
-- **Go 1.26.5**, bukan 1.27: ADR-0001 berkata "stable terbaru", tetapi 1.27.0 baru rilis
-  Agustus 2026 dan kompatibilitas toolchain pihak ketiga (air, sqlc, golangci-lint) belum
-  diverifikasi. Naik ke 1.27.x nanti = ubah `go.mod` + `GO_VERSION` di backend.Dockerfile, tanpa ADR baru.
-- **Node 24** (`.nvmrc`, `engines`, `NODE_VERSION=24`). Paket frontend dipatok persis di
-  `apps/web/package.json` (Svelte 5.57.1, Vite 8.3.2, TypeScript 6.0.3, Vitest 5.0.3,
-  svelte-check 4.7.6) — semua diverifikasi lewat `npm ci`, lint, tes, dan build di sandbox.
-- **PostgreSQL / Redis:** compose memakai `postgres:18` dan `redis:8` (major dipatok, patch mengambang).
-  Ini menyimpang dari "patch persis" dan HARUS ditutup: operator menjalankan
-  `docker compose exec postgres postgres --version` dan `docker compose exec redis redis-server --version`,
-  lalu patch persis dicatat di sini dan di compose.
-- Alat dev (air, sqlc, swag, golangci-lint, goimports) dipatok lewat `tool` directive di go.mod
-  memakai `make tools-pin` (butuh jaringan penuh; belum dijalankan, lihat HANDOVER).
+- **Go 1.26.5**, bukan 1.27: 1.27.0 baru rilis Agustus 2026 dan toolchain pihak ketiga (air, sqlc, golangci-lint)
+  belum diverifikasi di atasnya. Terverifikasi di mesin pengembang (`go1.26.5 linux/amd64`) dan di image
+  `golang:1.26.5-alpine`. Naik ke 1.27.x = ubah `go.mod` + `GO_VERSION` di backend.Dockerfile, tanpa ADR baru.
+- **Node 24** (`.nvmrc`, `engines`, `NODE_VERSION=24`); terverifikasi v24.21.0. Paket frontend dipatok persis
+  di `apps/web/package.json` (Svelte 5.57.1, Vite 8.3.2, TypeScript 6.0.3, Vitest 5.0.3, svelte-check 4.7.6).
+- **Alat dev dipatok lewat `tool` directive di `go.mod`** (air, golangci-lint v2, sqlc, swag, goimports),
+  checksum di `go.sum`; dipasang dengan `make tools-pin`, dijalankan sebagai `go tool <nama>`.
+- **PostgreSQL dan Redis: tag mayor mengambang** (`postgres:18`, `redis:8`), patch yang TERAMATI pada 2026-10-03:
+  **PostgreSQL 18.6**, **Redis 8.10.2**. Ini sengaja menyimpang dari "patch persis" di ADR-0001: patch kedua
+  image menerima perbaikan keamanan, dan kode hanya memakai fitur dasar. Tes integrasi (testcontainers)
+  dan compose memakai tag yang sama sehingga perilakunya konsisten. Pematokan ke patch persis (atau digest)
+  ditinjau ulang di M15 (hardening/rilis). Setiap handover mencatat patch yang teramati.
 
 ## Konsekuensi
-`go.sum` dan `tool` directives belum ada di repo sampai `make tools-pin` dijalankan di mesin dengan akses jaringan penuh.
+Dua dari lima versi inti dapat berubah antar-hari tanpa perubahan repo; regresi yang muncul dari update patch
+terdeteksi oleh `make verify` dan CI, bukan oleh pematokan.

@@ -29,7 +29,7 @@ help:            ## Tampilkan bantuan ini
 
 # ---------- 2.1 Onboarding ----------
 setup:           ## Setup pertama kali: deps, .env, datastore, migrasi
-	cp -n .env.example .env || true
+	test -f .env || cp .env.example .env
 	$(MAKE) install
 	$(MAKE) infra-up
 	$(MAKE) migrate-up
