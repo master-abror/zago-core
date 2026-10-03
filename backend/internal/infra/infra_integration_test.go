@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -33,7 +32,7 @@ func start(t *testing.T, image, port string, env map[string]string) (testcontain
 			Image:        image,
 			ExposedPorts: []string{port + "/tcp"},
 			Env:          env,
-			WaitingFor:   wait.ForListeningPort(nat.Port(port + "/tcp")).WithStartupTimeout(90 * time.Second),
+			WaitingFor:   wait.ForListeningPort(port + "/tcp").WithStartupTimeout(90 * time.Second),
 		},
 		Started: true,
 	})
@@ -42,7 +41,7 @@ func start(t *testing.T, image, port string, env map[string]string) (testcontain
 
 	host, err := c.Host(ctx)
 	require.NoError(t, err)
-	mapped, err := c.MappedPort(ctx, nat.Port(port+"/tcp"))
+	mapped, err := c.MappedPort(ctx, port+"/tcp")
 	require.NoError(t, err)
 	return c, host + ":" + mapped.Port()
 }
