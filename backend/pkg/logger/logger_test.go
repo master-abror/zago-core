@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"platform/backend/pkg/logger"
+	"github.com/master-abror/zago-core/backend/pkg/logger"
 )
 
 func decodeLines(t *testing.T, buf *bytes.Buffer) []map[string]any {

@@ -6,7 +6,7 @@ import (
 	"io"
 	"strconv"
 
-	"platform/backend/pkg/config"
+	"github.com/master-abror/zago-core/backend/pkg/config"
 )
 
 const migrateUsage = "usage: migrate <up | down N | roundtrip>"

@@ -11,9 +11,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"platform/backend/internal/health"
-	"platform/backend/internal/httpserver"
-	"platform/backend/pkg/logger"
+	"github.com/master-abror/zago-core/backend/internal/health"
+	"github.com/master-abror/zago-core/backend/internal/httpserver"
+	"github.com/master-abror/zago-core/backend/pkg/logger"
 )
 
 func newRouter(t *testing.T, checkers ...health.Checker) (http.Handler, *bytes.Buffer) {

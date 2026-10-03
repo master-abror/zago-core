@@ -13,7 +13,7 @@ terpatok, skrip pendukung Makefile, proxy/CI/smoke — jadi `make verify` BELUM 
 ## 2. Status task
 | Task | Status | Catatan |
 |---|---|---|
-| T1 skeleton repo + `apps/web` | DONE | commit `d22cb2b` |
+| T1 skeleton repo + `apps/web` | DONE | commit T1 (hash berubah setelah penulisan ulang author) |
 | T2 `go.mod` + Makefile | DONE (sebagian) | `go.mod` hanya `module platform` / `go 1.26.5`; **tanpa `go.sum` dan tanpa `tool` directives** |
 | T3 compose + Dockerfile + air | DONE (belum dijalankan) | YAML valid; tak ada Docker di sandbox |
 | T4 `pkg/id`, `pkg/config`, `pkg/logger` | DONE | tes lulus (-race) di sandbox |

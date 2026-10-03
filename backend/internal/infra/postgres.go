@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"platform/backend/internal/app"
+	"github.com/master-abror/zago-core/backend/internal/app"
 )
 
 // Deps adalah implementasi app.Dependencies yang memakai pgxpool dan go-redis.

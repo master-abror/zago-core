@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"platform/backend/internal/health"
+	"github.com/master-abror/zago-core/backend/internal/health"
 )
 
 // DefaultRequestTimeout membatasi waktu pemrosesan satu request biasa.

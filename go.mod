@@ -1,4 +1,4 @@
-module platform
+module github.com/master-abror/zago-core
 
 go 1.26.5
 

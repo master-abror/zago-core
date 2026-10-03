@@ -14,7 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"platform/backend/internal/app"
+	"github.com/master-abror/zago-core/backend/internal/app"
 )
 
 func devEnv() map[string]string {

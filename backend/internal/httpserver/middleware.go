@@ -14,8 +14,8 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
-	"platform/backend/pkg/id"
-	"platform/backend/pkg/logger"
+	"github.com/master-abror/zago-core/backend/pkg/id"
+	"github.com/master-abror/zago-core/backend/pkg/logger"
 )
 
 // requestIDPattern membatasi X-Request-ID dari klien: karakter aman, panjang wajar.

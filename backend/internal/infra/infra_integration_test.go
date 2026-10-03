@@ -12,11 +12,11 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"platform/backend/internal/app"
-	"platform/backend/internal/health"
-	"platform/backend/internal/httpserver"
-	"platform/backend/internal/infra"
-	"platform/backend/pkg/logger"
+	"github.com/master-abror/zago-core/backend/internal/app"
+	"github.com/master-abror/zago-core/backend/internal/health"
+	"github.com/master-abror/zago-core/backend/internal/httpserver"
+	"github.com/master-abror/zago-core/backend/internal/infra"
+	"github.com/master-abror/zago-core/backend/pkg/logger"
 )
 
 // Tes integrasi MEMBUTUHKAN Docker (testcontainers). Tanpa Docker tes di-skip, bukan gagal.

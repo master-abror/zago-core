@@ -24,7 +24,7 @@ dan bind-mount Docker jauh lebih lambat dan bisa menyebabkan timeout. Pasang Go 
 ## Mulai cepat
 
 ```bash
-git clone <repo> platform && cd platform
+git clone https://github.com/master-abror/zago-core.git && cd zago-core
 make setup          # .env, dependensi, datastore (postgres, redis, mailpit), migrasi
 make dev            # api + worker + frontend native, hot reload, satu terminal (Ctrl-C menghentikan semuanya)
 ```

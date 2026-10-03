@@ -22,7 +22,7 @@ Tidak ada fitur bisnis, tidak ada migrasi, tidak ada endpoint selain `/health*` 
 | T7 ADR, STATUS, README, CHANGELOG, handover | DONE |
 
 ## 3. Bukti verifikasi (apa adanya)
-**Terbukti** (log dari mesin pengembang, 2026-10-03; WSL2 Ubuntu, Docker Desktop):
+**Terbukti** (log dari mesin pengembang, 2026-10-03; WSL2 Ubuntu, Docker Desktop). *Seluruh butir di bawah diperoleh SEBELUM path modul diganti (ADR-0004). Penggantian terbukti di sandbox (`vet` + 65 tes `-race` lulus; `lint-structure` diuji positif/negatif) tetapi golangci-lint, `internal/infra`, `cmd/api`, `cmd/worker` belum dikompilasi ulang dengan path baru — V1 pada klon baru membuktikannya.*
 - `make lint`: golangci-lint 0 issues · svelte-check 0 error 0 warning · Prettier bersih · `lint-structure OK`.
 - `make test`: backend lulus dengan `-race` (`app`, `health`, `httpserver`, `infra` ±20 dtk, `pkg/*`); frontend Vitest 3/3.
   `internal/infra` memakai PostgreSQL 18.6 dan Redis 8.10.2 sungguhan: `/health/ready` 200 → 503 saat container dihentikan.
@@ -42,7 +42,7 @@ Tidak ada fitur bisnis, tidak ada migrasi, tidak ada endpoint selain `/health*` 
   Versi aksi (`checkout@v4`, `setup-go@v5`, `setup-node@v4`) mengikuti docs/19 dan belum diperiksa masih terbaru.
 
 ## 4. Keputusan & penyimpangan
-ADR-0001 (stack, versi) · ADR-0002 (Go 1.26.5; PG/Redis tag mayor mengambang, teramati 18.6 / 8.10.2) ·
+ADR-0001 (stack, versi) · ADR-0004 (path modul `github.com/master-abror/zago-core`) · ADR-0002 (Go 1.26.5; PG/Redis tag mayor mengambang, teramati 18.6 / 8.10.2) ·
 ADR-0003 (tabel penyimpangan kecil: volume `migrate`, CREATEDB dev, config per role, `db-test`/`generate` bertahap,
 `contract-check` dengan `git status`, Dockerfile tanpa `go mod download`, Vitest env `node`, `verify` membuat `.env`).
 Doc-sync selesai untuk docs/10 §8 dan docs/15 (compose + Dockerfile).
@@ -68,7 +68,7 @@ Doc-sync selesai untuk docs/10 §8 dan docs/15 (compose + Dockerfile).
 
 ## 7. Cara menjalankan & memverifikasi
 ```bash
-git clone <repo> platform && cd platform     # taruh di filesystem Linux/WSL, BUKAN /mnt/c atau OneDrive
+git clone https://github.com/master-abror/zago-core.git && cd zago-core     # taruh di filesystem Linux/WSL, BUKAN /mnt/c atau OneDrive
 make verify                                  # mandiri: membuat .env + npm ci bila perlu; port 5432/6379/8080/5173/1025/8025 harus bebas; build pertama beberapa menit
 make setup && make dev                       # (terpisah, SETELAH verify selesai) api + worker + web native; curl localhost:8080/health/ready → 200
 ```
@@ -86,11 +86,10 @@ Prasyarat: Go 1.26.5, Node 24 (`nvm install`), Docker, `make`, dan `gcc` (hanya 
 - Lisensi proyek belum ditetapkan.
 
 ## 9. Pertanyaan terbuka
-- **Path modul Go** saat ini `platform` (`go.mod`). Untuk publikasi di GitHub apakah menjadi `github.com/<user>/<repo>`?
-  Mengganti mudah sekarang (semua impor `platform/...`), mahal setelah M01+. Putuskan sebelum M01 (ADR jika berubah).
-- Nama repositori GitHub dan lisensi proyek.
+- ~~Path modul Go~~ → diputuskan: `github.com/master-abror/zago-core` (ADR-0004).
+- Lisensi proyek (belum ditetapkan).
 
 ## 10. Langkah pertama berikutnya
 1. Pastikan V1–V3 (§3) tercatat hijau, lalu perbarui `docs/STATUS.md` (M00 → DONE, tag `m00-done`) dan hapus "IN REVIEW" di handover ini.
 2. M01 — Database Schema: buka `docs/21` bagian M01 dan hanya dokumen yang tercantum di "Baca:"-nya (docs/04 dan terkait).
-3. Putuskan item `migrate-roundtrip` dan path modul (§8, §9) sebagai ADR di awal M01.
+3. Putuskan item `migrate-roundtrip` (§8) sebagai ADR di awal M01.

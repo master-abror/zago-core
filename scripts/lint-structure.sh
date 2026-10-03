@@ -17,7 +17,7 @@ GREP_EXCLUDES=(--exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist 
 
 # 1. Modul HANYA mengimpor packages/module-sdk, tak pernah backend/internal/* (CLAUDE.md, docs/10 §4).
 if [ -d modules ]; then
-  hits=$(grep -rnE '"platform/backend/(internal|cmd)' modules --include='*.go' "${GREP_EXCLUDES[@]}" || true)
+  hits=$(grep -rnE '"github.com/master-abror/zago-core/backend/(internal|cmd)' modules --include='*.go' "${GREP_EXCLUDES[@]}" || true)
   [ -z "$hits" ] || violation "modules/ mengimpor backend/internal atau backend/cmd" "$hits"
 fi
 

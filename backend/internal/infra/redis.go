@@ -6,7 +6,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"platform/backend/internal/app"
+	"github.com/master-abror/zago-core/backend/internal/app"
 )
 
 // Redis membuat klien go-redis. Seperti pgxpool, koneksi dibuat lazy. Error tidak menyertakan

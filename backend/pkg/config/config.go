@@ -13,7 +13,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 
-	"platform/backend/pkg/logger"
+	"github.com/master-abror/zago-core/backend/pkg/logger"
 )
 
 // Role menentukan variabel mana yang wajib. Satu struct Config dipakai tiga binary, tetapi

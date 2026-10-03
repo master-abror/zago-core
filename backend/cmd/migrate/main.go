@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"platform/backend/internal/app"
+	"github.com/master-abror/zago-core/backend/internal/app"
 )
 
 func main() {

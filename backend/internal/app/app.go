@@ -11,10 +11,10 @@ import (
 	"net"
 	"strings"
 
-	"platform/backend/internal/health"
-	"platform/backend/internal/httpserver"
-	"platform/backend/pkg/config"
-	"platform/backend/pkg/logger"
+	"github.com/master-abror/zago-core/backend/internal/health"
+	"github.com/master-abror/zago-core/backend/internal/httpserver"
+	"github.com/master-abror/zago-core/backend/pkg/config"
+	"github.com/master-abror/zago-core/backend/pkg/logger"
 )
 
 // Exit code proses.

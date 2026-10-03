@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"platform/backend/pkg/config"
+	"github.com/master-abror/zago-core/backend/pkg/config"
 )
 
 // .env.example adalah titik awal `make setup`. Tes ini menjaganya tetap valid untuk SEMUA role,

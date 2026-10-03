@@ -28,7 +28,7 @@
 Go 1.26.5 · Node 24 (v24.21.0) · PostgreSQL 18.x (`postgres:18`, teramati 18.6) · Redis 8.x (`redis:8`, teramati 8.10.2); lihat adr/0001 dan adr/0002.
 
 ## Dokumen
-Rev 1.1 berlaku. Penyimpangan: ADR-0002, ADR-0003 · Doc-sync tertunda: (tidak ada)
+Rev 1.1 berlaku. Penyimpangan: ADR-0002, ADR-0003, ADR-0004 · Doc-sync tertunda: (tidak ada)
 
 ## Blocker / catatan lintas milestone
-- Putuskan di awal M01: path modul Go (`platform` vs path GitHub) dan sumber PostgreSQL untuk `migrate-roundtrip` di `make verify` (handover M00 §8–§9).
+- Putuskan di awal M01: sumber PostgreSQL untuk `migrate-roundtrip` di `make verify` (handover M00 §8). Path modul Go sudah diputuskan: `github.com/master-abror/zago-core` (ADR-0004).

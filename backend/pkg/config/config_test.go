@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"platform/backend/pkg/config"
+	"github.com/master-abror/zago-core/backend/pkg/config"
 )
 
 const goodSecret = "0123456789abcdef0123456789abcdef-prod-secret"

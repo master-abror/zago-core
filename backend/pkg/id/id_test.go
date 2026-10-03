@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"platform/backend/pkg/id"
+	"github.com/master-abror/zago-core/backend/pkg/id"
 )
 
 func TestNewIDIsVersion7(t *testing.T) {

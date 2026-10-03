@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"platform/backend/internal/httpserver"
+	"github.com/master-abror/zago-core/backend/internal/httpserver"
 )
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))

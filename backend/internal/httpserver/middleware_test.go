@@ -13,8 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"platform/backend/internal/httpserver"
-	"platform/backend/pkg/logger"
+	"github.com/master-abror/zago-core/backend/internal/httpserver"
+	"github.com/master-abror/zago-core/backend/pkg/logger"
 )
 
 func logLines(t *testing.T, buf *bytes.Buffer) []map[string]any {

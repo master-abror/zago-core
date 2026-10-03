@@ -16,9 +16,10 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
   berkonteks root, konfigurasi air, proxy dev Vite (`/api`, `/ws`).
 - Skrip: `dev.sh`, `wait-for-healthy.sh`, `verify-smoke.sh`, `lint-structure.sh` (kerangka), `smoke/m00.sh`.
 - CI GitHub Actions (lint, test, migrations, build, docker-smoke, contract-check).
-- ADR-0001 (stack), ADR-0002 (versi), ADR-0003 (penyimpangan kecil dari dokumen).
+- ADR-0001 (stack), ADR-0002 (versi), ADR-0003 (penyimpangan kecil dari dokumen), ADR-0004 (path modul).
 
 #### Changed
+- Path modul Go `platform` → `github.com/master-abror/zago-core` (ADR-0004).
 - Dockerfile backend tanpa `go mod download` (image 2,13 GB → 386 MB; build 18 menit → hitungan menit).
 - Vitest memakai environment `node` secara default; jsdom dipilih per berkas.
 - `make verify` membuat `.env` dari `.env.example` bila belum ada; `make db-test`, `make generate`,

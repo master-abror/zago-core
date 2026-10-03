@@ -14,7 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"platform/backend/internal/health"
+	"github.com/master-abror/zago-core/backend/internal/health"
 )
 
 var discard = slog.New(slog.NewTextHandler(io.Discard, nil))
