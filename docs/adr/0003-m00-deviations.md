@@ -17,4 +17,5 @@
 | 16 §2.7 (`verify-smoke.sh`) | Compose project terpisah `platform-verify`, penjaga port 5432/6379/8080/5173/1025/8025, `.env` sementara hanya bila belum ada | `down -v` tak boleh menghapus volume data pengembangan; bentrok port harus gagal dengan pesan jelas. |
 | 16 (pemanggilan skrip) | Makefile memanggil skrip lewat `bash ./scripts/x.sh` | Bit eksekusi tidak selalu bertahan di `/mnt/c` (WSL) atau saat zip diekstrak. |
 | 10 §2 (repo) | `backend/migrations/.gitkeep` | Git tak melacak direktori kosong; tanpanya `COPY backend/migrations` di Dockerfile produksi gagal di clone bersih. |
+| 16 §2.7 (`verify`) | Langkah pertama membuat `.env` dari `.env.example` bila belum ada | Zip/clone bersih tak punya `.env` (gitignored) dan prompt serah-terima mewajibkan `make verify` segera; tanpanya `migrate-roundtrip` gagal "MIGRATION_DATABASE_URL wajib diisi". `.env` yang sudah ada tak pernah ditimpa. |
 

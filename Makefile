@@ -145,6 +145,7 @@ smoke:           ## Jalankan semua smoke script milestone terhadap stack yang be
 	@for f in scripts/smoke/m*.sh; do echo "== $$f"; bash $$f || exit 1; done
 
 verify:          ## Gerbang tunggal: lint + test + migrate-roundtrip + build + smoke
+	@test -f .env || { cp .env.example .env && echo "verify: .env dibuat dari .env.example (nilai pengembangan)"; }
 	$(MAKE) lint
 	$(MAKE) test
 	$(MAKE) migrate-roundtrip
