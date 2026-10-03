@@ -58,7 +58,7 @@ services:
       # PostgreSQL 18 images keep PGDATA under /var/lib/postgresql/<major>/…;
       # mount the PARENT directory, not /var/lib/postgresql/data.
       - postgres_data:/var/lib/postgresql
-      - ./deploy/db/init:/docker-entrypoint-initdb.d:ro
+      - ./deploy/db/init:/docker-entrypoint-initdb.d:ro   # 00-roles.sql, 01-dev-privileges.sql (dev/CI only: app_migrator CREATEDB for migrate-roundtrip; ADR-0003)
     ports:
       - "127.0.0.1:5432:5432"
     healthcheck:
@@ -87,6 +87,10 @@ services:
     profiles: ["full"]
     build: { context: ., dockerfile: deploy/docker/backend.Dockerfile, target: dev }
     command: ["go", "run", "./backend/cmd/migrate", "up"]
+    volumes:                      # stage dev tidak berisi source; tanpa mount `go run` gagal (ADR-0003)
+      - .:/app
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
     env_file: .env
     environment:
       DATABASE_URL: postgres://app_user:app_dev_pw@postgres:5432/platform
@@ -100,6 +104,8 @@ services:
     command: ["air", "-c", ".air.api.toml"]
     volumes:
       - .:/app
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
     ports:
       - "127.0.0.1:8080:8080"
     env_file: .env
@@ -107,6 +113,12 @@ services:
       DATABASE_URL: postgres://app_user:app_dev_pw@postgres:5432/platform
       REDIS_URL: redis://redis:6379
       SMTP_HOST: mailpit
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health/ready >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 120s          # air mengompilasi + mengunduh modul saat start pertama (cache dingin)
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
@@ -117,6 +129,8 @@ services:
     command: ["air", "-c", ".air.worker.toml"]
     volumes:
       - .:/app
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
     env_file: .env
     environment:
       DATABASE_URL: postgres://app_user:app_dev_pw@postgres:5432/platform
@@ -143,6 +157,8 @@ services:
 
 volumes:
   postgres_data:
+  go_mod_cache:
+  go_build_cache:
 ```
 
 `condition: service_healthy` and `service_completed_successfully` make the start order deterministic: the API never starts before PostgreSQL accepts connections **and** the migrations have been applied, instead of crash-looping for ten seconds.
@@ -157,22 +173,26 @@ The development passwords above exist only for local use. The init script (`depl
 
 ```dockerfile
 # deploy/docker/backend.Dockerfile
-ARG GO_VERSION=1.xx          # pinned in docs/adr/0001-stack.md
+ARG GO_VERSION=1.xx          # pinned in docs/adr/0001-stack.md and 0002
 FROM golang:${GO_VERSION}-alpine AS base
 WORKDIR /app
 COPY go.mod go.sum ./
-RUN go mod download
+# NO `go mod download`: it would pull every dev-tool dependency (golangci-lint, sqlc, swag) into an
+# image layer (2 GB, 18-minute builds). Module and build caches use BuildKit cache mounts instead (ADR-0003).
 
 FROM base AS dev
-# source is bind-mounted by docker-compose.yml; air rebuilds and restarts on change
-RUN go install github.com/air-verse/air@latest   # replace with a pinned version via the go.mod `tool` directive
+# air is built once into the image (pinned by the go.mod `tool` directive); source is bind-mounted by
+# docker-compose.yml; application modules are downloaded on first start into the go_mod_cache volume
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    go build -o /usr/local/bin/air github.com/air-verse/air
 CMD ["air", "-c", ".air.api.toml"]
 
 FROM base AS build
 COPY backend ./backend
 COPY packages ./packages
 COPY modules ./modules
-RUN CGO_ENABLED=0 go build -trimpath -o /out/api     ./backend/cmd/api \
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -o /out/api     ./backend/cmd/api \
  && CGO_ENABLED=0 go build -trimpath -o /out/worker  ./backend/cmd/worker \
  && CGO_ENABLED=0 go build -trimpath -o /out/migrate ./backend/cmd/migrate
 
