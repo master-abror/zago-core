@@ -16,7 +16,10 @@ export default defineConfig({
     },
   },
   test: {
-    environment: 'jsdom',
+    // Default 'node': tes logika (core/api, can(), registry) tak butuh DOM, dan memuat jsdom dari
+    // disk lambat (mis. /mnt/c di WSL) memakan hampir seluruh waktu tes sampai worker timeout.
+    // Tes komponen memilih DOM per berkas dengan komentar pertama: // @vitest-environment jsdom
+    environment: 'node',
     include: ['src/**/*.test.ts'],
   },
 });
