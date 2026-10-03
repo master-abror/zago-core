@@ -17,33 +17,33 @@ const migrateUsage = "usage: migrate <up | down N | roundtrip>"
 // berhasil tanpa menyentuh database.
 func Migrate(_ context.Context, args []string, env map[string]string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, migrateUsage)
+		_, _ = fmt.Fprintln(stderr, migrateUsage)
 		return ExitConfig
 	}
 	switch args[0] {
 	case "up", "roundtrip":
 		if len(args) != 1 {
-			fmt.Fprintln(stderr, migrateUsage)
+			_, _ = fmt.Fprintln(stderr, migrateUsage)
 			return ExitConfig
 		}
 	case "down":
 		if len(args) != 2 {
-			fmt.Fprintln(stderr, migrateUsage)
+			_, _ = fmt.Fprintln(stderr, migrateUsage)
 			return ExitConfig
 		}
 		if n, err := strconv.Atoi(args[1]); err != nil || n < 1 {
-			fmt.Fprintln(stderr, "migrate down: N harus bilangan bulat >= 1")
+			_, _ = fmt.Fprintln(stderr, "migrate down: N harus bilangan bulat >= 1")
 			return ExitConfig
 		}
 	default:
-		fmt.Fprintf(stderr, "migrate: perintah tidak dikenal %q\n%s\n", args[0], migrateUsage)
+		_, _ = fmt.Fprintf(stderr, "migrate: perintah tidak dikenal %q\n%s\n", args[0], migrateUsage)
 		return ExitConfig
 	}
 
 	if _, err := config.LoadFrom(config.RoleMigrate, env); err != nil {
-		fmt.Fprintf(stderr, "migrate: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "migrate: %v\n", err)
 		return ExitConfig
 	}
-	fmt.Fprintf(stdout, "migrate %s: tidak ada migrasi (migrasi pertama datang di M01)\n", args[0])
+	_, _ = fmt.Fprintf(stdout, "migrate %s: tidak ada migrasi (migrasi pertama datang di M01)\n", args[0])
 	return ExitOK
 }

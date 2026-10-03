@@ -82,7 +82,7 @@ func (f *fakeDeps) snapshot() (opened, closed []string) {
 func TestAPIFailsFastOnBadConfigBeforeBindingOrOpeningAnything(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 
 	env := devEnv()
 	delete(env, "REDIS_URL")
@@ -131,7 +131,7 @@ func startAPI(t *testing.T, deps *fakeDeps) (base string, stop func() int) {
 		if err != nil {
 			return false
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return resp.StatusCode == http.StatusOK
 	}, 3*time.Second, 20*time.Millisecond)
 
@@ -151,7 +151,7 @@ func status(t *testing.T, url string) int {
 	t.Helper()
 	resp, err := http.Get(url)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.Copy(io.Discard, resp.Body)
 	return resp.StatusCode
 }
@@ -206,7 +206,7 @@ func TestAPIDependencyOpenFailureClosesWhatWasOpened(t *testing.T) {
 func TestAPIPortAlreadyInUseExitsWithErrorAndClosesResources(t *testing.T) {
 	busy, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer busy.Close()
+	defer func() { _ = busy.Close() }()
 
 	env := devEnv()
 	env["PORT"] = strconv.Itoa(busy.Addr().(*net.TCPAddr).Port)

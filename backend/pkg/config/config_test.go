@@ -247,7 +247,7 @@ func TestSecretsNeverLeak(t *testing.T) {
 	var buf bytes.Buffer
 	slog.New(slog.NewJSONHandler(&buf, nil)).Info("start", "config", c)
 	out := strings.Join([]string{
-		fmt.Sprintf("%v", c), fmt.Sprintf("%+v", c), fmt.Sprintf("%#v", c), fmt.Sprintf("%s", c), buf.String(),
+		fmt.Sprintf("%v", c), fmt.Sprintf("%+v", c), fmt.Sprintf("%#v", c), c.String(), buf.String(),
 	}, "\n")
 	for _, s := range []string{secretPW, secretSession, "MFA-KEY-VALUE", "SMTP-PASSWORD-VALUE"} {
 		require.NotContains(t, out, s)

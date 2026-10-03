@@ -17,7 +17,7 @@ func readEnvExample(t *testing.T) map[string]string {
 	t.Helper()
 	f, err := os.Open("../../../.env.example")
 	require.NoError(t, err, ".env.example harus ada di root repo")
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	env := map[string]string{}
 	sc := bufio.NewScanner(f)

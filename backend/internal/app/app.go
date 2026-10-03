@@ -85,7 +85,7 @@ func (r *resources) checkers() []health.Checker {
 func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stderr io.Writer, ln net.Listener) int {
 	cfg, err := config.LoadFrom(config.RoleAPI, env)
 	if err != nil {
-		fmt.Fprintf(stderr, "api: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "api: %v\n", err)
 		return ExitConfig
 	}
 	log := newLogger(stderr, cfg, "api")
@@ -132,7 +132,7 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 func RunWorker(ctx context.Context, env map[string]string, deps Dependencies, stderr io.Writer) int {
 	cfg, err := config.LoadFrom(config.RoleWorker, env)
 	if err != nil {
-		fmt.Fprintf(stderr, "worker: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "worker: %v\n", err)
 		return ExitConfig
 	}
 	log := newLogger(stderr, cfg, "worker")

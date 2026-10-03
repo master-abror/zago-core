@@ -56,7 +56,7 @@ func TestGracefulShutdownFinishesInFlightRequest(t *testing.T) {
 			resCh <- result{err: err}
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		b, _ := io.ReadAll(resp.Body)
 		resCh <- result{body: string(b), code: resp.StatusCode}
 	}()
