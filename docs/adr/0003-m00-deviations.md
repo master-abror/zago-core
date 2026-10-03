@@ -11,3 +11,10 @@
 | 10 §8 (Config) | Satu struct `Config`, kewajiban variabel divalidasi per `Role` (api/worker/migrate); `cmd/migrate` hanya butuh `MIGRATION_DATABASE_URL` | Dokumen tak menyebut role; migrate tak boleh butuh Redis/SESSION_SECRET. |
 | 10 §2 (struktur) | Logika start/stop di `backend/internal/app`, adapter pgx/redis di `backend/internal/infra`; `cmd/*` hanya wiring | Alur fail-fast dan graceful shutdown bisa dites dengan fake tanpa Docker. |
 | 21 M00 (`cmd/migrate`) | Hanya kerangka: validasi config + urai perintah; belum menyentuh database | golang-migrate dihubungkan di M01 bersama migrasi pertama. |
+| 19 §3 (`contract-check`) | `git status --porcelain -- <path>` menggantikan `git diff --exit-code <path>` | `git diff` error untuk path yang belum ada di M00 dan tak mendeteksi berkas hasil generate yang belum terlacak. |
+| 19 §3 (workflow) | Menambah `permissions: contents: read`, `concurrency` (batalkan run lama), dump log service saat `docker-smoke` gagal; job `migrations` juga menjalankan `01-dev-privileges.sql` | Hak minimum token CI; diagnosis kegagalan; `roundtrip` butuh CREATEDB (baris di atas). |
+| 16 §2.4 (`db-test`) | Dilewati dengan pesan eksplisit selama belum ada `*_test.go` di `backend/migrations` | `go test` pada direktori tanpa paket Go keluar dengan kode 1 ("no packages to test") dan akan memerahkan CI di M00. Aktif otomatis saat tes skema pertama ada (M01). |
+| 16 §2.7 (`verify-smoke.sh`) | Compose project terpisah `platform-verify`, penjaga port 5432/6379/8080/5173/1025/8025, `.env` sementara hanya bila belum ada | `down -v` tak boleh menghapus volume data pengembangan; bentrok port harus gagal dengan pesan jelas. |
+| 16 (pemanggilan skrip) | Makefile memanggil skrip lewat `bash ./scripts/x.sh` | Bit eksekusi tidak selalu bertahan di `/mnt/c` (WSL) atau saat zip diekstrak. |
+| 10 §2 (repo) | `backend/migrations/.gitkeep` | Git tak melacak direktori kosong; tanpanya `COPY backend/migrations` di Dockerfile produksi gagal di clone bersih. |
+

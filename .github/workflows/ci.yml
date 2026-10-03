@@ -1,0 +1,116 @@
+# CI sesuai docs/19 §3. Semua langkah memanggil `make`, sehingga lokal dan CI identik.
+# Versi Go berasal dari go.mod (go-version-file); Node dari env di bawah (ADR-0001/0002).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "24"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - run: make install
+      - run: make lint
+
+  test:
+    runs-on: ubuntu-latest
+    # testcontainers menjalankan PostgreSQL 18 / Redis 8 sendiri (Docker tersedia di runner ubuntu)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - run: make install
+      - run: make test
+
+  migrations:
+    # up → down → up pada database sementara; juga menjalankan suite constraint/trigger/grant skema
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: platform }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      # 00-roles.sql = role aplikasi; 01-dev-privileges.sql = CREATEDB untuk roundtrip (ADR-0003)
+      - run: |
+          psql "postgres://postgres:postgres@localhost:5432/platform" -v ON_ERROR_STOP=1 \
+            -f deploy/db/init/00-roles.sql -f deploy/db/init/01-dev-privileges.sql
+      - run: make migrate-roundtrip
+        env:
+          MIGRATION_DATABASE_URL: pgx5://app_migrator:migrator_dev_pw@localhost:5432/platform
+      - run: make db-test
+
+  build:
+    needs: [lint, test, migrations]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - run: make install
+      - run: make build
+      - run: make docker-build # membuktikan image produksi ter-build dari root repo
+
+  docker-smoke:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env
+      - run: docker compose --profile full up -d --build
+      - run: bash ./scripts/wait-for-healthy.sh # polling sampai semua service sehat, dibatasi timeout
+      - run: make smoke # semua smoke script milestone terhadap stack yang berjalan
+      - name: Log service (hanya bila gagal)
+        if: failure()
+        run: docker compose --profile full logs --no-color --tail=100
+      - run: docker compose --profile full down -v
+        if: always()
+
+  contract-check:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - run: make install
+      - run: make generate
+      # Gagal bila hasil generate (OpenAPI, SDK TypeScript, sqlc, registri modul) berbeda dari yang
+      # di-commit (drift check 08 §9, 07 §5.2). `git status --porcelain` mendeteksi juga berkas baru
+      # yang belum terlacak, dan tak error untuk path yang belum ada di M00 (ADR-0003).
+      - run: |
+          drift=$(git status --porcelain -- docs/api packages/ts-sdk \
+            backend/cmd/api/modules_gen.go backend/cmd/worker/modules_gen.go apps/web/src/modules_gen.ts)
+          if [ -n "$drift" ]; then
+            echo "Hasil generate tidak sinkron dengan yang di-commit:" >&2
+            echo "$drift" >&2
+            exit 1
+          fi

@@ -55,7 +55,7 @@ infra-up:        ## Jalankan postgres + redis + mailpit (pengembangan native), t
 dev:             ## infra + migrasi, lalu api + worker + frontend native dalam SATU terminal
 	$(MAKE) infra-up
 	$(MAKE) migrate-up
-	./scripts/dev.sh
+	bash ./scripts/dev.sh
 
 run-api:         ## Jalankan API native dengan hot reload
 	go tool air -c .air.api.toml
@@ -83,7 +83,7 @@ test-e2e:        ## Tes end-to-end Playwright terhadap stack yang berjalan (mula
 lint:            ## Lint backend dan frontend + pemeriksaan struktural
 	go tool golangci-lint run ./...
 	npm run lint -w apps/web
-	./scripts/lint-structure.sh
+	bash ./scripts/lint-structure.sh
 
 format:          ## Format otomatis backend dan frontend
 	gofmt -w backend packages modules
@@ -112,7 +112,11 @@ migrate-roundtrip: ## up -> down(semua) -> up pada database SEMENTARA (dibuat & 
 	go run ./backend/cmd/migrate roundtrip
 
 db-test:         ## Tes constraint/trigger/grant skema (docs/04 §17; mulai M01)
-	go test ./backend/migrations/... -count=1
+	@if find backend/migrations -name '*_test.go' 2>/dev/null | grep -q .; then \
+		go test ./backend/migrations/... -count=1; \
+	else \
+		echo "db-test: dilewati (belum ada tes skema di backend/migrations; dimulai M01, docs/21)"; \
+	fi
 
 bootstrap-admin: ## Buat Super Admin pertama: make bootstrap-admin EMAIL=you@example.org (mulai M03)
 	@test -n "$(EMAIL)" || (echo "usage: make bootstrap-admin EMAIL=<email>" && exit 1)
@@ -145,7 +149,7 @@ verify:          ## Gerbang tunggal: lint + test + migrate-roundtrip + build + s
 	$(MAKE) test
 	$(MAKE) migrate-roundtrip
 	$(MAKE) build
-	./scripts/verify-smoke.sh
+	bash ./scripts/verify-smoke.sh
 
 # ---------- 2.8 Bersih-bersih ----------
 clean:           ## Hapus artefak build dan container BESERTA volume data
@@ -162,7 +166,7 @@ module-create:   ## Scaffold modul baru: make module-create NAME=announcements
 # ---------- 2.10 Handover ----------
 handover-pack:   ## Kemas berkas untuk chat baru: make handover-pack M=03
 	@test -n "$(M)" || (echo "usage: make handover-pack M=<NN>" && exit 1)
-	./scripts/handover-pack.sh $(M)
+	bash ./scripts/handover-pack.sh $(M)
 
 repo-zip:        ## Zip repo lengkap (tanpa node_modules/bin/dist/.env/data) untuk chat berikutnya
-	./scripts/repo-zip.sh
+	bash ./scripts/repo-zip.sh
