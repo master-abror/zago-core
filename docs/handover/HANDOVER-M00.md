@@ -35,7 +35,7 @@ Tidak ada fitur bisnis, tidak ada migrasi, tidak ada endpoint selain `/health*` 
   `verify-smoke.sh` (guard port, `.env`, `down -v` selalu jalan), `lint-structure.sh` (5 pelanggaran terdeteksi).
 
 **BELUM terbukti (syarat menutup M00 → `DONE`):**
-- **V1** — `make setup && make verify` pada clone bersih (filesystem Linux, bukan `/mnt/c`) berakhir **exit 0**.
+- **V1** — `make verify` pada clone bersih (filesystem Linux, bukan `/mnt/c`; tanpa `make setup` lebih dulu) berakhir **exit 0**.
   (Log yang ada hanya menunjukkan ekor `M00 smoke OK`; kode keluar penuh belum terkonfirmasi.)
 - **V2** — `curl -i localhost:8080/health/ready` → `200` saat `make dev` berjalan, dan Ctrl-C tidak meninggalkan proses.
 - **V3** — CI GitHub Actions hijau pada PR pertama (repo belum ada di GitHub saat handover ini ditulis).
@@ -69,8 +69,8 @@ Doc-sync selesai untuk docs/10 §8 dan docs/15 (compose + Dockerfile).
 ## 7. Cara menjalankan & memverifikasi
 ```bash
 git clone <repo> platform && cd platform     # taruh di filesystem Linux/WSL, BUKAN /mnt/c atau OneDrive
-make setup && make verify                    # port 5432/6379/8080/5173/1025/8025 harus bebas; build pertama beberapa menit
-make dev                                     # api + worker + web native; curl localhost:8080/health/ready → 200
+make verify                                  # mandiri: membuat .env + npm ci bila perlu; port 5432/6379/8080/5173/1025/8025 harus bebas; build pertama beberapa menit
+make setup && make dev                       # (terpisah, SETELAH verify selesai) api + worker + web native; curl localhost:8080/health/ready → 200
 ```
 Prasyarat: Go 1.26.5, Node 24 (`nvm install`), Docker, `make`, dan `gcc` (hanya untuk `go test -race`). Lihat README.
 
