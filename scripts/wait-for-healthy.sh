@@ -2,13 +2,13 @@
 # Menunggu SEMUA service compose (profile full) siap, dengan batas waktu (docs/15 §8, docs/19 §3).
 #   siap = running+healthy, running tanpa healthcheck, atau exited dengan kode 0 (migrate).
 #   gagal = unhealthy, exited non-nol, dead; service yang diharapkan tak kunjung muncul.
-# Env: WAIT_TIMEOUT (detik, default 240), WAIT_INTERVAL (default 3),
+# Env: WAIT_TIMEOUT (detik, default 600), WAIT_INTERVAL (default 3),
 #      EXPECTED_SERVICES (default "postgres redis mailpit migrate api worker web"),
 #      COMPOSE_PROJECT_NAME (opsional; dipakai docker compose apa adanya).
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-TIMEOUT=${WAIT_TIMEOUT:-240}
+TIMEOUT=${WAIT_TIMEOUT:-600}
 INTERVAL=${WAIT_INTERVAL:-3}
 EXPECTED=${EXPECTED_SERVICES:-"postgres redis mailpit migrate api worker web"}
 COMPOSE=(docker compose --profile full)

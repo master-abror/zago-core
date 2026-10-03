@@ -45,6 +45,8 @@ services:
     # Source harus dipasang: stage dev hanya berisi go.mod/go.sum (ADR-0003, perbaikan 15 §2.1).
     volumes:
       - .:/app
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
     env_file: .env
     environment:
       DATABASE_URL: postgres://app_user:app_dev_pw@postgres:5432/platform
@@ -55,9 +57,11 @@ services:
   api:
     profiles: ["full"]
     build: { context: ., dockerfile: deploy/docker/backend.Dockerfile, target: dev }
-    command: ["go", "tool", "air", "-c", ".air.api.toml"]
+    command: ["air", "-c", ".air.api.toml"]
     volumes:
       - .:/app
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
     ports:
       - "127.0.0.1:8080:8080"
     env_file: .env
@@ -69,8 +73,8 @@ services:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health/ready >/dev/null || exit 1"]
       interval: 5s
       timeout: 3s
-      retries: 30
-      start_period: 30s # air mengompilasi saat pertama start
+      retries: 40
+      start_period: 120s # air mengompilasi + mengunduh modul saat pertama start (cache dingin)
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
@@ -78,9 +82,11 @@ services:
   worker:
     profiles: ["full"]
     build: { context: ., dockerfile: deploy/docker/backend.Dockerfile, target: dev }
-    command: ["go", "tool", "air", "-c", ".air.worker.toml"]
+    command: ["air", "-c", ".air.worker.toml"]
     volumes:
       - .:/app
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
     env_file: .env
     environment:
       DATABASE_URL: postgres://app_user:app_dev_pw@postgres:5432/platform
@@ -113,3 +119,5 @@ services:
 
 volumes:
   postgres_data:
+  go_mod_cache:
+  go_build_cache:

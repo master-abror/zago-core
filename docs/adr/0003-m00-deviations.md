@@ -18,4 +18,6 @@
 | 16 (pemanggilan skrip) | Makefile memanggil skrip lewat `bash ./scripts/x.sh` | Bit eksekusi tidak selalu bertahan di `/mnt/c` (WSL) atau saat zip diekstrak. |
 | 10 §2 (repo) | `backend/migrations/.gitkeep` | Git tak melacak direktori kosong; tanpanya `COPY backend/migrations` di Dockerfile produksi gagal di clone bersih. |
 | 16 §2.7 (`verify`) | Langkah pertama membuat `.env` dari `.env.example` bila belum ada | Zip/clone bersih tak punya `.env` (gitignored) dan prompt serah-terima mewajibkan `make verify` segera; tanpanya `migrate-roundtrip` gagal "MIGRATION_DATABASE_URL wajib diisi". `.env` yang sudah ada tak pernah ditimpa. |
+| 15 §3 (Dockerfile backend) | Tanpa `go mod download`; cache modul/build lewat BuildKit cache mount; `air` dibangun ke image; compose memberi volume `go_mod_cache` + `go_build_cache` dan memanggil `air` langsung (bukan `go tool air`) | `go mod download` menarik seluruh dependensi alat dev ke layer image: build pertama 1114 dtk, export+unpack ±1000 dtk ×3 image, dan Docker Desktop (±3,5 GB RAM) mati. Layer image kini hanya golang:alpine + biner air. |
+| 15 §2.1 (healthcheck api) | `start_period` 120 dtk dan `retries` 40 (semula 30 dtk / 30); `wait-for-healthy.sh` default 600 dtk | Start pertama dengan cache modul dingin mengunduh dan mengompilasi di dalam container. |
 
