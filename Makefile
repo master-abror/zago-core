@@ -146,7 +146,7 @@ smoke:           ## Jalankan semua smoke script milestone terhadap stack yang be
 
 verify:          ## Gerbang tunggal: lint + test + migrate-roundtrip + build + smoke
 	@test -f .env || { cp .env.example .env && echo "verify: .env dibuat dari .env.example (nilai pengembangan)"; }
-	@test -d node_modules || { echo "verify: node_modules belum ada; menjalankan npm ci"; npm ci; }
+	@test -f node_modules/.package-lock.json || { echo "verify: node_modules belum ada/lengkap; menjalankan npm ci"; npm ci; }
 	$(MAKE) lint
 	$(MAKE) test
 	$(MAKE) migrate-roundtrip
