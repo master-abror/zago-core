@@ -18,6 +18,9 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - CI GitHub Actions (lint, test, migrations, build, docker-smoke, contract-check).
 - ADR-0001 (stack), ADR-0002 (versi), ADR-0003 (penyimpangan kecil dari dokumen), ADR-0004 (path modul).
 
+#### Fixed
+- Container `web`/`api`/`worker` tak lagi menulis berkas milik root ke working tree (volume anonim `/app/apps/web/node_modules`, `/app/tmp`); `verify-smoke.sh` mendeteksi kebocoran.
+
 #### Changed
 - Path modul Go `platform` → `github.com/master-abror/zago-core` (ADR-0004).
 - Dockerfile backend tanpa `go mod download` (image 2,13 GB → 386 MB; build 18 menit → hitungan menit).

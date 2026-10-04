@@ -104,6 +104,7 @@ services:
     command: ["air", "-c", ".air.api.toml"]
     volumes:
       - .:/app
+      - /app/tmp                   # air build output stays in a volume, not the (root-owned) working tree
       - go_mod_cache:/go/pkg/mod
       - go_build_cache:/root/.cache/go-build
     ports:
@@ -129,6 +130,7 @@ services:
     command: ["air", "-c", ".air.worker.toml"]
     volumes:
       - .:/app
+      - /app/tmp                   # air build output stays in a volume, not the (root-owned) working tree
       - go_mod_cache:/go/pkg/mod
       - go_build_cache:/root/.cache/go-build
     env_file: .env
@@ -148,6 +150,7 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
+      - /app/apps/web/node_modules   # Vite cache (.vite) stays in a volume, not the working tree
     ports:
       - "127.0.0.1:5173:5173"
     environment:

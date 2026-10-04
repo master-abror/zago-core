@@ -22,7 +22,7 @@ Tidak ada fitur bisnis, tidak ada migrasi, tidak ada endpoint selain `/health*` 
 | T7 ADR, STATUS, README, CHANGELOG, handover | DONE |
 
 ## 3. Bukti verifikasi (apa adanya)
-**Terbukti** (log dari mesin pengembang, 2026-10-03; WSL2 Ubuntu, Docker Desktop). *Seluruh butir di bawah diperoleh SEBELUM path modul diganti (ADR-0004). Penggantian terbukti di sandbox (`vet` + 65 tes `-race` lulus; `lint-structure` diuji positif/negatif) tetapi golangci-lint, `internal/infra`, `cmd/api`, `cmd/worker` belum dikompilasi ulang dengan path baru — V1 pada klon baru membuktikannya.*
+**Terbukti** (log dari mesin pengembang, 2026-10-03; WSL2 Ubuntu, Docker Desktop). *Butir di bawah (sampai "Di sandbox") diperoleh SEBELUM path modul diganti (ADR-0004); dikonfirmasi ulang oleh V1 dan V3 sesudahnya.*
 - `make lint`: golangci-lint 0 issues · svelte-check 0 error 0 warning · Prettier bersih · `lint-structure OK`.
 - `make test`: backend lulus dengan `-race` (`app`, `health`, `httpserver`, `infra` ±20 dtk, `pkg/*`); frontend Vitest 3/3.
   `internal/infra` memakai PostgreSQL 18.6 dan Redis 8.10.2 sungguhan: `/health/ready` 200 → 503 saat container dihentikan.
@@ -34,12 +34,20 @@ Tidak ada fitur bisnis, tidak ada migrasi, tidak ada endpoint selain `/health*` 
 - Di sandbox (tanpa Docker): `dev.sh` (crash, Ctrl-C, tanpa proses yatim), `wait-for-healthy.sh` (6 skenario),
   `verify-smoke.sh` (guard port, `.env`, `down -v` selalu jalan), `lint-structure.sh` (5 pelanggaran terdeteksi).
 
+**Terbukti SESUDAH penggantian path modul (ADR-0004), 2026-10-04:**
+- **V1** — `make verify` pada klon bersih di filesystem Linux (`~/projects/zago-core`, tanpa `make setup` lebih dulu): **`exit=0`**.
+  `.env` dan `node_modules` dibuat otomatis; golangci-lint 0 issues; `internal/infra` 23 dtk di PostgreSQL/Redis sungguhan;
+  roundtrip (kerangka), build, lalu stack Docker penuh naik (`api` healthy 177 dtk dengan cache dingin) dan `M00 smoke OK`.
+- **V3** — CI GitHub Actions hijau pada PR #1: 6 job (`lint`, `test`, `migrations`, `build`, `docker-smoke`, `contract-check`);
+  run `actions/runs/37163858143`. Ini juga membuktikan `internal/infra`, `cmd/api`, `cmd/worker` terkompilasi di runner bersih.
+
 **BELUM terbukti (syarat menutup M00 → `DONE`):**
-- **V1** — `make verify` pada clone bersih (filesystem Linux, bukan `/mnt/c`; tanpa `make setup` lebih dulu) berakhir **exit 0**.
-  (Log yang ada hanya menunjukkan ekor `M00 smoke OK`; kode keluar penuh belum terkonfirmasi.)
-- **V2** — `curl -i localhost:8080/health/ready` → `200` saat `make dev` berjalan, dan Ctrl-C tidak meninggalkan proses.
-- **V3** — CI GitHub Actions hijau pada PR pertama (repo belum ada di GitHub saat handover ini ditulis).
-  Versi aksi (`checkout@v4`, `setup-go@v5`, `setup-node@v4`) mengikuti docs/19 dan belum diperiksa masih terbaru.
+- **V2** — `make setup && make dev` secara native, `curl -i localhost:8080/health/ready` → `200`, dan Ctrl-C tanpa proses yatim.
+  Percobaan pertama (2026-10-04) gagal di `npm ci` dengan `EACCES` pada `apps/web/node_modules/.vite/...`:
+  **bug compose** — container `web` (root) menulis cache `.vite` ke working tree lewat bind-mount `.:/app`; hal yang sama
+  mengancam `tmp/` (air). Tak terlihat di `/mnt/c` (DrvFS tak menerapkan kepemilikan). Perbaikan: volume anonim
+  `/app/apps/web/node_modules` (web) dan `/app/tmp` (api, worker), plus `verify-smoke.sh` kini gagal bila tersisa berkas milik root.
+  Perbaikan ini belum dibuktikan di mesin pengembang; V2 harus diulang setelah `sudo chown -R "$USER":"$USER" .` dan `make verify` ulang.
 
 ## 4. Keputusan & penyimpangan
 ADR-0001 (stack, versi) · ADR-0004 (path modul `github.com/master-abror/zago-core`) · ADR-0002 (Go 1.26.5; PG/Redis tag mayor mengambang, teramati 18.6 / 8.10.2) ·
@@ -81,6 +89,7 @@ Prasyarat: Go 1.26.5, Node 24 (`nvm install`), Docker, `make`, dan `gcc` (hanya 
   (urutan sekarang: roundtrip dulu, `verify-smoke` terakhir; tak ada Postgres menyala di tahap roundtrip dan
   `verify-smoke` menolak jalan bila port 5432 terpakai) — mis. roundtrip lewat testcontainers.
 - Worker tak punya health endpoint sendiri; `docker-compose` hanya memantau prosesnya berjalan.
+- Setiap perubahan compose yang menambah jalur tulis ke bind-mount `.:/app` harus di-mask volume (lihat V2); `verify-smoke.sh` mendeteksi kebocoran berkas root.
 - Start pertama dengan cache modul dingin lambat (compose `start_period` 120 dtk); di `/mnt/c` Vite butuh ±36 dtk untuk siap.
 - Tag image PG/Redis mengambang (ADR-0002); Valkey belum diuji di CI (docs/20).
 - Lisensi proyek belum ditetapkan.

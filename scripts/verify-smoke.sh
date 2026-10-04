@@ -31,6 +31,18 @@ cleanup() {
   fi
   "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
   [ "$created_env" = "1" ] && rm -f .env
+
+  # Container berjalan sebagai root dengan bind-mount .:/app; bila ada jalur tulis yang tak di-mask
+  # volume, berkas milik root muncul di working tree dan merusak `npm ci`/`make dev` berikutnya.
+  if [ "$(id -u)" -ne 0 ]; then
+    leaked=$(find . -path ./.git -prune -o -user root -print 2>/dev/null | head -5)
+    if [ -n "$leaked" ]; then
+      echo "✗ container meninggalkan berkas milik root di repo (jalur tulis belum di-mask volume di docker-compose.yml):" >&2
+      echo "$leaked" | sed 's/^/    /' >&2
+      echo "  Perbaiki kepemilikan: sudo chown -R \"\$USER\":\"\$USER\" ." >&2
+      [ "$status" -ne 0 ] || status=1
+    fi
+  fi
   exit "$status"
 }
 trap cleanup EXIT
