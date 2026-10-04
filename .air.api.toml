@@ -1,0 +1,13 @@
+# Hot reload API (docs/15). Dijalankan: go tool air -c .air.api.toml
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/api ./backend/cmd/api"
+  bin = "./tmp/api"
+  include_ext = ["go"]
+  exclude_dir = ["tmp", "node_modules", "apps", "docs", "bin", "dist", "data"]
+  delay = 500
+  stop_on_error = true
+  send_interrupt = true
+  kill_delay = "5s"

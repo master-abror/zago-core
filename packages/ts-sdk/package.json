@@ -1,0 +1,9 @@
+{
+  "name": "@platform/ts-sdk",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "generate": "node -e \"console.log('ts-sdk: belum ada kontrak OpenAPI (dimulai M02, lihat docs/21)')\""
+  }
+}
