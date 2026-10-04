@@ -1,13 +1,13 @@
 # STATUS
 
-**Terakhir diperbarui:** 2026-10-03 oleh sesi M00
-**Milestone aktif:** M00 — Foundation & Tooling
-**Branch:** milestone/m00-foundation
-**Kesehatan `make verify`:** hijau (exit 0) pada klon bersih Linux, 2026-10-04; CI GitHub hijau (PR #1). Menunggu V2 (`make dev` native) setelah perbaikan kepemilikan berkas compose.
+**Terakhir diperbarui:** 2026-10-04 oleh sesi M00
+**Milestone aktif:** M01 — Database Schema (belum dimulai; M00 selesai)
+**Branch:** main (setelah merge PR #1); M01 memakai `milestone/m01-database-schema`
+**Kesehatan `make verify`:** hijau (exit 0) pada klon bersih Linux, 2026-10-04; `make dev` native terbukti (`/health/ready` 200, Ctrl-C tanpa proses yatim); CI GitHub hijau pada PR #1 (run awal `37163858143`; run pada head akhir adalah syarat merge).
 
 | M | Nama | Status | Tag | Handover |
 |---|---|---|---|---|
-| M00 | Foundation & Tooling | IN REVIEW (kode selesai; menunggu V1–V3) | – | handover/HANDOVER-M00.md |
+| M00 | Foundation & Tooling | DONE | m00-done | handover/HANDOVER-M00.md |
 | M01 | Database Schema | TODO | – | – |
 | M02 | Kernel (tx, outbox, audit, HTTP toolkit) | TODO | – | – |
 | M03 | Authentication | TODO | – | – |

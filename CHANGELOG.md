@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M00 — Foundation & Tooling
+## [M00] - 2026-10-04 — Foundation & Tooling
 
 #### Added
 - Monorepo: `backend/` (Go), `apps/web` (Svelte 5 runes + Vite + Vitest), npm workspaces, `packages/*`, `modules/`.

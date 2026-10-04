@@ -1,6 +1,6 @@
 # HANDOVER — M00 Foundation & Tooling
 
-**Tanggal:** 2026-10-03 · **Status:** IN REVIEW (kode selesai; 3 bukti penutup menunggu — lihat §3) · **Tag:** belum (`m00-done` setelah V1–V3)
+**Tanggal:** 2026-10-04 · **Status:** DONE (V1–V3 tercatat; merge ke `main` hanya setelah CI hijau pada head akhir) · **Tag:** `m00-done` (diberikan setelah merge)
 **Branch:** `milestone/m00-foundation` · **Handover sebelumnya:** `archive/HANDOVER-M00-partial-1.md`
 
 ## 1. Ringkasan
@@ -41,13 +41,18 @@ Tidak ada fitur bisnis, tidak ada migrasi, tidak ada endpoint selain `/health*` 
 - **V3** — CI GitHub Actions hijau pada PR #1: 6 job (`lint`, `test`, `migrations`, `build`, `docker-smoke`, `contract-check`);
   run `actions/runs/37163858143`. Ini juga membuktikan `internal/infra`, `cmd/api`, `cmd/worker` terkompilasi di runner bersih.
 
-**BELUM terbukti (syarat menutup M00 → `DONE`):**
-- **V2** — `make setup && make dev` secara native, `curl -i localhost:8080/health/ready` → `200`, dan Ctrl-C tanpa proses yatim.
-  Percobaan pertama (2026-10-04) gagal di `npm ci` dengan `EACCES` pada `apps/web/node_modules/.vite/...`:
-  **bug compose** — container `web` (root) menulis cache `.vite` ke working tree lewat bind-mount `.:/app`; hal yang sama
-  mengancam `tmp/` (air). Tak terlihat di `/mnt/c` (DrvFS tak menerapkan kepemilikan). Perbaikan: volume anonim
-  `/app/apps/web/node_modules` (web) dan `/app/tmp` (api, worker), plus `verify-smoke.sh` kini gagal bila tersisa berkas milik root.
-  Perbaikan ini belum dibuktikan di mesin pengembang; V2 harus diulang setelah `sudo chown -R "$USER":"$USER" .` dan `make verify` ulang.
+- **V2** — jalur native (2026-10-04, WSL2, repo di filesystem Linux): `make setup && make dev` → worker, api (air), dan Vite berjalan
+  dalam satu terminal; `curl -i localhost:8080/health/ready` → **`HTTP/1.1 200 OK`**, badan `{"status":"ok","checks":{"postgres":"ok","redis":"ok"}}`
+  (header keamanan dan `X-Request-Id` UUIDv7 hadir); `curl localhost:5173/api/x` → `{"error":{"code":"not_found"}}` (proxy Vite → API);
+  `tmp/` milik pengguna, bukan root. **Ctrl-C** → log `shutdown dimulai` (worker dan api), `api stopped`, dependensi ditutup terbalik dari urutan dibuka,
+  `make dev` keluar dengan kode 130, dan `ps aux | grep -E 'tmp/(api|worker)|vite'` **kosong** (tanpa proses yatim).
+  Bug yang ditemukan lewat V2 dan diperbaiki: container menulis berkas milik root ke working tree (`EACCES` pada `npm ci`); perbaikan = volume
+  anonim `/app/apps/web/node_modules`, `/app/tmp`, dan `verify-smoke.sh` gagal bila tersisa berkas milik root. `make verify` sesudah perbaikan: `exit=0`,
+  `find . -user root` kosong. Penjaga `node_modules` di `verify` juga diperkuat (`.package-lock.json`).
+
+**Syarat merge (dicek manual di PR #1):** V3 di atas diperoleh pada commit awal. Sesudahnya ada tiga commit perbaikan yang menyentuh compose
+(dipakai job `docker-smoke`), jadi **run CI pada head akhir harus hijau (6 job) sebelum PR digabung**. Merge dengan "Create a merge commit"
+(bukan Squash) agar commit kecil tetap tercatat; beri tag `m00-done` pada `main` setelahnya.
 
 ## 4. Keputusan & penyimpangan
 ADR-0001 (stack, versi) · ADR-0004 (path modul `github.com/master-abror/zago-core`) · ADR-0002 (Go 1.26.5; PG/Redis tag mayor mengambang, teramati 18.6 / 8.10.2) ·
@@ -99,6 +104,6 @@ Prasyarat: Go 1.26.5, Node 24 (`nvm install`), Docker, `make`, dan `gcc` (hanya 
 - Lisensi proyek (belum ditetapkan).
 
 ## 10. Langkah pertama berikutnya
-1. Pastikan V1–V3 (§3) tercatat hijau, lalu perbarui `docs/STATUS.md` (M00 → DONE, tag `m00-done`) dan hapus "IN REVIEW" di handover ini.
-2. M01 — Database Schema: buka `docs/21` bagian M01 dan hanya dokumen yang tercantum di "Baca:"-nya (docs/04 dan terkait).
+1. Pastikan PR #1 sudah digabung (merge commit) dengan CI hijau, lalu `git tag m00-done` pada `main`.
+2. M01 — Database Schema: buka `docs/21` bagian M01 dan hanya dokumen yang tercantum di "Baca:"-nya (docs/04 dan terkait). Cabang: `milestone/m01-database-schema`.
 3. Putuskan item `migrate-roundtrip` (§8) sebagai ADR di awal M01.
