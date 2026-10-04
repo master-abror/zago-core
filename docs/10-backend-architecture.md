@@ -318,6 +318,8 @@ type Config struct {
 
 A missing or invalid required value fails the process **before** it binds a port or accepts a connection — never a partially-configured process serving traffic with a nil dependency waiting to panic on the first request that needs it. Additional cross-field rules: `CookieSecure=false` or a non-HTTPS `PublicBaseURL` is rejected when `ENVIRONMENT=production`; `MaintenanceDatabaseURL` is required by the worker; `SessionSecret` shorter than 32 bytes is rejected. Configuration values are never logged.
 
+**Implementation note (ADR-0003):** one `Config` struct serves all three binaries, but *which* variables are required depends on the binary's role (`api`, `worker`, `migrate`), so the `required` struct tag is not used; `Validate(role)` collects every problem at once. `cmd/migrate` needs only `MIGRATION_DATABASE_URL` (scheme `pgx5://`); `cmd/worker` additionally needs `MAINTENANCE_DATABASE_URL`. Error messages name variables, never values.
+
 ---
 
 # 9. Error Handling

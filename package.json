@@ -1,0 +1,8 @@
+{
+  "name": "platform",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Open Source Modular Application Platform (monorepo root, npm workspaces)",
+  "engines": { "node": ">=24" },
+  "workspaces": ["apps/web", "packages/ts-sdk", "packages/ui"]
+}

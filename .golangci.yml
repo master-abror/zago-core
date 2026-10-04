@@ -1,0 +1,13 @@
+# golangci-lint v2 (dipatok lewat `tool` directive di go.mod, jalankan: go tool golangci-lint run ./...)
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
