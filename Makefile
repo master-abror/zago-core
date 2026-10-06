@@ -20,7 +20,7 @@ GO_TOOL_PACKAGES := \
 
 .PHONY: help setup install tools tools-pin infra-up dev run-api run-worker frontend \
 	test test-backend test-frontend test-e2e lint format generate modules-sync \
-	migrate-up migrate-down migrate-roundtrip db-test bootstrap-admin \
+	migrate-up migrate-down migrate-version db-seed migrate-roundtrip db-test bootstrap-admin \
 	build docker-up docker-down docker-build smoke verify clean \
 	module-create handover-pack repo-zip
 
@@ -71,8 +71,8 @@ test:            ## Seluruh tes: backend (core + module-sdk + semua modul) dan f
 	$(MAKE) test-backend
 	$(MAKE) test-frontend
 
-test-backend:    ## Tes Go unit + integrasi (butuh Docker untuk testcontainers)
-	go test ./... -race -count=1
+test-backend:    ## Tes Go unit + integrasi (butuh Docker untuk testcontainers; REQUIRE_DOCKER=1 = tanpa Docker GAGAL, bukan skip)
+	REQUIRE_DOCKER=1 go test ./... -race -count=1
 
 test-frontend:   ## Tes komponen/logika frontend
 	npm test -w apps/web
@@ -108,15 +108,17 @@ migrate-up:      ## Terapkan semua migrasi inti yang tertunda (MIGRATION_DATABAS
 migrate-down:    ## Mundurkan SATU migrasi inti
 	go run ./backend/cmd/migrate down 1
 
-migrate-roundtrip: ## up -> down(semua) -> up pada database SEMENTARA (dibuat & dihapus sendiri)
-	go run ./backend/cmd/migrate roundtrip
+migrate-version: ## Tampilkan versi migrasi terpasang (MIGRATION_DATABASE_URL)
+	go run ./backend/cmd/migrate version
 
-db-test:         ## Tes constraint/trigger/grant skema (docs/04 §17; mulai M01)
-	@if find backend/migrations -name '*_test.go' 2>/dev/null | grep -q .; then \
-		go test ./backend/migrations/... -count=1; \
-	else \
-		echo "db-test: dilewati (belum ada tes skema di backend/migrations; dimulai M01, docs/21)"; \
-	fi
+db-seed:         ## Pastikan baris platform ada (idempoten; docs/04 §16)
+	go run ./backend/cmd/migrate seed
+
+migrate-roundtrip: ## up -> down(semua) -> up pada database SEMENTARA di PostgreSQL SEMENTARA (Docker; ADR-0005)
+	bash ./scripts/migrate-roundtrip.sh
+
+db-test:         ## Tes constraint/trigger/cascade/grant skema + seeder (docs/04 §17; butuh Docker)
+	REQUIRE_DOCKER=1 go test ./backend/migrations/... -race -count=1
 
 bootstrap-admin: ## Buat Super Admin pertama: make bootstrap-admin EMAIL=you@example.org (mulai M03)
 	@test -n "$(EMAIL)" || (echo "usage: make bootstrap-admin EMAIL=<email>" && exit 1)
