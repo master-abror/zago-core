@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 
 [build]
   cmd = "go build -o ./tmp/worker ./backend/cmd/worker"
-  bin = "./tmp/worker"
+  entrypoint = ["./tmp/worker"]
   include_ext = ["go"]
   exclude_dir = ["tmp", "node_modules", "apps", "docs", "bin", "dist", "data"]
   delay = 500
