@@ -41,6 +41,9 @@ Semua stack di Docker: `make docker-up` / `make docker-down`.
 | `make verify` | **Gerbang tunggal**: lint + tes + migrate-roundtrip + build + smoke pada stack Docker sementara. Harus hijau sebelum merge. |
 | `make lint` / `make test` | lint Go + frontend + pemeriksaan struktural / tes backend (`-race`, testcontainers) + frontend |
 | `make generate` | regenerasi OpenAPI, SDK TS, kode sqlc, registri modul (bertahap per milestone) |
+| `make migrate-up` / `migrate-down` / `migrate-version` | terapkan / mundurkan satu / tampilkan versi migrasi inti (`MIGRATION_DATABASE_URL`) |
+| `make db-seed` | pastikan baris platform ada (idempoten) |
+| `make migrate-roundtrip` / `make db-test` | up→down→up pada PostgreSQL sementara / tes constraint, trigger, cascade, grant skema (butuh Docker). Skema: [docs/erd.md](docs/erd.md) |
 | `make infra-up` | hanya datastore, untuk pengembangan native |
 | `make clean` | hapus artefak **dan volume data** (destruktif) |
 
