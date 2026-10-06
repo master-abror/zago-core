@@ -278,24 +278,85 @@ func migrateEnv() map[string]string {
 	return map[string]string{"MIGRATION_DATABASE_URL": "pgx5://app_migrator:SECRET-MG-PW@localhost:5432/platform"}
 }
 
-func TestMigrateSkeleton(t *testing.T) {
-	for _, args := range [][]string{{"up"}, {"roundtrip"}, {"down", "1"}} {
+// fakeRunner mencatat panggilan dan mengembalikan hasil yang diatur tes (tanpa PostgreSQL).
+type fakeRunner struct {
+	calls   []string
+	err     error
+	version uint
+	dirty   bool
+	seed    app.SeedResult
+}
+
+func (f *fakeRunner) rec(s string) { f.calls = append(f.calls, s) }
+
+func (f *fakeRunner) Up(_ context.Context, url string) error { f.rec("up " + url); return f.err }
+func (f *fakeRunner) Down(_ context.Context, _ string, n int) error {
+	f.rec("down " + strconv.Itoa(n))
+	return f.err
+}
+func (f *fakeRunner) Version(_ context.Context, _ string) (uint, bool, error) {
+	f.rec("version")
+	return f.version, f.dirty, f.err
+}
+func (f *fakeRunner) Roundtrip(_ context.Context, _ string) error { f.rec("roundtrip"); return f.err }
+func (f *fakeRunner) Seed(_ context.Context, _ string) (app.SeedResult, error) {
+	f.rec("seed")
+	return f.seed, f.err
+}
+
+func TestMigrateDispatchesCommands(t *testing.T) {
+	cases := []struct {
+		args      []string
+		wantCalls []string
+		wantOut   string
+	}{
+		{[]string{"up"}, []string{"up pgx5://app_migrator:SECRET-MG-PW@localhost:5432/platform", "version"}, "versi 33"},
+		{[]string{"down", "2"}, []string{"down 2", "version"}, "migrate down 2"},
+		{[]string{"version"}, []string{"version"}, "versi 33 dirty=false"},
+		{[]string{"roundtrip"}, []string{"roundtrip"}, "roundtrip"},
+		{[]string{"seed"}, []string{"seed"}, "baris platform dibuat (id abc)"},
+	}
+	for _, c := range cases {
+		f := &fakeRunner{version: 33, seed: app.SeedResult{Created: true, ID: "abc"}}
 		var out, errb bytes.Buffer
-		code := app.Migrate(context.Background(), args, migrateEnv(), &out, &errb)
-		require.Equal(t, app.ExitOK, code, "%v: %s", args, errb.String())
-		require.Contains(t, out.String(), "tidak ada migrasi")
+		code := app.Migrate(context.Background(), c.args, migrateEnv(), f, &out, &errb)
+		require.Equal(t, app.ExitOK, code, "%v: %s", c.args, errb.String())
+		require.Equal(t, c.wantCalls, f.calls, "%v", c.args)
+		require.Contains(t, out.String(), c.wantOut)
+	}
+}
+
+func TestMigrateSeedReportsExistingRow(t *testing.T) {
+	f := &fakeRunner{seed: app.SeedResult{Created: false, ID: "abc"}}
+	var out, errb bytes.Buffer
+	require.Equal(t, app.ExitOK, app.Migrate(context.Background(), []string{"seed"}, migrateEnv(), f, &out, &errb))
+	require.Contains(t, out.String(), "sudah ada")
+}
+
+func TestMigrateReportsRuntimeFailureAsExitFailed(t *testing.T) {
+	for _, args := range [][]string{{"up"}, {"down", "1"}, {"version"}, {"roundtrip"}, {"seed"}} {
+		f := &fakeRunner{err: errors.New("boom")}
+		var out, errb bytes.Buffer
+		code := app.Migrate(context.Background(), args, migrateEnv(), f, &out, &errb)
+		require.Equal(t, app.ExitFailed, code, "%v", args)
+		require.Contains(t, errb.String(), "boom")
+		require.NotContains(t, errb.String(), "SECRET-MG-PW")
+		require.Empty(t, out.String())
 	}
 }
 
 func TestMigrateRejectsBadArguments(t *testing.T) {
 	cases := [][]string{
-		nil, {"sideways"}, {"down"}, {"down", "0"}, {"down", "-3"}, {"down", "abc"}, {"down", "1", "2"}, {"up", "extra"},
+		nil, {"sideways"}, {"down"}, {"down", "0"}, {"down", "-3"}, {"down", "abc"}, {"down", "1", "2"},
+		{"up", "extra"}, {"version", "x"}, {"roundtrip", "x"}, {"seed", "x"},
 	}
 	for _, args := range cases {
+		f := &fakeRunner{}
 		var out, errb bytes.Buffer
-		code := app.Migrate(context.Background(), args, migrateEnv(), &out, &errb)
+		code := app.Migrate(context.Background(), args, migrateEnv(), f, &out, &errb)
 		require.Equal(t, app.ExitConfig, code, "%v", args)
 		require.NotEmpty(t, errb.String())
+		require.Empty(t, f.calls, "argumen buruk tak boleh menyentuh database: %v", args)
 	}
 }
 
@@ -304,12 +365,14 @@ func TestMigrateFailsFastWithoutOrWithWrongMigrationURL(t *testing.T) {
 		{},
 		{"MIGRATION_DATABASE_URL": "postgres://app_migrator:SECRET-MG-PW@localhost:5432/platform"}, // skema bukan pgx5
 	} {
+		f := &fakeRunner{}
 		var out, errb bytes.Buffer
-		code := app.Migrate(context.Background(), []string{"up"}, env, &out, &errb)
+		code := app.Migrate(context.Background(), []string{"up"}, env, f, &out, &errb)
 		require.Equal(t, app.ExitConfig, code)
 		require.Contains(t, errb.String(), "MIGRATION_DATABASE_URL")
 		require.NotContains(t, errb.String(), "SECRET-MG-PW")
 		require.Empty(t, out.String())
+		require.Empty(t, f.calls, "konfigurasi buruk tak boleh menyentuh database")
 	}
 }
 
