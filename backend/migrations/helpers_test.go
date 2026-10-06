@@ -20,6 +20,7 @@ const (
 	uniqueViolation = "23505"
 	checkViolation  = "23514"
 	fkViolation     = "23503"
+	restrictViol    = "23001" // PostgreSQL 18: ON DELETE RESTRICT; PostgreSQL <= 17 melaporkan 23503
 	raiseException  = "P0001"
 	noPrivilege     = "42501"
 )
@@ -51,6 +52,20 @@ func requireDB(t *testing.T, err error, code, constraint string) {
 	var pe *pgconn.PgError
 	require.True(t, errors.As(err, &pe), "bukan error PostgreSQL: %v", err)
 	require.Equal(t, code, pe.Code, "SQLSTATE: %s", pe.Message)
+	if constraint != "" {
+		require.Equal(t, constraint, pe.ConstraintName, pe.Message)
+	}
+}
+
+// requireRestricted menegaskan DELETE/UPDATE ditolak database oleh FK ber-aksi RESTRICT.
+// PostgreSQL 18 memakai SQLSTATE 23001 (restrict_violation); versi <= 17 memakai 23503. Proyek ini
+// memakai PG18 (ADR-0002); keduanya diterima agar tes tetap bermakna bila dijalankan di server lama.
+func requireRestricted(t *testing.T, err error, constraint string) {
+	t.Helper()
+	require.Error(t, err)
+	var pe *pgconn.PgError
+	require.True(t, errors.As(err, &pe), "bukan error PostgreSQL: %v", err)
+	require.Contains(t, []string{restrictViol, fkViolation}, pe.Code, "SQLSTATE: %s", pe.Message)
 	if constraint != "" {
 		require.Equal(t, constraint, pe.ConstraintName, pe.Message)
 	}

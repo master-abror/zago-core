@@ -368,18 +368,18 @@ func TestCascadesAndRestricts(t *testing.T) {
 		w := newWorld(t)
 		withGroup := w.org()
 		w.group(withGroup, nil)
-		requireDB(t, tryExec(w.p, `DELETE FROM organizations WHERE id = $1`, withGroup), fkViolation, "")
+		requireRestricted(t, tryExec(w.p, `DELETE FROM organizations WHERE id = $1`, withGroup), "")
 
 		withMember := w.org()
 		w.member(withMember, w.user())
-		requireDB(t, tryExec(w.p, `DELETE FROM organizations WHERE id = $1`, withMember), fkViolation, "")
+		requireRestricted(t, tryExec(w.p, `DELETE FROM organizations WHERE id = $1`, withMember), "")
 	})
 
 	t.Run("hapus user diblokir (RESTRICT) selama punya keanggotaan", func(t *testing.T) {
 		w := newWorld(t)
 		org, user := w.org(), w.user()
 		w.member(org, user)
-		requireDB(t, tryExec(w.p, `DELETE FROM users WHERE id = $1`, user), fkViolation, "")
+		requireRestricted(t, tryExec(w.p, `DELETE FROM users WHERE id = $1`, user), "")
 	})
 
 	t.Run("hapus grup: cascade ke group_memberships; diblokir selama role merujuknya", func(t *testing.T) {
@@ -395,12 +395,12 @@ func TestCascadesAndRestricts(t *testing.T) {
 
 		held := w.group(org, nil)
 		require.NoError(t, w.tryRole("held", "group", org, held))
-		requireDB(t, tryExec(w.p, `DELETE FROM groups WHERE id = $1`, held), fkViolation, "fk_roles_group")
+		requireRestricted(t, tryExec(w.p, `DELETE FROM groups WHERE id = $1`, held), "fk_roles_group")
 
 		// grup yang masih punya anak juga tak bisa dihapus
 		parent := w.group(org, nil)
 		w.group(org, parent)
-		requireDB(t, tryExec(w.p, `DELETE FROM groups WHERE id = $1`, parent), fkViolation, "")
+		requireRestricted(t, tryExec(w.p, `DELETE FROM groups WHERE id = $1`, parent), "")
 	})
 
 	t.Run("hapus grup: undangan ber-group_id ikut terhapus (ADR-0008)", func(t *testing.T) {
