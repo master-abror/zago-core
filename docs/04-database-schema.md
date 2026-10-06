@@ -973,11 +973,23 @@ REVOKE UPDATE, DELETE ON activities, security_events, system_logs FROM app_user;
 GRANT SELECT, DELETE ON activities, security_events, system_logs, outbox_events TO app_maintenance;
 GRANT UPDATE (actor_user_id, metadata)                            ON activities      TO app_maintenance;
 GRANT UPDATE (user_id, ip_address, user_agent, metadata)          ON security_events TO app_maintenance;
+
+-- ADR-0006: golang-migrate's version table is not application data. The runtime role may read it
+-- (schema version check) but never write it. Guarded: the table exists once golang-migrate has opened it.
+DO $$
+BEGIN
+    IF to_regclass('public.schema_migrations') IS NOT NULL THEN
+        REVOKE INSERT, UPDATE, DELETE ON public.schema_migrations FROM app_user;
+    END IF;
+END
+$$;
 ```
+
+The last block (ADR-0006) exists because golang-migrate creates its version table (`schema_migrations`) *before* migration 001, so `GRANT … ON ALL TABLES` would otherwise hand the runtime role write access to the schema version. `app_user` may read it, never write it.
 
 A bug that somehow tried to `UPDATE activities` as `app_user` fails in the database, not just in code review. The only sanctioned mutation — anonymization — is a separate code path on a separate connection pool (`MAINTENANCE_DATABASE_URL`).
 
-Because module tables are created by `app_migrator`, the default privileges give `app_user` DML on them without further work. A module that wants an append-only table adds its own `REVOKE` in its migration (17 §5).
+Because module tables are created by `app_migrator`, the default privileges give `app_user` DML on them without further work. A module that wants an append-only table adds its own `REVOKE` in its migration (17 §5). The same applies to the module's version table `schema_migrations_<module_code>` (§15.2): it is created after 033, so it receives the default DML grant — the module migration revokes `INSERT, UPDATE, DELETE` on it from `app_user` (ADR-0006; enforced when the module system lands, M07).
 
 ---
 
@@ -1027,7 +1039,7 @@ Each numbered step has a paired `.up.sql` / `.down.sql`. A module's own tables (
 
 # 15. Migration Tooling
 
-**golang-migrate used as a library** by `cmd/migrate` (the same binary runs locally, in CI and in Docker), with the pgx v5 driver. The connection URL scheme for that driver is `pgx5://…`. Plain `.sql` files, `up`/`down`/`version`/`roundtrip` subcommands, no ORM DSL — consistent with "the database is the source of truth".
+**golang-migrate used as a library** by `cmd/migrate` (the same binary runs locally, in CI and in Docker), with the pgx v5 driver. The connection URL scheme for that driver is `pgx5://…`. Plain `.sql` files (embedded into the binary with `go:embed`, `backend/migrations/embed.go`), `up`/`down N`/`version`/`roundtrip`/`seed` subcommands, no ORM DSL — consistent with "the database is the source of truth".
 
 ```text
 backend/migrations/
@@ -1041,7 +1053,7 @@ backend/migrations/
 
 ## 15.1 Rollback strategy
 
-Every `.down.sql` reverses its `.up.sql` in opposite dependency order — e.g. `010_module_installations.down.sql` is `DROP TABLE module_installations;`, and a migration that added a constraint via `ALTER TABLE` (like `026`'s `last_read_message_id` wiring) drops that constraint before the referenced table is dropped further down the chain. `033_grants.down.sql` revokes what it granted. The CI job `make migrate-roundtrip` (up → down → up) runs against a throwaway database on every migration change (19 §5).
+Every `.down.sql` reverses its `.up.sql` in opposite dependency order — e.g. `010_module_installations.down.sql` is `DROP TABLE module_installations;`, and a migration that added a constraint via `ALTER TABLE` (like `026`'s `last_read_message_id` wiring) drops that constraint before the referenced table is dropped further down the chain. `033_grants.down.sql` revokes what it granted. The CI job `make migrate-roundtrip` (up → down → up) runs against a throwaway database inside a throwaway PostgreSQL container (ADR-0005) on every migration change (19 §5), and fails if any table or function is left in `public` after the full down (the version table excepted). `down` at version 0 is a successful no-op.
 
 ## 15.2 Module migrations
 
@@ -1105,11 +1117,14 @@ Triggers
   groups.organization_id cannot be changed
 
 Cascades
-  deleting an organization cascades to its groups, memberships, roles, role_assignments,
-    module_installations, conversations, invitations — never to the `users` rows themselves
-    (ON DELETE RESTRICT on users everywhere); activities/security_events/outbox rows are unaffected
-  deleting a group cascades to group_memberships but is blocked while roles or
-    role_assignments still reference it (RESTRICT)
+  deleting an organization cascades to its roles, role_assignments, module_installations,
+    conversations, invitations — never to the `users` rows themselves (ON DELETE RESTRICT on
+    users everywhere); it is BLOCKED (RESTRICT) while groups or organization_memberships still
+    exist (soft delete is the normal path, 02 §36); activities/security_events/outbox rows are unaffected
+  deleting a group cascades to group_memberships and to invitations bound to it, and is blocked
+    (RESTRICT) while roles.group_id or a child group still reference it; role_assignments with
+    scope_type='group' are NOT blocked by the database (polymorphic scope_id) — the application
+    revokes them (ADR-0008)
 
 Grants
   app_user cannot UPDATE or DELETE a row in activities, security_events, or system_logs
@@ -1120,6 +1135,8 @@ Grants
 
 Migrations
   every .down.sql successfully reverses its .up.sql on a throwaway database
-    (make migrate-roundtrip: up → down → up)
+    (make migrate-roundtrip: up → down → up; nothing left in `public` after the full down)
+  app_user can read but not write the golang-migrate version table (schema_migrations)
+  docs/erd.md is generated from the migrated schema and must match it (UPDATE_ERD=1 make db-test)
   the bootstrap/seed path is idempotent — running it twice produces no duplicate rows
 ```

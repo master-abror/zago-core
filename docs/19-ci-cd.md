@@ -73,23 +73,14 @@ jobs:
       - run: make test
 
   migrations:
-    # up → down → up on a throwaway database; also runs the schema constraint/trigger/grant suite
+    # up → down → up on a throwaway database inside a throwaway PostgreSQL container (same script as local,
+    # ADR-0005); also runs the schema constraint/trigger/cascade/grant suite (testcontainers, PostgreSQL 18)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18
-        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: platform }
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with: { go-version-file: go.mod }
-      - run: psql "postgres://postgres:postgres@localhost:5432/platform" -f deploy/db/init/00-roles.sql   # CI passwords supplied via psql variables
       - run: make migrate-roundtrip
-        env:
-          MIGRATION_DATABASE_URL: pgx5://app_migrator:migrator_dev_pw@localhost:5432/platform
       - run: make db-test
 
   build:
@@ -182,7 +173,7 @@ A known-vulnerable dependency introduced by a PR fails that PR's checks (12 §8)
 
 # 5. Migration Rollback Verification
 
-Referenced as a requirement in 04 §15.1; the CI job is `migrations` in §3: it applies the roles script, then runs `make migrate-roundtrip` (up → down → up) and the schema suite (`make db-test`).
+Referenced as a requirement in 04 §15.1; the CI job is `migrations` in §3: `make migrate-roundtrip` starts a throwaway PostgreSQL container with the roles script (`deploy/db/init/*.sql`) and runs up → down → up against a throwaway database in it (ADR-0005), then the schema suite (`make db-test`).
 
 Running unconditionally keeps the job simple; a path filter (`backend/migrations/**`, `deploy/db/**`) may be added later as an optimization if the job becomes slow — never at the cost of skipping it on a migration change.
 
