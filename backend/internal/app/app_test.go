@@ -114,6 +114,15 @@ func TestAPIWithEmptyEnvironmentExitsWithConfigError(t *testing.T) {
 	require.NotEmpty(t, stderr.String())
 }
 
+// testClient TIDAK memakai keep-alive. http.Transport bawaan kadang membuka koneksi cadangan
+// (dial race) yang masuk pool tanpa pernah dipakai; di sisi server koneksi baru tanpa request itu
+// baru dianggap idle setelah 5 dtk, sehingga Server.Shutdown tertahan melewati batas tunggu tes
+// (diukur: 9 dari 30 percobaan gagal di bawah -race sebelum perbaikan ini).
+var testClient = &http.Client{
+	Transport: &http.Transport{DisableKeepAlives: true},
+	Timeout:   5 * time.Second,
+}
+
 func startAPI(t *testing.T, deps *fakeDeps) (base string, stop func() int) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -127,7 +136,7 @@ func startAPI(t *testing.T, deps *fakeDeps) (base string, stop func() int) {
 
 	base = "http://" + ln.Addr().String()
 	require.Eventually(t, func() bool {
-		resp, err := http.Get(base + "/health")
+		resp, err := testClient.Get(base + "/health")
 		if err != nil {
 			return false
 		}
@@ -149,7 +158,7 @@ func startAPI(t *testing.T, deps *fakeDeps) (base string, stop func() int) {
 
 func status(t *testing.T, url string) int {
 	t.Helper()
-	resp, err := http.Get(url)
+	resp, err := testClient.Get(url)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.Copy(io.Discard, resp.Body)
