@@ -42,26 +42,14 @@ jobs:
       - run: make test
 
   migrations:
-    # up → down → up pada database sementara; juga menjalankan suite constraint/trigger/grant skema
+    # up → down → up pada PostgreSQL sementara (skrip yang sama dengan lokal, ADR-0005) + suite skema
+    # (constraint/trigger/cascade/grant/seeder; testcontainers PostgreSQL 18). Tanpa Docker tes GAGAL.
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18
-        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: platform }
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with: { go-version-file: go.mod }
-      # 00-roles.sql = role aplikasi; 01-dev-privileges.sql = CREATEDB untuk roundtrip (ADR-0003)
-      - run: |
-          psql "postgres://postgres:postgres@localhost:5432/platform" -v ON_ERROR_STOP=1 \
-            -f deploy/db/init/00-roles.sql -f deploy/db/init/01-dev-privileges.sql
       - run: make migrate-roundtrip
-        env:
-          MIGRATION_DATABASE_URL: pgx5://app_migrator:migrator_dev_pw@localhost:5432/platform
       - run: make db-test
 
   build:
