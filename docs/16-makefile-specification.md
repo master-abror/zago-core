@@ -119,11 +119,17 @@ migrate-up:      ## Apply all pending core migrations (MIGRATION_DATABASE_URL)
 migrate-down:    ## Roll back ONE core migration
 	go run ./backend/cmd/migrate down 1
 
-migrate-roundtrip: ## up → down(all) → up, on a throwaway database; used by CI
-	go run ./backend/cmd/migrate roundtrip
+migrate-version: ## Show the installed migration version
+	go run ./backend/cmd/migrate version
 
-db-test:         ## Schema constraint/trigger/grant tests (04 §17)
-	go test ./backend/migrations/... -count=1
+db-seed:         ## Ensure the platform row exists (idempotent, 04 §16)
+	go run ./backend/cmd/migrate seed
+
+migrate-roundtrip: ## up → down(all) → up on a throwaway database in a throwaway PostgreSQL container (ADR-0005); used by CI
+	bash ./scripts/migrate-roundtrip.sh
+
+db-test:         ## Schema constraint/trigger/cascade/grant + seeder tests (04 §17); needs Docker, fails (not skips) without it
+	REQUIRE_DOCKER=1 go test ./backend/migrations/... -race -count=1
 
 bootstrap-admin: ## Create the first Super Admin: make bootstrap-admin EMAIL=you@example.org
 	@test -n "$(EMAIL)" || (echo "usage: make bootstrap-admin EMAIL=<email>" && exit 1)
