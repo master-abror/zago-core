@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/caarlos0/env/v11"
 
@@ -34,6 +35,11 @@ type Config struct {
 	MaintenanceDatabaseURL string `env:"MAINTENANCE_DATABASE_URL"` // role app_maintenance (worker)
 	MigrationDatabaseURL   string `env:"MIGRATION_DATABASE_URL"`   // role app_migrator (cmd/migrate)
 	RedisURL               string `env:"REDIS_URL"`
+
+	// pool PostgreSQL (docs/10 §6, M02). Batas statement berlaku di sisi server untuk SETIAP query.
+	DBMaxConns            int           `env:"DB_MAX_CONNS" envDefault:"10"`
+	DBMaintenanceMaxConns int           `env:"DB_MAINTENANCE_MAX_CONNS" envDefault:"2"`
+	DBStatementTimeout    time.Duration `env:"DB_STATEMENT_TIMEOUT" envDefault:"15s"`
 
 	// security
 	SessionSecret    string   `env:"SESSION_SECRET"` // ≥ 32 byte
@@ -165,6 +171,16 @@ func (c *Config) validateRuntime(role Role) []string {
 			p = append(p, "TRUSTED_PROXIES harus berisi daftar CIDR atau alamat IP yang valid")
 			break
 		}
+	}
+
+	if c.DBMaxConns < 1 || c.DBMaxConns > 200 {
+		p = append(p, "DB_MAX_CONNS harus 1–200")
+	}
+	if c.DBMaintenanceMaxConns < 1 || c.DBMaintenanceMaxConns > 50 {
+		p = append(p, "DB_MAINTENANCE_MAX_CONNS harus 1–50")
+	}
+	if c.DBStatementTimeout < 100*time.Millisecond || c.DBStatementTimeout > 10*time.Minute {
+		p = append(p, "DB_STATEMENT_TIMEOUT harus antara 100ms dan 10m")
 	}
 
 	p = append(p, checkURL("PUBLIC_BASE_URL", c.PublicBaseURL, "http", "https")...)
