@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M01 — Database Schema (dalam peninjauan: menunggu `make verify`/CI hijau pada hasil akhir)
+### M01 — Database Schema (2026-10-07; PR #2, tag `m01-done`)
 
 #### Added
 - Migrasi inti 001–033 (`backend/migrations`, disematkan ke binary): fungsi umum + `attach_updated_at`, platform, organisasi,

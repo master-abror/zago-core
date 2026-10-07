@@ -1,14 +1,14 @@
 # STATUS
 
-**Terakhir diperbarui:** 2026-10-05 oleh sesi M01
-**Milestone aktif:** M01 — Database Schema (IN PROGRESS: kode, tes, ADR, doc-sync, ERD selesai; menunggu `make verify` dan CI hijau pada hasil akhir)
-**Branch:** `milestone/m01-database-schema` (basis: tag `m00-done`)
-**Kesehatan `make verify`:** M00: hijau (2026-10-04). M01: BELUM dijalankan pada hasil akhir; di sandbox terbukti hanya tes skema/seeder/CLI pada PostgreSQL 16 lokal (bukan PG18/testcontainers) — lihat handover M01 setelah verify hijau.
+**Terakhir diperbarui:** 2026-10-07 oleh sesi M01
+**Milestone aktif:** M02 — Kernel (belum dimulai; M01 selesai dan digabung lewat PR #2)
+**Branch:** `main` (tag `m01-done`); M02 memakai `milestone/m02-kernel`
+**Kesehatan `make verify`:** hijau pada hasil akhir M01, 2026-10-07 (WSL2 + Docker Desktop, PostgreSQL 18 via testcontainers; `M00 smoke OK`); exit criterion M01 pada DB dev lulus. CI GitHub PR #2 hijau pada semua job.
 
 | M | Nama | Status | Tag | Handover |
 |---|---|---|---|---|
 | M00 | Foundation & Tooling | DONE | m00-done | handover/HANDOVER-M00.md |
-| M01 | Database Schema | IN PROGRESS | – | – |
+| M01 | Database Schema | DONE | m01-done | handover/HANDOVER-M01.md |
 | M02 | Kernel (tx, outbox, audit, HTTP toolkit) | TODO | – | – |
 | M03 | Authentication | TODO | – | – |
 | M04 | Authorization | TODO | – | – |
