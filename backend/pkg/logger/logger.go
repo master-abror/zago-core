@@ -24,6 +24,20 @@ func RequestID(ctx context.Context) string {
 	return v
 }
 
+type traceKey struct{}
+
+// WithTraceID menyimpan trace id pada context; setiap log yang memakai context itu menyertakan
+// atribut "trace_id" (docs/14 §3, §6).
+func WithTraceID(ctx context.Context, traceID string) context.Context {
+	return context.WithValue(ctx, traceKey{}, traceID)
+}
+
+// TraceID mengembalikan trace id pada context, atau "" bila tidak ada.
+func TraceID(ctx context.Context) string {
+	v, _ := ctx.Value(traceKey{}).(string)
+	return v
+}
+
 // ParseLevel mengubah "debug|info|warn|error" (tak peka huruf besar/kecil) menjadi slog.Level.
 func ParseLevel(s string) (slog.Level, error) {
 	switch strings.ToLower(strings.TrimSpace(s)) {
@@ -54,6 +68,9 @@ type contextHandler struct {
 func (h contextHandler) Handle(ctx context.Context, r slog.Record) error {
 	if rid := RequestID(ctx); rid != "" {
 		r.AddAttrs(slog.String("request_id", rid))
+	}
+	if tid := TraceID(ctx); tid != "" {
+		r.AddAttrs(slog.String("trace_id", tid))
 	}
 	return h.Handler.Handle(ctx, r)
 }

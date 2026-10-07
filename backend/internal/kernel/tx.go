@@ -84,6 +84,12 @@ func stateFrom(ctx context.Context) *txState {
 	return st
 }
 
+// DetachTx mengembalikan ctx tanpa transaksi (nilai lain tetap). Dipakai untuk pekerjaan yang
+// berjalan SETELAH commit: transaksi pada ctx asal sudah selesai dan tidak boleh dipakai lagi.
+func DetachTx(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxKeyTx, (*txState)(nil))
+}
+
 // InTx melaporkan apakah ctx membawa transaksi yang sedang terbuka.
 func InTx(ctx context.Context) bool { return stateFrom(ctx) != nil }
 

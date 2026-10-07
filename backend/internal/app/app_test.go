@@ -41,6 +41,7 @@ type fakeDeps struct {
 	redisErr error
 	pgCheck  func(context.Context) error
 	redisChk func(context.Context) error
+	specs    []app.PostgresSpec
 }
 
 func (f *fakeDeps) res(name string, check func(context.Context) error) app.Resource {
@@ -57,11 +58,14 @@ func (f *fakeDeps) res(name string, check func(context.Context) error) app.Resou
 	}}
 }
 
-func (f *fakeDeps) Postgres(_ context.Context, name, _ string) (app.Resource, error) {
+func (f *fakeDeps) Postgres(_ context.Context, spec app.PostgresSpec) (app.Resource, error) {
 	if f.pgErr != nil {
 		return app.Resource{}, f.pgErr
 	}
-	return f.res(name, f.pgCheck), nil
+	f.mu.Lock()
+	f.specs = append(f.specs, spec)
+	f.mu.Unlock()
+	return f.res(spec.Name, f.pgCheck), nil
 }
 
 func (f *fakeDeps) Redis(_ context.Context, name, _ string) (app.Resource, error) {
@@ -379,4 +383,34 @@ func TestMigrateFailsFastWithoutOrWithWrongMigrationURL(t *testing.T) {
 func TestEnvMap(t *testing.T) {
 	m := app.EnvMap([]string{"A=1", "B=x=y", "BROKEN", "C="})
 	require.Equal(t, map[string]string{"A": "1", "B": "x=y", "C": ""}, m)
+}
+
+// ---------- Spesifikasi pool dari konfigurasi ----------
+
+func TestWorkerOpensPoolsWithSizesAndStatementTimeoutFromConfig(t *testing.T) {
+	env := devEnv()
+	env["DB_MAX_CONNS"] = "7"
+	env["DB_MAINTENANCE_MAX_CONNS"] = "3"
+	env["DB_STATEMENT_TIMEOUT"] = "4s"
+
+	deps := &fakeDeps{}
+	ctx, cancel := context.WithCancel(context.Background())
+	codeCh := make(chan int, 1)
+	var stderr bytes.Buffer
+	go func() { codeCh <- app.RunWorker(ctx, env, deps, &stderr) }()
+
+	require.Eventually(t, func() bool { o, _ := deps.snapshot(); return len(o) == 3 }, 2*time.Second, 10*time.Millisecond)
+	cancel()
+	require.Equal(t, app.ExitOK, <-codeCh)
+
+	deps.mu.Lock()
+	defer deps.mu.Unlock()
+	require.Len(t, deps.specs, 2)
+	require.Equal(t, "postgres", deps.specs[0].Name)
+	require.EqualValues(t, 7, deps.specs[0].MaxConns)
+	require.Equal(t, 4*time.Second, deps.specs[0].StatementTimeout)
+	require.Equal(t, "postgres_maintenance", deps.specs[1].Name)
+	require.EqualValues(t, 3, deps.specs[1].MaxConns)
+	require.Contains(t, deps.specs[0].URL, "app_user")
+	require.Contains(t, deps.specs[1].URL, "app_maintenance")
 }
