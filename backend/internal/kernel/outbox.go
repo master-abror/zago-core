@@ -71,8 +71,8 @@ func (b *Bus) Publish(ctx context.Context, event modulesdk.Event) {
 		return
 	}
 	_, err = DBFrom(ctx, b.db).Exec(ctx, insertOutboxSQL,
-		ev.ID.String(), nullUUID(ev.OrganizationID), ev.Name, nullString(ev.AggregateType),
-		nullUUID(ev.AggregateID), string(ev.Payload), nullString(ev.RequestID), nullString(ev.TraceID))
+		ev.ID.String(), NullUUID(ev.OrganizationID), ev.Name, NullString(ev.AggregateType),
+		NullUUID(ev.AggregateID), string(ev.Payload), NullString(ev.RequestID), NullString(ev.TraceID))
 	if err != nil {
 		b.publishFailed(ctx, ev.Name, fmt.Errorf("tulis outbox: %w", err))
 		return
@@ -136,16 +136,16 @@ func prepareEvent(ctx context.Context, ev modulesdk.Event) (modulesdk.Event, err
 	return ev, nil
 }
 
-// nullUUID mengubah uuid.Nil menjadi NULL SQL; selain itu teks UUID.
-func nullUUID(u uuid.UUID) any {
+// NullUUID mengubah uuid.Nil menjadi NULL SQL; selain itu teks UUID. Untuk argumen kolom uuid yang nullable.
+func NullUUID(u uuid.UUID) any {
 	if u == uuid.Nil {
 		return nil
 	}
 	return u.String()
 }
 
-// nullString mengubah string kosong menjadi NULL SQL.
-func nullString(s string) any {
+// NullString mengubah string kosong menjadi NULL SQL. Untuk argumen kolom teks yang nullable.
+func NullString(s string) any {
 	if s == "" {
 		return nil
 	}

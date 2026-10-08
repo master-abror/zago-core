@@ -25,6 +25,9 @@ type ctxKey int
 // Seluruh kunci context kernel didefinisikan di satu tempat (docs/10 §10). Tambahkan di AKHIR.
 const (
 	ctxKeyTx ctxKey = iota
+	ctxKeyActor
+	ctxKeyScope
+	ctxKeyClient
 )
 
 // DBTX adalah himpunan kecil operasi query yang dipenuhi pgxpool.Pool maupun pgx.Tx, sehingga

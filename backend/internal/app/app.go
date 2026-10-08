@@ -17,6 +17,7 @@ import (
 	"github.com/master-abror/zago-core/backend/internal/health"
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
+	"github.com/master-abror/zago-core/backend/internal/systemlog"
 	"github.com/master-abror/zago-core/backend/pkg/config"
 	"github.com/master-abror/zago-core/backend/pkg/logger"
 )
@@ -182,7 +183,8 @@ func RunWorker(ctx context.Context, env map[string]string, deps Dependencies, st
 
 	var relayDone sync.WaitGroup
 	if appPool != nil {
-		relay := kernel.NewRelay(appPool, log, kernel.RelayConfig{})
+		sysLog := systemlog.New(appPool, log, "worker", cfg.Environment)
+		relay := kernel.NewRelay(appPool, log, kernel.RelayConfig{OnDead: systemlog.RelayOnDead(sysLog)})
 		relayDone.Add(1)
 		go func() {
 			defer relayDone.Done()
