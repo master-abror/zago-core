@@ -1,7 +1,7 @@
 # STATUS
 
 **Terakhir diperbarui:** 2026-10-08 oleh sesi M02
-**Milestone aktif:** M02 — Kernel — IN PROGRESS (T6 testkit + T1 pool/TxManager terbukti hijau; T2 outbox/relay/EventBus terbukti hijau; T3 audit/system log/redaksi ditulis, belum terbukti)
+**Milestone aktif:** M02 — Kernel — IN PROGRESS (T6 testkit + T1 pool/TxManager terbukti hijau; T2 outbox/relay/EventBus terbukti hijau; T3 audit/system log/redaksi terbukti hijau; berikutnya T4 HTTP toolkit, lalu T5; `make verify` penuh belum dijalankan setelah perubahan M02)
 **Branch:** `main` (tag `m01-done`); M02 memakai `milestone/m02-kernel`
 **Kesehatan `make verify`:** hijau pada hasil akhir M01, 2026-10-07 (WSL2 + Docker Desktop, PostgreSQL 18 via testcontainers; `M00 smoke OK`); exit criterion M01 pada DB dev lulus. CI GitHub PR #2 hijau pada semua job.
 
@@ -9,7 +9,7 @@
 |---|---|---|---|---|
 | M00 | Foundation & Tooling | DONE | m00-done | handover/HANDOVER-M00.md |
 | M01 | Database Schema | DONE | m01-done | handover/HANDOVER-M01.md |
-| M02 | Kernel (tx, outbox, audit, HTTP toolkit) | IN PROGRESS | – | – |
+| M02 | Kernel (tx, outbox, audit, HTTP toolkit) | IN PROGRESS (T6, T1, T2, T3 selesai; berikutnya T4) | – | handover/HANDOVER-M02-partial-1.md |
 | M03 | Authentication | TODO | – | – |
 | M04 | Authorization | TODO | – | – |
 | M05 | Organization · User · Group · Invite · Email | TODO | – | – |
