@@ -65,9 +65,22 @@ func EnvMap(environ []string) map[string]string {
 	return m
 }
 
-func newLogger(w io.Writer, cfg *config.Config, binary string) *slog.Logger {
+// newLogger membuat logger proses. gate dipasang sejak awal; sink system_logs baru di-attach
+// setelah pool PostgreSQL siap (AttachSystemLog), jadi log bertanda logger.SystemLog sebelum itu
+// hanya ke stdout.
+func newLogger(w io.Writer, cfg *config.Config, binary string, gate *logger.Gate) *slog.Logger {
 	level, _ := logger.ParseLevel(cfg.LogLevel) // sudah divalidasi oleh config
-	return logger.New(w, level).With("binary", binary)
+	return logger.New(w, level, logger.WithSystemGate(gate)).With("binary", binary)
+}
+
+// AttachSystemLog membuat systemlog.Writer di atas db (pool runtime, role app_user) dan
+// menghubungkannya ke gate sehingga log bertanda logger.SystemLog ikut ditulis ke system_logs
+// (docs/14 §3). detach melepas sink dan HARUS dipanggil sebelum pool ditutup. Writer
+// dikembalikan agar dipakai komponen lain (hook dead-letter relay, audit.Recorder).
+func AttachSystemLog(gate *logger.Gate, db kernel.DBTX, log *slog.Logger, service, environment string) (w *systemlog.Writer, detach func()) {
+	w = systemlog.New(db, log, service, environment)
+	gate.Attach(w.Sink())
+	return w, gate.Detach
 }
 
 // resources mengumpulkan Resource yang dibuka dan menutupnya dalam urutan terbalik.
@@ -103,14 +116,20 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 		_, _ = fmt.Fprintf(stderr, "api: %v\n", err)
 		return ExitConfig
 	}
-	log := newLogger(stderr, cfg, "api")
+	gate := logger.NewGate()
+	log := newLogger(stderr, cfg, "api", gate)
 	log.Info("api starting", "config", cfg)
 
 	res := &resources{log: log}
 	defer res.closeAll()
 
+	var appPool kernel.Pool
 	for _, open := range []func() (Resource, error){
-		func() (Resource, error) { return deps.Postgres(ctx, appPostgres(cfg)) },
+		func() (Resource, error) {
+			r, err := deps.Postgres(ctx, appPostgres(cfg))
+			appPool = r.Pool
+			return r, err
+		},
 		func() (Resource, error) { return deps.Redis(ctx, "redis", cfg.RedisURL) },
 	} {
 		r, err := open()
@@ -119,6 +138,14 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 			return ExitFailed
 		}
 		res.add(r)
+	}
+
+	// Dideklarasikan SETELAH res.closeAll, jadi dijalankan SEBELUM pool ditutup (defer LIFO).
+	if appPool != nil {
+		_, detach := AttachSystemLog(gate, appPool, log, "api", cfg.Environment)
+		defer detach()
+	} else {
+		log.Warn("tanpa pool PostgreSQL: system log tidak ditulis ke database")
 	}
 
 	handler := httpserver.NewHandler(httpserver.Options{
@@ -150,7 +177,8 @@ func RunWorker(ctx context.Context, env map[string]string, deps Dependencies, st
 		_, _ = fmt.Fprintf(stderr, "worker: %v\n", err)
 		return ExitConfig
 	}
-	log := newLogger(stderr, cfg, "worker")
+	gate := logger.NewGate()
+	log := newLogger(stderr, cfg, "worker", gate)
 	log.Info("worker starting", "config", cfg)
 
 	res := &resources{log: log}
@@ -183,7 +211,9 @@ func RunWorker(ctx context.Context, env map[string]string, deps Dependencies, st
 
 	var relayDone sync.WaitGroup
 	if appPool != nil {
-		sysLog := systemlog.New(appPool, log, "worker", cfg.Environment)
+		// defer di dalam if tetap berlaku sampai RunWorker selesai, SEBELUM res.closeAll (LIFO).
+		sysLog, detach := AttachSystemLog(gate, appPool, log, "worker", cfg.Environment)
+		defer detach()
 		relay := kernel.NewRelay(appPool, log, kernel.RelayConfig{OnDead: systemlog.RelayOnDead(sysLog)})
 		relayDone.Add(1)
 		go func() {
