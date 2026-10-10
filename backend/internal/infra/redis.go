@@ -21,5 +21,6 @@ func (Deps) Redis(_ context.Context, name, url string) (app.Resource, error) {
 		Name:  name,
 		Check: func(ctx context.Context) error { return client.Ping(ctx).Err() },
 		Close: func() { _ = client.Close() },
+		Redis: client,
 	}, nil
 }

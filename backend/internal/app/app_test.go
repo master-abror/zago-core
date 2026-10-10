@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
 	"github.com/master-abror/zago-core/backend/internal/app"
@@ -42,6 +43,7 @@ type fakeDeps struct {
 	pgCheck  func(context.Context) error
 	redisChk func(context.Context) error
 	specs    []app.PostgresSpec
+	rdb      redis.UniversalClient // klien Redis yang dikembalikan fake (nil = tanpa klien)
 }
 
 func (f *fakeDeps) res(name string, check func(context.Context) error) app.Resource {
@@ -72,7 +74,9 @@ func (f *fakeDeps) Redis(_ context.Context, name, _ string) (app.Resource, error
 	if f.redisErr != nil {
 		return app.Resource{}, f.redisErr
 	}
-	return f.res(name, f.redisChk), nil
+	r := f.res(name, f.redisChk)
+	r.Redis = f.rdb
+	return r, nil
 }
 
 func (f *fakeDeps) snapshot() (opened, closed []string) {
@@ -129,13 +133,18 @@ var testClient = &http.Client{
 
 func startAPI(t *testing.T, deps *fakeDeps) (base string, stop func() int) {
 	t.Helper()
+	return startAPIEnv(t, deps, devEnv())
+}
+
+func startAPIEnv(t *testing.T, deps *fakeDeps, env map[string]string) (base string, stop func() int) {
+	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	codeCh := make(chan int, 1)
 	var stderr bytes.Buffer
-	go func() { codeCh <- app.RunAPI(ctx, devEnv(), deps, &stderr, ln) }()
+	go func() { codeCh <- app.RunAPI(ctx, env, deps, &stderr, ln) }()
 	t.Cleanup(cancel)
 
 	base = "http://" + ln.Addr().String()
@@ -413,4 +422,41 @@ func TestWorkerOpensPoolsWithSizesAndStatementTimeoutFromConfig(t *testing.T) {
 	require.EqualValues(t, 3, deps.specs[1].MaxConns)
 	require.Contains(t, deps.specs[0].URL, "app_user")
 	require.Contains(t, deps.specs[1].URL, "app_maintenance")
+}
+
+// deadRedisClient mensimulasikan Redis yang tak terjangkau (ditolak seketika): rate limit
+// non-sensitif fail open, jadi endpoint tanpa idempotency tetap melayani.
+func deadRedisClient(t *testing.T) redis.UniversalClient {
+	t.Helper()
+	c := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1", DialTimeout: 100 * time.Millisecond, MaxRetries: -1})
+	t.Cleanup(func() { _ = c.Close() })
+	return c
+}
+
+func envFor(environment string) map[string]string {
+	env := devEnv()
+	env["ENVIRONMENT"] = environment
+	return env
+}
+
+func TestAPIMountsEchoOnlyInDevelopmentAndTestWhenRedisClientExists(t *testing.T) {
+	for environment, want := range map[string]int{
+		"development": http.StatusOK,
+		"test":        http.StatusOK,
+		"staging":     http.StatusNotFound,
+	} {
+		t.Run(environment, func(t *testing.T) {
+			base, stop := startAPIEnv(t, &fakeDeps{rdb: deadRedisClient(t)}, envFor(environment))
+			require.Equal(t, want, status(t, base+"/api/v1/_kernel/echo/items"))
+			require.Equal(t, app.ExitOK, stop())
+		})
+	}
+}
+
+func TestAPIDoesNotMountEchoWithoutRedisClient(t *testing.T) {
+	base, stop := startAPI(t, &fakeDeps{}) // fake tanpa klien Redis
+	defer stop()
+
+	require.Equal(t, http.StatusOK, status(t, base+"/health/live"), "API tetap hidup")
+	require.Equal(t, http.StatusNotFound, status(t, base+"/api/v1/_kernel/echo/items"))
 }
