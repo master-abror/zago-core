@@ -17,6 +17,7 @@ import (
 
 	"github.com/master-abror/zago-core/backend/internal/kernel"
 	"github.com/master-abror/zago-core/backend/pkg/id"
+	"github.com/master-abror/zago-core/backend/pkg/logger"
 	"github.com/master-abror/zago-core/backend/pkg/redact"
 	modulesdk "github.com/master-abror/zago-core/packages/module-sdk"
 )
@@ -143,6 +144,31 @@ func (w *Writer) Log(ctx context.Context, level Level, eventCode, message string
 		kernel.NullString(kernel.RequestIDFromContext(ctx)), kernel.NullString(kernel.TraceIDFromContext(ctx)), string(raw))
 	if err != nil {
 		w.log.WarnContext(ctx, "system log gagal ditulis", "event_code", eventCode, "error", err)
+	}
+}
+
+// Sink mengadaptasi Writer menjadi logger.SystemSink: log bertanda logger.SystemLog(...) ditulis
+// sebagai baris system_logs (docs/14 §3). Level slog dipetakan ke level tabel: ≥ Error → error,
+// Warn → warn, Info → info, di bawahnya debug. Atribut log menjadi metadata (diredaksi Writer);
+// request_id/trace_id diambil dari ctx.
+func (w *Writer) Sink() logger.SystemSink { return sink{w: w} }
+
+type sink struct{ w *Writer }
+
+func (s sink) SystemLog(ctx context.Context, e logger.SystemEntry) {
+	s.w.Log(ctx, levelFromSlog(e.Level), e.EventCode, e.Message, e.Fields)
+}
+
+func levelFromSlog(l slog.Level) Level {
+	switch {
+	case l >= slog.LevelError:
+		return LevelError
+	case l >= slog.LevelWarn:
+		return LevelWarn
+	case l >= slog.LevelInfo:
+		return LevelInfo
+	default:
+		return LevelDebug
 	}
 }
 
