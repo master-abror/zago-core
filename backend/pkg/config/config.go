@@ -106,6 +106,13 @@ func finish(c *Config, role Role) (*Config, error) {
 // IsProduction melaporkan apakah ENVIRONMENT=production.
 func (c *Config) IsProduction() bool { return c.Environment == "production" }
 
+// DevEndpointsEnabled melaporkan apakah endpoint dev/test (mis. /api/v1/_kernel/echo) boleh
+// terdaftar: hanya ENVIRONMENT development atau test. Staging dan production tidak pernah
+// (ADR-0016).
+func (c *Config) DevEndpointsEnabled() bool {
+	return c.Environment == "development" || c.Environment == "test"
+}
+
 // Validate menerapkan aturan docs/10 §8 untuk role yang diberikan.
 func (c *Config) Validate(role Role) error {
 	var p []string

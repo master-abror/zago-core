@@ -1,7 +1,7 @@
 // Package app berisi logika start/stop tiga binary (api, worker, migrate). Klien pgx/go-redis
 // tidak dibuat di sini: dependensi eksternal masuk lewat interface Dependencies (hanya tipe
-// kernel.Pool yang terlihat) sehingga alur fail-fast dan graceful shutdown bisa dites dengan
-// fake. Adapter nyata ada di internal/infra.
+// kernel.Pool dan redis.UniversalClient yang terlihat) sehingga alur fail-fast dan graceful
+// shutdown bisa dites dengan fake. Adapter nyata ada di internal/infra.
 package app
 
 import (
@@ -14,12 +14,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
+	"github.com/master-abror/zago-core/backend/internal/audit"
 	"github.com/master-abror/zago-core/backend/internal/health"
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
 	"github.com/master-abror/zago-core/backend/internal/systemlog"
 	"github.com/master-abror/zago-core/backend/pkg/config"
 	"github.com/master-abror/zago-core/backend/pkg/logger"
+	modulesdk "github.com/master-abror/zago-core/packages/module-sdk"
 )
 
 // Exit code proses.
@@ -36,6 +40,10 @@ type Resource struct {
 	Close func()
 	// Pool terisi untuk Resource PostgreSQL nyata; nil untuk Redis dan untuk fake di tes.
 	Pool kernel.Pool
+	// Redis terisi untuk Resource Redis nyata; nil untuk PostgreSQL dan untuk fake di tes. Ini
+	// SATU-SATUNYA klien Redis proses: composition root membagikannya ke idempotency, rate
+	// limiter, dan komponen berikutnya (ADR-0016).
+	Redis redis.UniversalClient
 }
 
 // PostgresSpec menjelaskan satu pool PostgreSQL (nilai berasal dari konfigurasi).
@@ -123,14 +131,21 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 	res := &resources{log: log}
 	defer res.closeAll()
 
-	var appPool kernel.Pool
+	var (
+		appPool kernel.Pool
+		rdb     redis.UniversalClient
+	)
 	for _, open := range []func() (Resource, error){
 		func() (Resource, error) {
 			r, err := deps.Postgres(ctx, appPostgres(cfg))
 			appPool = r.Pool
 			return r, err
 		},
-		func() (Resource, error) { return deps.Redis(ctx, "redis", cfg.RedisURL) },
+		func() (Resource, error) {
+			r, err := deps.Redis(ctx, "redis", cfg.RedisURL)
+			rdb = r.Redis
+			return r, err
+		},
 	} {
 		r, err := open()
 		if err != nil {
@@ -141,17 +156,39 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 	}
 
 	// Dideklarasikan SETELAH res.closeAll, jadi dijalankan SEBELUM pool ditutup (defer LIFO).
+	var auditor modulesdk.AuditRecorder
 	if appPool != nil {
-		_, detach := AttachSystemLog(gate, appPool, log, "api", cfg.Environment)
+		sysLog, detach := AttachSystemLog(gate, appPool, log, "api", cfg.Environment)
 		defer detach()
+		auditor = audit.New(appPool, log, audit.WithSystemLog(sysLog))
 	} else {
-		log.Warn("tanpa pool PostgreSQL: system log tidak ditulis ke database")
+		log.Warn("tanpa pool PostgreSQL: system log dan audit tidak ditulis ke database")
+	}
+
+	// Toolkit HTTP kernel dirakit SEKALI di sini dari klien Redis tunggal (docs/10 §3).
+	var kern *httpserver.KernelServices
+	if rdb != nil {
+		kern, err = httpserver.NewKernelServices(httpserver.KernelDeps{
+			Redis: rdb, Log: log, SessionSecret: cfg.SessionSecret, Audit: auditor,
+		})
+		if err != nil {
+			log.Error("gagal merakit toolkit HTTP kernel", "error", err)
+			return ExitFailed
+		}
+	} else {
+		log.Warn("tanpa klien Redis: toolkit HTTP kernel (idempotency, rate limit, cursor) tidak dirakit")
+	}
+	devEndpoints := cfg.DevEndpointsEnabled()
+	if devEndpoints && kern != nil {
+		log.Warn("endpoint dev/test aktif: " + httpserver.EchoPath + " (tidak pernah aktif di staging/production)")
 	}
 
 	handler := httpserver.NewHandler(httpserver.Options{
 		Logger:         log,
 		TrustedProxies: cfg.TrustedProxyPrefixes(),
 		ReadyCheckers:  res.checkers(),
+		Kernel:         kern,
+		DevEndpoints:   devEndpoints,
 	})
 	srv := httpserver.NewServer(fmt.Sprintf(":%d", cfg.Port), handler, log, httpserver.DefaultShutdownTimeout)
 

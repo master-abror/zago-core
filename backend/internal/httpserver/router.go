@@ -25,6 +25,11 @@ type Options struct {
 	RequestTimeout time.Duration
 	ReadyTimeout   time.Duration
 	ReadyCheckers  []health.Checker
+	// Kernel adalah toolkit httpx yang dirakit composition root (nil bila tidak tersedia).
+	Kernel *KernelServices
+	// DevEndpoints mendaftarkan endpoint dev/test (/api/v1/_kernel/echo). Hanya berlaku bila
+	// Kernel terisi. Composition root menyalakannya HANYA untuk development/test (ADR-0016).
+	DevEndpoints bool
 }
 
 // NewHandler membangun handler root. Urutan middleware (terluar -> terdalam): RequestID,
@@ -56,6 +61,10 @@ func NewHandler(o Options) http.Handler {
 	r.Method(http.MethodGet, "/health", live)
 	r.Method(http.MethodGet, "/health/live", live)
 	r.Method(http.MethodGet, "/health/ready", health.Ready(log, o.ReadyTimeout, o.ReadyCheckers...))
+
+	if o.DevEndpoints && o.Kernel != nil {
+		mountEcho(r, o.Kernel)
+	}
 
 	r.NotFound(func(w http.ResponseWriter, req *http.Request) { rs.Error(w, req, httpx.ResourceNotFound.New()) })
 	r.MethodNotAllowed(func(w http.ResponseWriter, req *http.Request) {
