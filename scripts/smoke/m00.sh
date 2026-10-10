@@ -51,7 +51,8 @@ replaced=$(curl -s -D - -o /dev/null --max-time 5 -H 'X-Request-ID: bad id with 
 
 step "rute tak dikenal → 404 JSON; metode salah → 405"
 notfound=$(curl -s --max-time 5 "$BASE/api/v1/__smoke_probe")
-grep -q '"not_found"' <<<"$notfound" || fail "404 bukan JSON not_found: $notfound"
+grep -q '"resource_not_found"' <<<"$notfound" || fail "404 bukan envelope resource_not_found: $notfound"
+grep -q '"request_id"' <<<"$notfound" || fail "envelope error tanpa request_id: $notfound"
 expect_code 404 "$BASE/api/v1/__smoke_probe"
 expect_code 405 -X POST "$BASE/health"
 
@@ -64,7 +65,7 @@ else
 
   step "proxy dev Vite: $WEB/api/... diteruskan ke API (404 JSON dari API, bukan fallback SPA)"
   proxied=$(curl -s --max-time 5 "$WEB/api/v1/__smoke_probe")
-  grep -q '"not_found"' <<<"$proxied" || fail "proxy /api tidak sampai ke API: ${proxied:0:120}"
+  grep -q '"resource_not_found"' <<<"$proxied" || fail "proxy /api tidak sampai ke API: ${proxied:0:120}"
   expect_code 404 "$WEB/api/v1/__smoke_probe"
 fi
 

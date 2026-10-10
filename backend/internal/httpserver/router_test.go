@@ -3,6 +3,7 @@ package httpserver_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -52,17 +53,29 @@ func TestHealthReadyReflectsDependencies(t *testing.T) {
 	require.Equal(t, http.StatusServiceUnavailable, serve(h, httptest.NewRequest(http.MethodGet, "/health/ready", nil)).Code)
 }
 
-func TestUnknownRouteAndWrongMethodReturnJSON(t *testing.T) {
+func TestUnknownRouteAndWrongMethodReturnErrorEnvelope(t *testing.T) {
 	h, _ := newRouter(t)
 
-	rec := serve(h, httptest.NewRequest(http.MethodGet, "/tidak-ada", nil))
+	req := httptest.NewRequest(http.MethodGet, "/tidak-ada", nil)
+	req.Header.Set("X-Request-ID", "trace-abcdef09")
+	rec := serve(h, req)
 	require.Equal(t, http.StatusNotFound, rec.Code)
 	require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
-	require.Contains(t, rec.Body.String(), "not_found")
+	var body struct {
+		Error struct {
+			Code      string `json:"code"`
+			Message   string `json:"message"`
+			RequestID string `json:"request_id"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "resource_not_found", body.Error.Code)
+	require.NotEmpty(t, body.Error.Message)
+	require.Equal(t, "trace-abcdef09", body.Error.RequestID)
 
 	rec = serve(h, httptest.NewRequest(http.MethodPost, "/health", nil))
 	require.Equal(t, http.StatusMethodNotAllowed, rec.Code)
-	require.Contains(t, rec.Body.String(), "method_not_allowed")
+	require.Contains(t, rec.Body.String(), `"method_not_allowed"`)
 }
 
 func TestEveryResponseCarriesSecurityHeadersAndRequestID(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
+	"github.com/master-abror/zago-core/backend/internal/kernel"
 	"github.com/master-abror/zago-core/backend/pkg/logger"
 )
 
@@ -124,6 +125,50 @@ func TestRealIP(t *testing.T) {
 	}
 }
 
+// ---------- ClientContext ----------
+
+func TestClientContextStoresIPAndUserAgent(t *testing.T) {
+	prefixes := []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}
+	var got kernel.Client
+	var ok bool
+	h := httpserver.RealIP(prefixes)(httpserver.ClientContext(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		got, ok = kernel.ClientFromContext(r.Context())
+	})))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.1.2.3:4567"
+	req.Header.Set("X-Forwarded-For", "203.0.113.7")
+	req.Header.Set("User-Agent", "smoke-agent/1.0")
+	serve(h, req)
+
+	require.True(t, ok)
+	require.Equal(t, "203.0.113.7", got.IP)
+	require.Equal(t, "smoke-agent/1.0", got.UserAgent)
+}
+
+func TestClientContextIgnoresSpoofedForwardedForFromUntrustedPeer(t *testing.T) {
+	var got kernel.Client
+	h := httpserver.RealIP(nil)(httpserver.ClientContext(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		got, _ = kernel.ClientFromContext(r.Context())
+	})))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "198.51.100.9:1111"
+	req.Header.Set("X-Forwarded-For", "203.0.113.7")
+	serve(h, req)
+	require.Equal(t, "198.51.100.9", got.IP)
+}
+
+func TestClientContextCapsUserAgentLength(t *testing.T) {
+	var got kernel.Client
+	h := httpserver.ClientContext(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		got, _ = kernel.ClientFromContext(r.Context())
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("User-Agent", strings.Repeat("a", 2000))
+	serve(h, req)
+	require.Len(t, got.UserAgent, 512)
+}
+
 // ---------- Recoverer ----------
 
 func TestRecovererTurnsPanicInto500WithoutLeaking(t *testing.T) {
@@ -140,7 +185,7 @@ func TestRecovererTurnsPanicInto500WithoutLeaking(t *testing.T) {
 
 	rec := serve(h, httptest.NewRequest(http.MethodGet, "/boom", nil))
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
-	require.Contains(t, rec.Body.String(), "internal_error")
+	require.Contains(t, rec.Body.String(), `"internal_error"`)
 	require.NotContains(t, rec.Body.String(), "rahasia-internal-xyz")
 	require.NotContains(t, rec.Body.String(), "goroutine")
 

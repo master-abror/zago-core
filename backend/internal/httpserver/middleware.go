@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,6 +13,8 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/master-abror/zago-core/backend/internal/kernel"
+	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
 	"github.com/master-abror/zago-core/backend/pkg/id"
 	"github.com/master-abror/zago-core/backend/pkg/logger"
 )
@@ -83,6 +84,23 @@ func RealIP(trusted []netip.Prefix) func(http.Handler) http.Handler {
 	}
 }
 
+// maxUserAgentLen membatasi User-Agent yang disimpan di context (dan akhirnya di activities).
+const maxUserAgentLen = 512
+
+// ClientContext menyimpan asal request (IP hasil RealIP yang tepercaya + User-Agent) pada context
+// lewat kernel.WithClient, supaya AuditRecorder dan penulis system_logs memakainya (docs/13 §2.2).
+// Harus berada SETELAH RealIP.
+func ClientContext(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ua := strings.ToValidUTF8(r.UserAgent(), "")
+		if len(ua) > maxUserAgentLen {
+			ua = strings.ToValidUTF8(ua[:maxUserAgentLen], "")
+		}
+		ctx := kernel.WithClient(r.Context(), kernel.Client{IP: ClientIP(r.Context()), UserAgent: ua})
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func peerAddr(remote string) netip.Addr {
 	if ap, err := netip.ParseAddrPort(remote); err == nil {
 		return ap.Addr().Unmap()
@@ -128,6 +146,7 @@ func AccessLog(log *slog.Logger) func(http.Handler) http.Handler {
 // Recoverer mengubah panic handler menjadi 500 generik. Stack trace dan pesan panic hanya
 // masuk log, tidak pernah ke respons.
 func Recoverer(log *slog.Logger) func(http.Handler) http.Handler {
+	rs := httpx.NewResponder(log)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
@@ -140,7 +159,7 @@ func Recoverer(log *slog.Logger) func(http.Handler) http.Handler {
 				}
 				log.ErrorContext(r.Context(), "panic pada handler",
 					"panic", fmt.Sprint(rec), "stack", string(debug.Stack()))
-				writeError(w, http.StatusInternalServerError, "internal_error")
+				rs.Error(w, r, httpx.InternalError.New())
 			}()
 			next.ServeHTTP(w, r)
 		})
@@ -159,12 +178,4 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		h.Set("Cross-Origin-Resource-Policy", "same-origin")
 		next.ServeHTTP(w, r)
 	})
-}
-
-// writeError menulis error JSON minimal. Bentuk envelope final ditetapkan di M02 (docs/08).
-func writeError(w http.ResponseWriter, status int, code string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code}})
 }

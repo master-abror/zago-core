@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/master-abror/zago-core/backend/internal/health"
+	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
 )
 
 // DefaultRequestTimeout membatasi waktu pemrosesan satu request biasa.
@@ -27,7 +28,7 @@ type Options struct {
 }
 
 // NewHandler membangun handler root. Urutan middleware (terluar -> terdalam): RequestID,
-// RealIP, AccessLog, Recoverer, SecurityHeaders, Timeout. AccessLog berada DI LUAR Recoverer
+// RealIP, ClientContext, AccessLog, Recoverer, SecurityHeaders, Timeout. AccessLog berada DI LUAR Recoverer
 // agar request yang panik tetap tercatat dengan status 500.
 func NewHandler(o Options) http.Handler {
 	log := o.Logger
@@ -39,10 +40,12 @@ func NewHandler(o Options) http.Handler {
 		timeout = DefaultRequestTimeout
 	}
 
+	rs := httpx.NewResponder(log)
 	r := chi.NewRouter()
 	r.Use(
 		RequestID,
 		RealIP(o.TrustedProxies),
+		ClientContext,
 		AccessLog(log),
 		Recoverer(log),
 		SecurityHeaders,
@@ -54,9 +57,9 @@ func NewHandler(o Options) http.Handler {
 	r.Method(http.MethodGet, "/health/live", live)
 	r.Method(http.MethodGet, "/health/ready", health.Ready(log, o.ReadyTimeout, o.ReadyCheckers...))
 
-	r.NotFound(func(w http.ResponseWriter, _ *http.Request) { writeError(w, http.StatusNotFound, "not_found") })
-	r.MethodNotAllowed(func(w http.ResponseWriter, _ *http.Request) {
-		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+	r.NotFound(func(w http.ResponseWriter, req *http.Request) { rs.Error(w, req, httpx.ResourceNotFound.New()) })
+	r.MethodNotAllowed(func(w http.ResponseWriter, req *http.Request) {
+		rs.Error(w, req, httpx.MethodNotAllowed.New())
 	})
 	return r
 }
