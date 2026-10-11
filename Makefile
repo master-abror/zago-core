@@ -10,6 +10,12 @@ include .env
 export
 endif
 
+# Paket tes yang berjalan bersamaan. Tiap paket integrasi menyalakan container PostgreSQL 18 (+ Redis)
+# sendiri; tanpa batas, `go test ./...` menjalankan sebanyak CPU dan membuat Docker Desktop kecil
+# (mis. 3,5 GB) kewalahan sampai tes yang punya batas waktu ketat gagal acak (ADR-0017).
+# Ubah per-eksekusi: make test-backend GO_TEST_PARALLEL=6 (mis. di CI yang lebih besar).
+GO_TEST_PARALLEL ?= 3
+
 # Alat Go dipatok lewat `tool` directive di go.mod; jalankan sebagai `go tool <nama>`.
 GO_TOOL_PACKAGES := \
 	github.com/air-verse/air \
@@ -72,7 +78,7 @@ test:            ## Seluruh tes: backend (core + module-sdk + semua modul) dan f
 	$(MAKE) test-frontend
 
 test-backend:    ## Tes Go unit + integrasi (butuh Docker untuk testcontainers; REQUIRE_DOCKER=1 = tanpa Docker GAGAL, bukan skip)
-	REQUIRE_DOCKER=1 go test ./... -race -count=1
+	REQUIRE_DOCKER=1 go test ./... -race -count=1 -p $(GO_TEST_PARALLEL)
 
 test-frontend:   ## Tes komponen/logika frontend
 	npm test -w apps/web
