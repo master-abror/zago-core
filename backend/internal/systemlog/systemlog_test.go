@@ -46,6 +46,9 @@ func rows(t *testing.T, db *testpg.DB) []row {
 func newWriter(t *testing.T, opts ...systemlog.Option) (*systemlog.Writer, *testpg.DB) {
 	t.Helper()
 	db := testkit.NewDB(t)
+	// Batas tulis dilonggarkan: batas produksi 2 detik terlalu ketat saat paket tes berebut
+	// sumber daya Docker (ADR-0017). Perilaku batas itu sendiri diuji di timeout_test.go.
+	opts = append([]systemlog.Option{systemlog.WithWriteTimeout(30 * time.Second)}, opts...)
 	return systemlog.New(db.App, nil, "worker", "test", opts...), db
 }
 

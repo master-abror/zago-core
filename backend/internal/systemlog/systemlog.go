@@ -36,12 +36,12 @@ const (
 )
 
 const (
-	maxEventCodeLen  = 150
-	maxMessageLen    = 2000
-	maxMetadataBytes = 16 * 1024
-	maxTrackedCodes  = 1000
-	overflowCode     = "_overflow"
-	writeTimeout     = 2 * time.Second
+	maxEventCodeLen     = 150
+	maxMessageLen       = 2000
+	maxMetadataBytes    = 16 * 1024
+	maxTrackedCodes     = 1000
+	overflowCode        = "_overflow"
+	defaultWriteTimeout = 2 * time.Second
 
 	defaultMaxPerWindow = 5
 	defaultWindow       = time.Minute
@@ -64,14 +64,15 @@ type bucket struct {
 
 // Writer menulis system_logs lewat pool runtime (app_user: boleh INSERT/SELECT saja).
 type Writer struct {
-	db          kernel.DBTX
-	service     string
-	environment string
-	log         *slog.Logger
-	redactor    *redact.Redactor
-	maxPerWin   int
-	window      time.Duration
-	now         func() time.Time
+	db           kernel.DBTX
+	service      string
+	environment  string
+	log          *slog.Logger
+	redactor     *redact.Redactor
+	maxPerWin    int
+	window       time.Duration
+	writeTimeout time.Duration
+	now          func() time.Time
 
 	mu      sync.Mutex
 	buckets map[string]*bucket
@@ -83,6 +84,17 @@ type Option func(*Writer)
 // WithRateLimit membatasi jumlah baris per event_code per jendela (default 5 per menit).
 func WithRateLimit(maxPerWindow int, window time.Duration) Option {
 	return func(w *Writer) { w.maxPerWin, w.window = maxPerWindow, window }
+}
+
+// WithWriteTimeout mengganti batas waktu satu INSERT system_logs (bawaan 2 detik). Nilai ≤ 0
+// diabaikan. Produksi memakai bawaan; opsi ini ada agar tes integrasi tidak bergantung pada batas
+// ketat itu saat mesin tes sedang padat (ADR-0017).
+func WithWriteTimeout(d time.Duration) Option {
+	return func(w *Writer) {
+		if d > 0 {
+			w.writeTimeout = d
+		}
+	}
 }
 
 // WithClock mengganti sumber waktu (untuk tes).
@@ -98,11 +110,12 @@ func New(db kernel.DBTX, log *slog.Logger, service, environment string, opts ...
 	}
 	w := &Writer{
 		db: db, service: service, environment: environment, log: log,
-		redactor:  redact.Default(),
-		maxPerWin: defaultMaxPerWindow,
-		window:    defaultWindow,
-		now:       time.Now,
-		buckets:   map[string]*bucket{},
+		redactor:     redact.Default(),
+		maxPerWin:    defaultMaxPerWindow,
+		window:       defaultWindow,
+		writeTimeout: defaultWriteTimeout,
+		now:          time.Now,
+		buckets:      map[string]*bucket{},
 	}
 	for _, opt := range opts {
 		opt(w)
@@ -136,7 +149,7 @@ func (w *Writer) Log(ctx context.Context, level Level, eventCode, message string
 	}
 
 	// Context request bisa sudah dibatalkan (klien putus) padahal kejadian ini justru penting.
-	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
+	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), w.writeTimeout)
 	defer cancel()
 	_, err = w.db.Exec(wctx, insertSQL,
 		id.NewID().String(), w.service, w.environment, level, eventCode,
