@@ -65,6 +65,12 @@ type Config struct {
 	// storage and telemetry
 	StoragePath  string `env:"STORAGE_PATH" envDefault:"./data/uploads"`
 	OTLPEndpoint string `env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
+
+	// /metrics Prometheus (docs/14 §5, ADR-0016/0017): port TERPISAH dari PORT, tidak pernah publik.
+	// 0 = nonaktif. API membaca METRICS_PORT, worker membaca WORKER_METRICS_PORT (dua variabel
+	// karena `make dev` menjalankan keduanya di satu host dengan .env yang sama).
+	MetricsPort       int `env:"METRICS_PORT" envDefault:"0"`
+	WorkerMetricsPort int `env:"WORKER_METRICS_PORT" envDefault:"0"`
 }
 
 // Error mengumpulkan SEMUA masalah validasi sekaligus (nama variabel saja, tanpa nilai).
@@ -111,6 +117,19 @@ func (c *Config) IsProduction() bool { return c.Environment == "production" }
 // (ADR-0016).
 func (c *Config) DevEndpointsEnabled() bool {
 	return c.Environment == "development" || c.Environment == "test"
+}
+
+// MetricsPortFor mengembalikan port /metrics untuk role (0 = nonaktif): METRICS_PORT untuk API,
+// WORKER_METRICS_PORT untuk worker. Role lain tidak punya /metrics.
+func (c *Config) MetricsPortFor(role Role) int {
+	switch role {
+	case RoleAPI:
+		return c.MetricsPort
+	case RoleWorker:
+		return c.WorkerMetricsPort
+	default:
+		return 0
+	}
 }
 
 // Validate menerapkan aturan docs/10 §8 untuk role yang diberikan.
@@ -188,6 +207,18 @@ func (c *Config) validateRuntime(role Role) []string {
 	}
 	if c.DBStatementTimeout < 100*time.Millisecond || c.DBStatementTimeout > 10*time.Minute {
 		p = append(p, "DB_STATEMENT_TIMEOUT harus antara 100ms dan 10m")
+	}
+
+	for _, mp := range []struct {
+		name string
+		port int
+	}{{"METRICS_PORT", c.MetricsPort}, {"WORKER_METRICS_PORT", c.WorkerMetricsPort}} {
+		if mp.port < 0 || mp.port > 65535 {
+			p = append(p, mp.name+" harus 0–65535 (0 = nonaktif)")
+		}
+	}
+	if role == RoleAPI && c.MetricsPort > 0 && c.MetricsPort == c.Port {
+		p = append(p, "METRICS_PORT tidak boleh sama dengan PORT")
 	}
 
 	p = append(p, checkURL("PUBLIC_BASE_URL", c.PublicBaseURL, "http", "https")...)

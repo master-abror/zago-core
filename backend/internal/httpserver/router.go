@@ -13,6 +13,7 @@ import (
 
 	"github.com/master-abror/zago-core/backend/internal/health"
 	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
+	"github.com/master-abror/zago-core/backend/pkg/telemetry"
 )
 
 // DefaultRequestTimeout membatasi waktu pemrosesan satu request biasa.
@@ -30,11 +31,13 @@ type Options struct {
 	// DevEndpoints mendaftarkan endpoint dev/test (/api/v1/_kernel/echo). Hanya berlaku bila
 	// Kernel terisi. Composition root menyalakannya HANYA untuk development/test (ADR-0016).
 	DevEndpoints bool
+	// Metrics, bila diisi, memasang middleware metrik HTTP (docs/14 §5). nil = tanpa metrik.
+	Metrics *telemetry.HTTP
 }
 
 // NewHandler membangun handler root. Urutan middleware (terluar -> terdalam): RequestID,
-// RealIP, ClientContext, AccessLog, Recoverer, SecurityHeaders, Timeout. AccessLog berada DI LUAR Recoverer
-// agar request yang panik tetap tercatat dengan status 500.
+// RealIP, ClientContext, AccessLog, [Metrics], Recoverer, SecurityHeaders, Timeout. AccessLog dan
+// Metrics berada DI LUAR Recoverer agar request yang panik tetap tercatat dengan status 500.
 func NewHandler(o Options) http.Handler {
 	log := o.Logger
 	if log == nil {
@@ -47,15 +50,17 @@ func NewHandler(o Options) http.Handler {
 
 	rs := httpx.NewResponder(log)
 	r := chi.NewRouter()
-	r.Use(
+	mws := []func(http.Handler) http.Handler{
 		RequestID,
 		RealIP(o.TrustedProxies),
 		ClientContext,
 		AccessLog(log),
-		Recoverer(log),
-		SecurityHeaders,
-		middleware.Timeout(timeout),
-	)
+	}
+	if o.Metrics != nil {
+		mws = append(mws, Metrics(o.Metrics))
+	}
+	mws = append(mws, Recoverer(log), SecurityHeaders, middleware.Timeout(timeout))
+	r.Use(mws...)
 
 	live := health.Live()
 	r.Method(http.MethodGet, "/health", live)

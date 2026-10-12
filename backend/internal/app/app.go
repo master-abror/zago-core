@@ -23,6 +23,7 @@ import (
 	"github.com/master-abror/zago-core/backend/internal/systemlog"
 	"github.com/master-abror/zago-core/backend/pkg/config"
 	"github.com/master-abror/zago-core/backend/pkg/logger"
+	"github.com/master-abror/zago-core/backend/pkg/telemetry"
 	modulesdk "github.com/master-abror/zago-core/packages/module-sdk"
 )
 
@@ -183,12 +184,31 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 		log.Warn("endpoint dev/test aktif: " + httpserver.EchoPath + " (tidak pernah aktif di staging/production)")
 	}
 
+	// /metrics di port terpisah (ADR-0016/0017). Dideklarasikan SETELAH res.closeAll dan detach,
+	// jadi stop dijalankan SEBELUM keduanya (defer LIFO): tak ada scrape yang menyentuh pool tertutup.
+	var httpMetrics *telemetry.HTTP
+	if port := cfg.MetricsPortFor(config.RoleAPI); port > 0 {
+		var reg *telemetry.Registry
+		reg, httpMetrics, err = setupAPIMetrics(log, appPool)
+		if err != nil {
+			log.Error("gagal menyiapkan metrik", "error", err)
+			return ExitFailed
+		}
+		stopMetrics, err := startMetricsServer(ctx, port, reg, log)
+		if err != nil {
+			log.Error("gagal membuka port metrics", "error", err)
+			return ExitFailed
+		}
+		defer stopMetrics()
+	}
+
 	handler := httpserver.NewHandler(httpserver.Options{
 		Logger:         log,
 		TrustedProxies: cfg.TrustedProxyPrefixes(),
 		ReadyCheckers:  res.checkers(),
 		Kernel:         kern,
 		DevEndpoints:   devEndpoints,
+		Metrics:        httpMetrics,
 	})
 	srv := httpserver.NewServer(fmt.Sprintf(":%d", cfg.Port), handler, log, httpserver.DefaultShutdownTimeout)
 
@@ -221,7 +241,7 @@ func RunWorker(ctx context.Context, env map[string]string, deps Dependencies, st
 	res := &resources{log: log}
 	defer res.closeAll()
 
-	var appPool kernel.Pool
+	var appPool, maintenancePool kernel.Pool
 	for _, open := range []func() (Resource, error){
 		func() (Resource, error) {
 			r, err := deps.Postgres(ctx, appPostgres(cfg))
@@ -229,12 +249,14 @@ func RunWorker(ctx context.Context, env map[string]string, deps Dependencies, st
 			return r, err
 		},
 		func() (Resource, error) {
-			return deps.Postgres(ctx, PostgresSpec{
+			r, err := deps.Postgres(ctx, PostgresSpec{
 				Name:             "postgres_maintenance",
 				URL:              cfg.MaintenanceDatabaseURL,
 				MaxConns:         int32(cfg.DBMaintenanceMaxConns),
 				StatementTimeout: cfg.DBStatementTimeout,
 			})
+			maintenancePool = r.Pool
+			return r, err
 		},
 		func() (Resource, error) { return deps.Redis(ctx, "redis", cfg.RedisURL) },
 	} {
@@ -246,12 +268,37 @@ func RunWorker(ctx context.Context, env map[string]string, deps Dependencies, st
 		res.add(r)
 	}
 
+	// /metrics worker di WORKER_METRICS_PORT (ADR-0017). stop dijalankan SEBELUM res.closeAll (LIFO).
+	var workerMetrics *telemetry.Worker
+	if port := cfg.MetricsPortFor(config.RoleWorker); port > 0 {
+		var reg *telemetry.Registry
+		reg, workerMetrics, err = setupWorkerMetrics(log, appPool, maintenancePool)
+		if err != nil {
+			log.Error("gagal menyiapkan metrik", "error", err)
+			return ExitFailed
+		}
+		stopMetrics, err := startMetricsServer(ctx, port, reg, log)
+		if err != nil {
+			log.Error("gagal membuka port metrics", "error", err)
+			return ExitFailed
+		}
+		defer stopMetrics()
+	}
+
 	var relayDone sync.WaitGroup
 	if appPool != nil {
 		// defer di dalam if tetap berlaku sampai RunWorker selesai, SEBELUM res.closeAll (LIFO).
 		sysLog, detach := AttachSystemLog(gate, appPool, log, "worker", cfg.Environment)
 		defer detach()
-		relay := kernel.NewRelay(appPool, log, kernel.RelayConfig{OnDead: systemlog.RelayOnDead(sysLog)})
+		logDead := systemlog.RelayOnDead(sysLog)
+		relay := kernel.NewRelay(appPool, log, kernel.RelayConfig{
+			OnDead: func(ctx context.Context, ev modulesdk.Event, lastErr error) {
+				logDead(ctx, ev, lastErr)
+				if workerMetrics != nil {
+					workerMetrics.OutboxDead()
+				}
+			},
+		})
 		relayDone.Add(1)
 		go func() {
 			defer relayDone.Done()

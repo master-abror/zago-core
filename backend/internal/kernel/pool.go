@@ -56,3 +56,21 @@ func NewPool(ctx context.Context, c PoolConfig) (*pgxpool.Pool, error) {
 	}
 	return pool, nil
 }
+
+// PoolStats adalah potret pool untuk metrik (docs/14 §5: db_pool_acquired_connections).
+type PoolStats struct {
+	Acquired int32 // koneksi sedang dipakai
+	Idle     int32 // koneksi menganggur
+	Max      int32 // batas pool
+}
+
+// StatsOf membaca statistik p bila p memilikinya (pool nyata, *pgxpool.Pool). Fake di tes tidak
+// punya Stat(); untuk itu ok=false dan pemanggil melewatkan pendaftaran metrik.
+func StatsOf(p Pool) (PoolStats, bool) {
+	sp, ok := p.(interface{ Stat() *pgxpool.Stat })
+	if !ok {
+		return PoolStats{}, false
+	}
+	s := sp.Stat()
+	return PoolStats{Acquired: s.AcquiredConns(), Idle: s.IdleConns(), Max: s.MaxConns()}, true
+}
