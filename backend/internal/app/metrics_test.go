@@ -28,16 +28,6 @@ func freePort(t *testing.T) int {
 	return port
 }
 
-func getBody(t *testing.T, url string) (int, string) {
-	t.Helper()
-	resp, err := testClient.Get(url)
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-	b, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	return resp.StatusCode, string(b)
-}
-
 func metricsURL(port int) string { return fmt.Sprintf("http://127.0.0.1:%d/metrics", port) }
 
 func requireMetricsUp(t *testing.T, port int) string {
