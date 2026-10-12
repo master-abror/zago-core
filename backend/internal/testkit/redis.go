@@ -3,6 +3,7 @@ package testkit
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"sync"
 	"testing"
@@ -68,7 +69,10 @@ func startRedis(t *testing.T) (*RedisServer, error) {
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:        redisImage,
 			ExposedPorts: []string{"6379/tcp"},
-			WaitingFor:   wait.ForListeningPort("6379/tcp").WithStartupTimeout(90 * time.Second),
+			// Tunggu berbasis log (seperti PostgreSQL), bukan polling port lewat Docker API yang
+			// gagal acak saat Docker Desktop kewalahan; kesiapan jalur host:port diverifikasi
+			// setelahnya oleh waitRedisReady (ADR-0017).
+			WaitingFor: wait.ForLog("Ready to accept connections").WithStartupTimeout(90 * time.Second),
 		},
 		Started: true,
 	})
@@ -85,8 +89,13 @@ func startRedis(t *testing.T) (*RedisServer, error) {
 		_ = testcontainers.TerminateContainer(c)
 		return nil, err
 	}
+	addr := net.JoinHostPort(host, port.Port())
+	if err := waitRedisReady(ctx, addr, redisReadyTimeout); err != nil {
+		_ = testcontainers.TerminateContainer(c)
+		return nil, fmt.Errorf("gagal menyalakan %s: %w", redisImage, err)
+	}
 	redisStop = func() { _ = testcontainers.TerminateContainer(c) }
-	return &RedisServer{addr: host + ":" + port.Port()}, nil
+	return &RedisServer{addr: addr}, nil
 }
 
 func terminateRedis() {
