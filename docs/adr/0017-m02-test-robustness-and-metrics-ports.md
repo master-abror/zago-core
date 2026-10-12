@@ -20,7 +20,13 @@
 2. **Paralelisme paket tes dibatasi**: `make test-backend` memakai `go test ./... -race -count=1 -p $(GO_TEST_PARALLEL)` dengan
    `GO_TEST_PARALLEL ?= 3`. Dapat diganti per-eksekusi (`make test-backend GO_TEST_PARALLEL=6`), mis. di CI yang lebih besar.
    Konsekuensi: `make verify` bisa lebih lambat di mesin besar, tetapi tidak acak-gagal di mesin kecil.
-3. **`/metrics` dibagi per proses (diimplementasikan di T5d):**
+3. **Tunggu Redis di `testkit` tidak bergantung pada Docker API.** Pada 2026-10-12, `make verify` merah di
+   `TestRedisClientStartsClean`: container Redis sudah menulis "Ready to accept connections" dalam ±1 detik, tetapi
+   `wait.ForListeningPort` (polling status container lewat Docker API) gagal selama 90 detik dengan `context deadline
+   exceeded`. Paket yang sama lulus 3× berturut-turut bila dijalankan sendirian. Perbaikan: tunggu berbasis log (seperti
+   container PostgreSQL), lalu `waitRedisReady` memverifikasi jalur host:port yang benar-benar dipakai tes lewat `PING` inline
+   (batas 60 detik; galat akhir memuat alasan nyata percobaan terakhir). Penyebab di tingkat Docker Desktop tetap dugaan.
+4. **`/metrics` dibagi per proses (diimplementasikan di T5d):**
    - **API** membuka `/metrics` di port `METRICS_PORT`: metrik HTTP per pola rute, statistik pool, dan gauge
      `outbox_events_pending` serta `outbox_oldest_pending_age_seconds` (dibaca dari database saat scrape). Gauge outbox sengaja di
      API: docs/14 §5 menyebutnya sinyal kesehatan worker, jadi harus tetap terbaca saat worker mati.
