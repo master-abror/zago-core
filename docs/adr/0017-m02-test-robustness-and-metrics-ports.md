@@ -35,7 +35,17 @@
    - Keduanya bawaan `0` (nonaktif). `.env.example` mengisi 9090 dan 9091. Dua variabel, bukan satu, karena `make dev` menjalankan
      API dan worker native di satu host dengan `.env` yang sama. Compose tidak mem-publish port ini.
 
+5. **Tracing OpenTelemetry di M02 hanya hook (T5d, bagian akhir).** `telemetry.SetupTracing`: `OTEL_EXPORTER_OTLP_ENDPOINT` kosong
+   = no-op penuh (tidak ada state global yang disentuh; docs/14 §6). Bila terisi: harus URL http/https tanpa kredensial, query, atau
+   fragment (divalidasi di `pkg/config`, salah = `ExitConfig`; pesan galat tak pernah memuat nilainya). Exporter OTLP/HTTP protobuf ke
+   URL dasar + `/v1/traces` (prefiks path dipertahankan); provider batch dengan resource `service.name` (`zago-api`/`zago-worker`) dan
+   `deployment.environment.name`; propagator W3C (`traceparent` + `baggage`); galat OTel (kolektor mati) diteruskan ke slog level WARN
+   dan tidak pernah menjatuhkan proses; shutdown mem-flush (batas 5 detik, dijalankan paling akhir). **Belum** ada span: span per lapisan
+   (docs/14 §6) dan penautan `trace_id` ke log/outbox datang bersama lapisan yang membuatnya. Rasio sampling (bawaan SDK:
+   `ParentBased(AlwaysSample)`) dikonfigurasi nanti, saat ada span nyata untuk disampel.
+
 ## Konsekuensi
-- Doc-sync (ritual akhir M02): docs/16 §2.3 (`test-backend` memakai `-p`), docs/14 §5 (pembagian metrik per proses, port), docs/10 §8
-  (`METRICS_PORT`, `WORKER_METRICS_PORT`; `OUTBOX_*` sengaja tidak diekspos, ADR-0016).
+- Doc-sync (ritual akhir M02): docs/16 §2.3 (`test-backend` memakai `-p`), docs/14 §5 (pembagian metrik per proses, port), docs/14 §6
+  (hook tracing M02: validasi endpoint, propagator, belum ada span), docs/10 §8 (`METRICS_PORT`, `WORKER_METRICS_PORT`,
+  validasi `OTEL_EXPORTER_OTLP_ENDPOINT`; `OUTBOX_*` sengaja tidak diekspos, ADR-0016).
 - Tes lain yang bergantung pada batas waktu produksi dan database nyata harus mengikuti pola yang sama (batas bisa di-override).
