@@ -60,3 +60,25 @@ func TestMetricsPortEqualToMainPortIsHarmlessWhenDisabled(t *testing.T) {
 	_, err := config.LoadFrom(config.RoleAPI, devEnv())
 	require.NoError(t, err)
 }
+
+func TestOTLPEndpointOptionalButMustBeHTTPURLWhenSet(t *testing.T) {
+	c, err := config.LoadFrom(config.RoleAPI, devEnv())
+	require.NoError(t, err)
+	require.Empty(t, c.OTLPEndpoint, "kosong = tracing no-op (docs/14 §6)")
+
+	for _, ok := range []string{"http://localhost:4318", "https://otel.example.org:4318/otlp"} {
+		e := with(devEnv(), func(m map[string]string) { m["OTEL_EXPORTER_OTLP_ENDPOINT"] = ok })
+		for _, role := range []config.Role{config.RoleAPI, config.RoleWorker} {
+			_, err := config.LoadFrom(role, e)
+			require.NoError(t, err, "%s role %s", ok, role)
+		}
+	}
+
+	for _, bad := range []string{"localhost:4318", "ftp://x:4318", "http://", "https://user:pw@x:4318"} {
+		e := with(devEnv(), func(m map[string]string) { m["OTEL_EXPORTER_OTLP_ENDPOINT"] = bad })
+		_, err := config.LoadFrom(config.RoleAPI, e)
+		require.Error(t, err, bad)
+		require.Contains(t, problems(t, err), "OTEL_EXPORTER_OTLP_ENDPOINT harus URL http/https tanpa kredensial, query, atau fragment")
+		require.NotContains(t, err.Error(), "pw@", "kredensial tidak boleh bocor ke pesan galat")
+	}
+}

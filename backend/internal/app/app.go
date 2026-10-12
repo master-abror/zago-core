@@ -129,6 +129,13 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 	log := newLogger(stderr, cfg, "api", gate)
 	log.Info("api starting", "config", cfg)
 
+	stopTracing, err := startTracing(ctx, cfg, "zago-api", log)
+	if err != nil {
+		log.Error("gagal menyalakan tracing", "error", err)
+		return ExitFailed
+	}
+	defer stopTracing() // dideklarasikan paling awal = dijalankan paling akhir (flush setelah semuanya berhenti)
+
 	res := &resources{log: log}
 	defer res.closeAll()
 
@@ -237,6 +244,13 @@ func RunWorker(ctx context.Context, env map[string]string, deps Dependencies, st
 	gate := logger.NewGate()
 	log := newLogger(stderr, cfg, "worker", gate)
 	log.Info("worker starting", "config", cfg)
+
+	stopTracing, err := startTracing(ctx, cfg, "zago-worker", log)
+	if err != nil {
+		log.Error("gagal menyalakan tracing", "error", err)
+		return ExitFailed
+	}
+	defer stopTracing()
 
 	res := &resources{log: log}
 	defer res.closeAll()

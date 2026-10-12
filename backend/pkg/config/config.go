@@ -221,6 +221,11 @@ func (c *Config) validateRuntime(role Role) []string {
 		p = append(p, "METRICS_PORT tidak boleh sama dengan PORT")
 	}
 
+	// Opsional: kosong = tracing no-op (docs/14 §6). Bila diisi, harus URL dasar kolektor OTLP/HTTP.
+	if c.OTLPEndpoint != "" && !validOTLPEndpoint(c.OTLPEndpoint) {
+		p = append(p, "OTEL_EXPORTER_OTLP_ENDPOINT harus URL http/https tanpa kredensial, query, atau fragment")
+	}
+
 	p = append(p, checkURL("PUBLIC_BASE_URL", c.PublicBaseURL, "http", "https")...)
 	if c.IsProduction() {
 		if !c.CookieSecure {
@@ -268,6 +273,16 @@ func checkURL(name, raw string, schemes ...string) []string {
 		return []string{fmt.Sprintf("%s harus URL absolut dengan skema %s", name, strings.Join(schemes, "/"))}
 	}
 	return nil
+}
+
+// validOTLPEndpoint memeriksa URL dasar kolektor OTLP: http/https dengan host, tanpa kredensial,
+// query, atau fragment (kredensial kolektor lewat header/env standar OTel, bukan di URL).
+func validOTLPEndpoint(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return false
+	}
+	return u.User == nil && u.RawQuery == "" && !u.ForceQuery && u.Fragment == ""
 }
 
 func cleanList(in []string) []string {
