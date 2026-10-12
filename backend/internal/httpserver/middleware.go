@@ -11,12 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/master-abror/zago-core/backend/internal/kernel"
 	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
 	"github.com/master-abror/zago-core/backend/pkg/id"
 	"github.com/master-abror/zago-core/backend/pkg/logger"
+	"github.com/master-abror/zago-core/backend/pkg/telemetry"
 )
 
 // requestIDPattern membatasi X-Request-ID dari klien: karakter aman, panjang wajar.
@@ -178,4 +180,28 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		h.Set("Cross-Origin-Resource-Policy", "same-origin")
 		next.ServeHTTP(w, r)
 	})
+}
+
+// Metrics mencatat http_requests_total dan http_request_duration_seconds per POLA rute chi
+// (docs/14 §5), bukan path mentah. Pola dibaca SETELAH handler selesai (saat itu routing sudah
+// final); request tanpa rute cocok (404/405) jatuh ke label "unmatched". Pasang di LUAR
+// Recoverer supaya request yang panik tetap terhitung sebagai 500.
+func Metrics(m *telemetry.HTTP) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			next.ServeHTTP(ww, r)
+
+			status := ww.Status()
+			if status == 0 {
+				status = http.StatusOK
+			}
+			route := ""
+			if rc := chi.RouteContext(r.Context()); rc != nil {
+				route = rc.RoutePattern()
+			}
+			m.ObserveRequest(route, r.Method, status, time.Since(start))
+		})
+	}
 }
