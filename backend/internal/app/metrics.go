@@ -11,6 +11,7 @@ import (
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
 	"github.com/master-abror/zago-core/backend/pkg/telemetry"
+	modulesdk "github.com/master-abror/zago-core/packages/module-sdk"
 )
 
 // metricsShutdownTimeout membatasi pengurasan scrape yang sedang berjalan saat berhenti.
@@ -103,4 +104,15 @@ func startMetricsServer(ctx context.Context, port int, reg *telemetry.Registry, 
 		cancel()
 		<-done
 	}, nil
+}
+
+// onDeadHook merangkai hook dead-letter relay: mencatat ke system log, lalu menaikkan
+// outbox_events_dead_total bila metrik worker aktif (wm nil = metrik nonaktif).
+func onDeadHook(logDead func(context.Context, modulesdk.Event, error), wm *telemetry.Worker) func(context.Context, modulesdk.Event, error) {
+	return func(ctx context.Context, ev modulesdk.Event, lastErr error) {
+		logDead(ctx, ev, lastErr)
+		if wm != nil {
+			wm.OutboxDead()
+		}
+	}
 }

@@ -304,14 +304,8 @@ func RunWorker(ctx context.Context, env map[string]string, deps Dependencies, st
 		// defer di dalam if tetap berlaku sampai RunWorker selesai, SEBELUM res.closeAll (LIFO).
 		sysLog, detach := AttachSystemLog(gate, appPool, log, "worker", cfg.Environment)
 		defer detach()
-		logDead := systemlog.RelayOnDead(sysLog)
 		relay := kernel.NewRelay(appPool, log, kernel.RelayConfig{
-			OnDead: func(ctx context.Context, ev modulesdk.Event, lastErr error) {
-				logDead(ctx, ev, lastErr)
-				if workerMetrics != nil {
-					workerMetrics.OutboxDead()
-				}
-			},
+			OnDead: onDeadHook(systemlog.RelayOnDead(sysLog), workerMetrics),
 		})
 		relayDone.Add(1)
 		go func() {
