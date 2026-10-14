@@ -24,16 +24,23 @@ func Items[T any](s []T) []T {
 	return s
 }
 
-type successBody struct {
-	Data any  `json:"data"`
+// Envelope adalah bentuk respons sukses di kawat: {"data": ..., "meta": ...} (docs/08 §3.1).
+// Inilah SATU-SATUNYA definisinya: Responder menulisnya dan anotasi swag merujuknya
+// (mis. `@Success 200 {object} httpx.Envelope[Item]`), jadi dokumen OpenAPI tak bisa menyimpang
+// dari respons nyata (dijaga envelope_types_test.go).
+type Envelope[T any] struct {
+	Data T    `json:"data"`
 	Meta Meta `json:"meta,omitempty"`
 }
 
-type errorEnvelope struct {
-	Error errorBody `json:"error"`
+// ErrorEnvelope adalah bentuk respons error di kawat: {"error": {...}} (docs/08 §3.2).
+type ErrorEnvelope struct {
+	Error ErrorBody `json:"error"`
 }
 
-type errorBody struct {
+// ErrorBody adalah isi "error": code stabil untuk percabangan klien, message berbahasa Inggris,
+// request_id untuk korelasi, dan details machine-readable (mis. galat per field).
+type ErrorBody struct {
 	Code      string         `json:"code"`
 	Message   string         `json:"message"`
 	RequestID string         `json:"request_id,omitempty"`
@@ -61,7 +68,7 @@ func setJSONHeaders(w http.ResponseWriter) {
 
 // JSON menulis {"data":..., "meta":...} dengan status yang diberikan; meta kosong tidak ditulis.
 func (rs *Responder) JSON(w http.ResponseWriter, r *http.Request, status int, data any, meta Meta) {
-	body, err := json.Marshal(successBody{Data: data, Meta: meta})
+	body, err := json.Marshal(Envelope[any]{Data: data, Meta: meta})
 	if err != nil {
 		rs.Error(w, r, InternalError.Wrap(err))
 		return
@@ -108,7 +115,7 @@ func (rs *Responder) Error(w http.ResponseWriter, r *http.Request, err error) {
 		rs.logFailure(r.Context(), ae, err)
 	}
 
-	body := errorBody{
+	body := ErrorBody{
 		Code:      ae.Code.Name,
 		Message:   ae.PublicMessage(),
 		RequestID: logger.RequestID(r.Context()),
@@ -124,7 +131,7 @@ func (rs *Responder) Error(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	setJSONHeaders(w)
 	w.WriteHeader(ae.Code.Status)
-	_ = json.NewEncoder(w).Encode(errorEnvelope{Error: body})
+	_ = json.NewEncoder(w).Encode(ErrorEnvelope{Error: body})
 }
 
 func (rs *Responder) logFailure(ctx context.Context, ae *Error, original error) {
