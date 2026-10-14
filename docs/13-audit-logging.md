@@ -72,6 +72,8 @@ type ActivityEntry struct {
 
 **Atomicity.** When called inside `TxManager.WithinTx`, the activity is written **in the same transaction** as the state change it describes (10 §6.1): both commit or neither does, and for sensitive actions a failure to write the audit row fails the operation. Activities with `result = denied` or `failed` are written in their **own** transaction (the main one never began or is rolled back), so refused attempts still leave a trace.
 
+**Implementation note (ADR-0011):** a `success` activity written inside `TxManager.WithinTx` is **fail-closed**: if the audit row cannot be written the operation fails (`kernel.FailTx` marks the transaction rollback-only). A `denied` or `failed` activity is written as **one statement on the runtime pool** (not a new transaction); if that write fails, the failure is reported to `system_logs` (`audit.write_failed`) and the operation that was already refused or already failed is **not** changed or retried. Metadata is redacted by `pkg/redact` before it is stored, and the redaction deliberately errs on the side of masking too much.
+
 ## 2.3 What never goes in `metadata`
 
 ```text
