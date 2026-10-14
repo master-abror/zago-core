@@ -1,4 +1,9 @@
 // Command api menjalankan server HTTP (+ WebSocket di M08). Logika ada di internal/app.
+//
+//	@title			Open Source Modular Application Platform API
+//	@version		0.1
+//	@description	API platform. Dokumen ini dihasilkan dari anotasi swag (`make generate`); sumber kebenaran bentuk field. Konvensi: docs/08.
+//	@BasePath		/
 package main
 
 import (

@@ -118,6 +118,22 @@ type echoResponse struct {
 	ActorID   string `json:"actor_id,omitempty"`
 }
 
+// create godoc
+//
+//	@Summary		Echo (dev/test)
+//	@Description	Hanya development/test (ADR-0016): memperagakan envelope, idempotency, rate limit, dan audit. Bukan API produk.
+//	@Tags			kernel-dev
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"Kunci idempotensi unik per aksi"
+//	@Param			X-Dev-Actor		header		string		true	"UUID aktor (pengganti autentikasi sampai M03)"
+//	@Param			body			body		echoRequest	true	"Pesan"
+//	@Success		201				{object}	httpx.Envelope[httpserver.echoResponse]
+//	@Failure		400				{object}	httpx.ErrorEnvelope	"validation_failed"
+//	@Failure		409				{object}	httpx.ErrorEnvelope	"idempotency_in_progress"
+//	@Failure		422				{object}	httpx.ErrorEnvelope	"idempotency_key_conflict"
+//	@Failure		429				{object}	httpx.ErrorEnvelope	"rate_limit_exceeded"
+//	@Router			/api/v1/_kernel/echo [post]
 func (h *echoHandlers) create(w http.ResponseWriter, r *http.Request) {
 	var req echoRequest
 	if err := httpx.DecodeJSON(w, r, &req, 0); err != nil {
@@ -153,6 +169,19 @@ func (h *echoHandlers) create(w http.ResponseWriter, r *http.Request) {
 	h.k.Responder.Created(w, r, out, nil)
 }
 
+// items godoc
+//
+//	@Summary		Daftar item echo (dev/test)
+//	@Description	Hanya development/test (ADR-0016): memperagakan pagination keyset dengan cursor bertanda tangan HMAC.
+//	@Tags			kernel-dev
+//	@Produce		json
+//	@Param			limit	query		int		false	"Jumlah item (bawaan 10, maks 20)"
+//	@Param			cursor	query		string	false	"Cursor dari meta.next_cursor"
+//	@Param			q		query		string	false	"Prefiks nama"
+//	@Success		200		{object}	httpx.Envelope[[]httpserver.echoItem]
+//	@Failure		400		{object}	httpx.ErrorEnvelope	"validation_failed (termasuk cursor rusak)"
+//	@Failure		429		{object}	httpx.ErrorEnvelope	"rate_limit_exceeded"
+//	@Router			/api/v1/_kernel/echo/items [get]
 func (h *echoHandlers) items(w http.ResponseWriter, r *http.Request) {
 	pr, err := httpx.ParsePage(r, httpx.PageOptions{DefaultLimit: echoDefaultLimit, MaxLimit: echoMaxLimit})
 	if err != nil {
