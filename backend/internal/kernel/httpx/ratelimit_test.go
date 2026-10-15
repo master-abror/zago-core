@@ -20,7 +20,10 @@ import (
 func newLimiter(t *testing.T, rdb redis.UniversalClient) *httpx.RateLimiter {
 	t.Helper()
 	rs, _ := newResponder(t)
-	l, err := httpx.NewRateLimiter(rdb, rs, nil)
+	// Batas Redis dilonggarkan: batas produksi 250ms terlalu ketat saat Docker kewalahan, dan satu
+	// panggilan lambat membuat aturan non-sensitif fail open 1 detik sehingga hitungan tes meleset
+	// (ADR-0017). Perilaku batas itu sendiri diuji di ratelimit_timeout_test.go.
+	l, err := httpx.NewRateLimiter(rdb, rs, nil, httpx.WithRedisTimeout(5*time.Second))
 	require.NoError(t, err)
 	return l
 }

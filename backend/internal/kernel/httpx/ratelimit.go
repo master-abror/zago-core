@@ -79,17 +79,41 @@ type RateLimiter struct {
 	mem       *memoryLimiter
 	now       func() time.Time
 	downUntil atomic.Int64 // UnixNano; sebelum ini Redis dianggap mati
+
+	redisTimeout time.Duration // batas satu pemeriksaan ke Redis (bawaan rlRedisTimeout)
 }
 
 // NewRateLimiter membuat limiter. log nil → slog.Default.
-func NewRateLimiter(rdb redis.UniversalClient, rs *Responder, log *slog.Logger) (*RateLimiter, error) {
+func NewRateLimiter(rdb redis.UniversalClient, rs *Responder, log *slog.Logger, opts ...RateLimiterOption) (*RateLimiter, error) {
 	if rdb == nil || rs == nil {
 		return nil, errors.New("httpx: NewRateLimiter butuh klien Redis dan Responder")
 	}
 	if log == nil {
 		log = slog.Default()
 	}
-	return &RateLimiter{rdb: rdb, rs: rs, log: log, mem: newMemoryLimiter(rlMemoryMaxKeys), now: time.Now}, nil
+	l := &RateLimiter{
+		rdb: rdb, rs: rs, log: log, mem: newMemoryLimiter(rlMemoryMaxKeys), now: time.Now,
+		redisTimeout: rlRedisTimeout,
+	}
+	for _, o := range opts {
+		o(l)
+	}
+	return l, nil
+}
+
+// RateLimiterOption mengubah perilaku RateLimiter yang tidak perlu diubah di produksi.
+type RateLimiterOption func(*RateLimiter)
+
+// WithRedisTimeout mengganti batas waktu satu pemeriksaan ke Redis (bawaan 250 ms). Nilai ≤ 0
+// diabaikan. Produksi memakai bawaan: batas ketat itu disengaja, karena satu panggilan lambat
+// membuat aturan non-sensitif fail open selama 1 detik. Opsi ini ada agar tes integrasi tidak
+// bergantung pada batas ketat itu saat mesin tes sedang padat (ADR-0017).
+func WithRedisTimeout(d time.Duration) RateLimiterOption {
+	return func(l *RateLimiter) {
+		if d > 0 {
+			l.redisTimeout = d
+		}
+	}
 }
 
 // Check menghitung satu request untuk identitas id pada aturan rule.
@@ -112,7 +136,7 @@ func (l *RateLimiter) Check(ctx context.Context, rule Rule, id string) RateResul
 }
 
 func (l *RateLimiter) checkRedis(ctx context.Context, rule Rule, id string, now time.Time) (RateResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, rlRedisTimeout)
+	ctx, cancel := context.WithTimeout(ctx, l.redisTimeout)
 	defer cancel()
 	vals, err := rlScript.Run(ctx, l.rdb, []string{rlKeyPrefix + ":" + rule.Name + ":" + id}, rule.Window.Milliseconds()).Slice()
 	if err != nil {
