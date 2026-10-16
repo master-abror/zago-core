@@ -21,6 +21,7 @@ import (
 // Run menjalankan tes paket lalu menghentikan container bersama (PostgreSQL dan Redis).
 // Dipanggil dari TestMain.
 func Run(m *testing.M) int {
+	testpg.ConfigureReaper() // sebelum container pertama (ADR-0017)
 	code := m.Run()
 	terminateRedis()
 	testpg.Terminate()
