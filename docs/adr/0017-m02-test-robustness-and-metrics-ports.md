@@ -43,6 +43,14 @@
    dan tidak pernah menjatuhkan proses; shutdown mem-flush (batas 5 detik, dijalankan paling akhir). **Belum** ada span: span per lapisan
    (docs/14 §6) dan penautan `trace_id` ke log/outbox datang bersama lapisan yang membuatnya. Rasio sampling (bawaan SDK:
    `ParentBased(AlwaysSample)`) dikonfigurasi nanti, saat ada span nyata untuk disampel.
+6. **Batas tunggu Ryuk dinaikkan menjadi 3 menit.** Pada 2026-10-16, `make verify` merah di paket `testkit`: `create container: reaper: …
+   wait for reaper 8f4c9fad: context deadline exceeded` setelah 63,49 detik (dua tes lain gagal seketika karena galat start `testpg.Shared`
+   dipakai ulang). Itu batas `RyukConnectionTimeout` testcontainers-go v0.44.0 (bawaan 1 menit) saat container Ryuk, penjaga yang menghapus
+   container tes bila proses tes mati mendadak, belum siap di Docker Desktop yang padat. Paket yang sama lulus 3/3 bila dijalankan sendirian.
+   `testpg.ConfigureReaper()` menyetel `TESTCONTAINERS_RYUK_CONNECTION_TIMEOUT=3m` kecuali operator sudah menyetel sendiri variabelnya
+   (`TESTCONTAINERS_RYUK_CONNECTION_TIMEOUT` atau `RYUK_CONNECTION_TIMEOUT`), dipanggil dari `testkit.Run` dan dari awal `startInstance` /
+   `startRedis` (konfigurasi dibaca sekali, lazy, saat container pertama dibuat). Ryuk sengaja TIDAK dimatikan: itu jaring pengaman agar
+   container tidak bocor. Penyebab di tingkat Docker Desktop tetap dugaan; mekanisme batas waktunya terbukti dari kode dan log.
 
 ## Konsekuensi
 - Doc-sync (ritual akhir M02): docs/16 §2.3 (`test-backend` memakai `-p`), docs/14 §5 (pembagian metrik per proses, port), docs/14 §6

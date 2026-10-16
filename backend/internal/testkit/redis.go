@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/master-abror/zago-core/backend/internal/testpg"
 )
 
 const redisImage = "redis:8"
@@ -61,6 +63,7 @@ func (r *RedisServer) Client(t *testing.T) *redis.Client {
 
 func startRedis(t *testing.T) (*RedisServer, error) {
 	t.Helper()
+	testpg.ConfigureReaper()
 	if os.Getenv("REQUIRE_DOCKER") != "1" {
 		testcontainers.SkipIfProviderIsNotHealthy(t)
 	}
