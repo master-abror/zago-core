@@ -339,6 +339,7 @@ A missing or invalid required value fails the process **before** it binds a port
 - The development-only `/api/v1/_kernel/echo*` routes are mounted only when `ENVIRONMENT` is `development` or `test` **and** a Redis client exists (`Config.DevEndpointsEnabled`); the acting user comes from the `X-Dev-Actor` header until authentication exists (M03).
 - The cursor signing key is derived from `SESSION_SECRET` (`HMAC-SHA256(secret, "zago/cursor/v1")`, 08 §4), so there is no separate cursor-key variable.
 - The relay's tuning (`OUTBOX_*`) is deliberately **not** exposed through the environment: defaults live in `kernel.RelayConfig` until an operator actually needs to change them.
+- The shared Redis client is built with `ContextTimeoutEnabled = true` (ADR-0019). go-redis otherwise ignores context deadlines on socket I/O and relies on its own read/write timeouts, so every "call Redis with a 250 ms context" in the kernel (rate limiter, idempotency completion, readiness ping) would silently not apply to a Redis that accepts connections but does not answer — measured: 5.0 s without the option, 0.25 s with it. A consequence worth remembering: cancelling a request context now also aborts its in-flight Redis call, so any write that must finish regardless (idempotency completion already does) must use `context.WithoutCancel`.
 
 ---
 
