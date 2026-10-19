@@ -4,6 +4,28 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
+### M02 — Kernel (2026-10-18; tag `m02-done`)
+
+#### Added
+- Kernel transaksional: pool per role dengan `statement_timeout`, `TxManager.WithinTx` (bersarang bergabung, rollback-only), outbox transaksional + relay `SKIP LOCKED`
+  (satu transaksi per event, backoff, dead-letter) di worker, `EventBus` in-process, `AuditRecorder` (aktor, IP, UA, request id, trace id dari `ctx`), penulis `system_logs`
+  lewat `logger.SystemLog` + gate, redaksi rahasia (`pkg/redact`). Tipe kontrak lintas batas di `packages/module-sdk`.
+- Toolkit HTTP `internal/kernel/httpx`: envelope sukses/error (`Envelope[T]`, `ErrorEnvelope`), registry kode error, validasi per field, paginasi keyset dengan cursor bertanda tangan HMAC,
+  middleware idempotency (Redis) dan rate limit (Redis + fallback memori), `Responder`; 404/405 kini envelope penuh (`method_not_allowed`).
+- Composition root `internal/app` (`RunAPI`, `RunWorker`) dengan satu klien Redis, `KernelServices`, dan endpoint dev/test `/api/v1/_kernel/echo` (hanya `development`/`test`).
+- Observabilitas: `pkg/telemetry` — `/metrics` Prometheus di port terpisah per proses (`METRICS_PORT`, `WORKER_METRICS_PORT`; metrik HTTP per pola rute, `db_pool_*`, gauge outbox, `worker_job_*`,
+  `outbox_events_dead_total`) dan hook OpenTelemetry (no-op tanpa `OTEL_EXPORTER_OTLP_ENDPOINT`; OTLP/HTTP, propagator W3C).
+- sqlc (`sqlc.yaml`; query pertama `ListActivitiesByRequestID` di `internal/audit/repository`), swag (`docs/api/swagger.json`, endpoint health), `make generate`, `make generate-check` (bagian dari `make verify`).
+- Infra tes `internal/testkit` + `internal/testpg` (PostgreSQL 18 dan Redis 8 sungguhan, tanpa mock), `scripts/smoke/m02.sh`, ADR-0009 s.d. ADR-0019.
+
+#### Changed
+- `make test-backend` memakai `-p $(GO_TEST_PARALLEL)` (bawaan 3); `make verify` memuat `generate-check`.
+- `OTEL_EXPORTER_OTLP_ENDPOINT` divalidasi bila diisi. Doc-sync: 08, 10, 13, 14, 16, 18, 19, README.
+
+#### Fixed
+- Klien Redis mengabaikan deadline context pada I/O soket (5,0 dtk vs 0,25 dtk terhadap Redis yang macet): `ContextTimeoutEnabled` diaktifkan (ADR-0019).
+- Flake `make verify` pada Docker Desktop yang padat: batas tulis `system_logs` (`WithWriteTimeout`), kesiapan Redis `testkit` (tunggu log + `PING`), batas tunggu Ryuk (3 menit), dan batas Redis di tes rate limit (`WithRedisTimeout`); lihat ADR-0017, ADR-0019.
+
 ### M01 — Database Schema (2026-10-07; PR #2, tag `m01-done`)
 
 #### Added
