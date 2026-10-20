@@ -119,7 +119,9 @@ jobs:
         with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
       - run: make install
       - run: make generate
-      - run: git diff --exit-code docs/api packages/ts-sdk backend/cmd/api/modules_gen.go backend/cmd/worker/modules_gen.go apps/web/src/modules_gen.ts
+      - run: git diff --exit-code docs/api backend packages/ts-sdk apps/web/src/modules_gen.ts
+      - run: test -z "$(git ls-files --others --exclude-standard docs/api backend packages/ts-sdk apps/web/src)"
+        # untracked output (a new sqlc/swag file nobody committed) is invisible to `git diff`
         # fails the build if generated output (OpenAPI, TypeScript SDK, sqlc, module registries)
         # differs from what's committed — the drift check from 08 §9 and 07 §5.2
 ```

@@ -1,0 +1,27 @@
+# sqlc (docs/10 §3, docs/16 §2): SQL tulisan tangan -> kode Go bertipe untuk pgx/v5, tanpa ORM.
+# Skema = migrasi golang-migrate (file .down.sql diabaikan sqlc). Jalankan: make generate.
+# Keluaran ter-commit; `make generate-check` (bagian dari `make verify`) gagal bila basi.
+version: "2"
+sql:
+  - engine: postgresql
+    schema: backend/migrations
+    queries: backend/internal/audit/repository/query.sql
+    gen:
+      go:
+        package: repository
+        out: backend/internal/audit/repository
+        sql_package: pgx/v5
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true # kolom nullable -> *T, bukan pgtype.*
+        omit_unused_structs: true          # hanya model yang dipakai query paket ini
+        overrides:
+          - db_type: uuid
+            go_type: github.com/google/uuid.UUID
+          - db_type: uuid
+            nullable: true
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+              pointer: true
+          - db_type: timestamptz
+            go_type: time.Time

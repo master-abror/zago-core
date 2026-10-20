@@ -39,8 +39,10 @@ func NewChecker(name string, fn func(context.Context) error) Checker {
 	return funcChecker{name: name, fn: fn}
 }
 
-type report struct {
-	Status string            `json:"status"`
+// Report adalah isi respons liveness/readiness. Status "ok" atau "unavailable"; Checks (hanya di
+// readiness) memetakan nama dependensi ke "ok"/"unavailable" tanpa detail galat.
+type Report struct {
+	Status string            `json:"status" example:"ok"`
 	Checks map[string]string `json:"checks,omitempty"`
 }
 
@@ -52,14 +54,30 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 // Live selalu 200 selama proses mampu melayani request.
+//
+//	@Summary		Liveness
+//	@Description	200 selama proses mampu melayani request; tidak memeriksa dependensi.
+//	@Tags			health
+//	@Produce		json
+//	@Success		200	{object}	Report
+//	@Router			/health [get]
+//	@Router			/health/live [get]
 func Live() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, report{Status: "ok"})
+		writeJSON(w, http.StatusOK, Report{Status: "ok"})
 	})
 }
 
 // Ready menjalankan semua checker secara paralel, masing-masing dengan timeout sendiri.
 // 200 bila semua sehat; 503 bila ada yang gagal atau melewati timeout.
+//
+//	@Summary		Readiness
+//	@Description	Memeriksa dependensi (PostgreSQL, Redis) secara paralel, masing-masing dengan timeout. Tanpa detail galat.
+//	@Tags			health
+//	@Produce		json
+//	@Success		200	{object}	Report
+//	@Failure		503	{object}	Report
+//	@Router			/health/ready [get]
 func Ready(log *slog.Logger, timeout time.Duration, checkers ...Checker) http.Handler {
 	if timeout <= 0 {
 		timeout = DefaultCheckTimeout
@@ -113,6 +131,6 @@ func Ready(log *slog.Logger, timeout time.Duration, checkers ...Checker) http.Ha
 				break
 			}
 		}
-		writeJSON(w, code, report{Status: status, Checks: results})
+		writeJSON(w, code, Report{Status: status, Checks: results})
 	})
 }

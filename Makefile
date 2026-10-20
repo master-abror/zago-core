@@ -10,6 +10,12 @@ include .env
 export
 endif
 
+# Paket tes yang berjalan bersamaan. Tiap paket integrasi menyalakan container PostgreSQL 18 (+ Redis)
+# sendiri; tanpa batas, `go test ./...` menjalankan sebanyak CPU dan membuat Docker Desktop kecil
+# (mis. 3,5 GB) kewalahan sampai tes yang punya batas waktu ketat gagal acak (ADR-0017).
+# Ubah per-eksekusi: make test-backend GO_TEST_PARALLEL=6 (mis. di CI yang lebih besar).
+GO_TEST_PARALLEL ?= 3
+
 # Alat Go dipatok lewat `tool` directive di go.mod; jalankan sebagai `go tool <nama>`.
 GO_TOOL_PACKAGES := \
 	github.com/air-verse/air \
@@ -19,7 +25,7 @@ GO_TOOL_PACKAGES := \
 	golang.org/x/tools/cmd/goimports
 
 .PHONY: help setup install tools tools-pin infra-up dev run-api run-worker frontend \
-	test test-backend test-frontend test-e2e lint format generate modules-sync \
+	test test-backend test-frontend test-e2e lint format generate generate-check modules-sync \
 	migrate-up migrate-down migrate-version db-seed migrate-roundtrip db-test bootstrap-admin \
 	build docker-up docker-down docker-build smoke verify clean \
 	module-create handover-pack repo-zip
@@ -72,7 +78,7 @@ test:            ## Seluruh tes: backend (core + module-sdk + semua modul) dan f
 	$(MAKE) test-frontend
 
 test-backend:    ## Tes Go unit + integrasi (butuh Docker untuk testcontainers; REQUIRE_DOCKER=1 = tanpa Docker GAGAL, bukan skip)
-	REQUIRE_DOCKER=1 go test ./... -race -count=1
+	REQUIRE_DOCKER=1 go test ./... -race -count=1 -p $(GO_TEST_PARALLEL)
 
 test-frontend:   ## Tes komponen/logika frontend
 	npm test -w apps/web
@@ -90,13 +96,18 @@ format:          ## Format otomatis backend dan frontend
 	go tool goimports -w backend packages modules
 	npm run format -w apps/web
 
-# `generate` dan `modules-sync` bertahap (ADR-0003): generator baru punya masukan di milestone
-# yang disebut di bawah. Sebelum itu target tetap ada, berhasil, dan tidak menghasilkan diff.
+# `generate` dan `modules-sync` bertahap (ADR-0003): generator tanpa masukan di milestone ini tetap
+# berhasil dan tidak menghasilkan diff. sqlc dan swag punya masukan sejak M02 (ADR-0018).
+# swag: --parseDependency wajib (resolusi tipe generik envelope); --tags '!kernel-dev' mengecualikan
+# endpoint dev/test (ADR-0016) dari dokumen yang dipublikasikan; hanya swagger.json (tanpa docs.go).
 generate:        ## Regenerasi OpenAPI, SDK TypeScript, kode sqlc, registri modul (bertahap)
-	@if [ -f sqlc.yaml ]; then go tool sqlc generate; else echo "sqlc: dilewati (belum ada sqlc.yaml; dimulai M02, docs/21)"; fi
-	@echo "swag: dilewati (anotasi handler pertama datang di M02, docs/21)"
+	go tool sqlc generate
+	go tool swag init -g backend/cmd/api/main.go -o docs/api --parseDependency --outputTypes json --tags '!kernel-dev'
 	npm run generate -w packages/ts-sdk
 	$(MAKE) modules-sync
+
+generate-check:  ## Gagal bila keluaran generator (sqlc, swag) di disk basi terhadap sumbernya
+	bash ./scripts/generate-check.sh
 
 modules-sync:    ## Regenerasi registri modul dari modules/*/module.yaml (modulegen dimulai M14)
 	@if [ -d backend/cmd/modulegen ]; then go run ./backend/cmd/modulegen; else echo "modules-sync: dilewati (backend/cmd/modulegen belum ada; docs/21)"; fi
@@ -146,10 +157,11 @@ docker-build:    ## Build image produksi (build context = root repo)
 smoke:           ## Jalankan semua smoke script milestone terhadap stack yang berjalan
 	@for f in scripts/smoke/m*.sh; do echo "== $$f"; bash $$f || exit 1; done
 
-verify:          ## Gerbang tunggal: lint + test + migrate-roundtrip + build + smoke
+verify:          ## Gerbang tunggal: lint + generate-check + test + migrate-roundtrip + build + smoke
 	@test -f .env || { cp .env.example .env && echo "verify: .env dibuat dari .env.example (nilai pengembangan)"; }
 	@test -f node_modules/.package-lock.json || { echo "verify: node_modules belum ada/lengkap; menjalankan npm ci"; npm ci; }
 	$(MAKE) lint
+	$(MAKE) generate-check
 	$(MAKE) test
 	$(MAKE) migrate-roundtrip
 	$(MAKE) build

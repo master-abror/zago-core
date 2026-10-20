@@ -1,6 +1,7 @@
-// Package app berisi logika start/stop tiga binary (api, worker, migrate) tanpa bergantung
-// pada pgx/go-redis: dependensi eksternal masuk lewat interface Dependencies sehingga alur
-// fail-fast dan graceful shutdown bisa dites dengan fake. Adapter nyata ada di internal/infra.
+// Package app berisi logika start/stop tiga binary (api, worker, migrate). Klien pgx/go-redis
+// tidak dibuat di sini: dependensi eksternal masuk lewat interface Dependencies (hanya tipe
+// kernel.Pool dan redis.UniversalClient yang terlihat) sehingga alur fail-fast dan graceful
+// shutdown bisa dites dengan fake. Adapter nyata ada di internal/infra.
 package app
 
 import (
@@ -10,11 +11,20 @@ import (
 	"log/slog"
 	"net"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/redis/go-redis/v9"
+
+	"github.com/master-abror/zago-core/backend/internal/audit"
 	"github.com/master-abror/zago-core/backend/internal/health"
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
+	"github.com/master-abror/zago-core/backend/internal/kernel"
+	"github.com/master-abror/zago-core/backend/internal/systemlog"
 	"github.com/master-abror/zago-core/backend/pkg/config"
 	"github.com/master-abror/zago-core/backend/pkg/logger"
+	"github.com/master-abror/zago-core/backend/pkg/telemetry"
+	modulesdk "github.com/master-abror/zago-core/packages/module-sdk"
 )
 
 // Exit code proses.
@@ -29,13 +39,27 @@ type Resource struct {
 	Name  string
 	Check func(context.Context) error // dipakai /health/ready
 	Close func()
+	// Pool terisi untuk Resource PostgreSQL nyata; nil untuk Redis dan untuk fake di tes.
+	Pool kernel.Pool
+	// Redis terisi untuk Resource Redis nyata; nil untuk PostgreSQL dan untuk fake di tes. Ini
+	// SATU-SATUNYA klien Redis proses: composition root membagikannya ke idempotency, rate
+	// limiter, dan komponen berikutnya (ADR-0016).
+	Redis redis.UniversalClient
+}
+
+// PostgresSpec menjelaskan satu pool PostgreSQL (nilai berasal dari konfigurasi).
+type PostgresSpec struct {
+	Name             string // label pendek: "postgres", "postgres_maintenance"
+	URL              string
+	MaxConns         int32
+	StatementTimeout time.Duration
 }
 
 // Dependencies membuka dependensi eksternal. Implementasi nyata: internal/infra.
 // Open TIDAK boleh memblokir menunggu server siap: server yang lambat dilaporkan
 // oleh /health/ready, bukan mencegah proses start.
 type Dependencies interface {
-	Postgres(ctx context.Context, name, url string) (Resource, error)
+	Postgres(ctx context.Context, spec PostgresSpec) (Resource, error)
 	Redis(ctx context.Context, name, url string) (Resource, error)
 }
 
@@ -50,9 +74,22 @@ func EnvMap(environ []string) map[string]string {
 	return m
 }
 
-func newLogger(w io.Writer, cfg *config.Config, binary string) *slog.Logger {
+// newLogger membuat logger proses. gate dipasang sejak awal; sink system_logs baru di-attach
+// setelah pool PostgreSQL siap (AttachSystemLog), jadi log bertanda logger.SystemLog sebelum itu
+// hanya ke stdout.
+func newLogger(w io.Writer, cfg *config.Config, binary string, gate *logger.Gate) *slog.Logger {
 	level, _ := logger.ParseLevel(cfg.LogLevel) // sudah divalidasi oleh config
-	return logger.New(w, level).With("binary", binary)
+	return logger.New(w, level, logger.WithSystemGate(gate)).With("binary", binary)
+}
+
+// AttachSystemLog membuat systemlog.Writer di atas db (pool runtime, role app_user) dan
+// menghubungkannya ke gate sehingga log bertanda logger.SystemLog ikut ditulis ke system_logs
+// (docs/14 §3). detach melepas sink dan HARUS dipanggil sebelum pool ditutup. Writer
+// dikembalikan agar dipakai komponen lain (hook dead-letter relay, audit.Recorder).
+func AttachSystemLog(gate *logger.Gate, db kernel.DBTX, log *slog.Logger, service, environment string) (w *systemlog.Writer, detach func()) {
+	w = systemlog.New(db, log, service, environment)
+	gate.Attach(w.Sink())
+	return w, gate.Detach
 }
 
 // resources mengumpulkan Resource yang dibuka dan menutupnya dalam urutan terbalik.
@@ -88,15 +125,35 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 		_, _ = fmt.Fprintf(stderr, "api: %v\n", err)
 		return ExitConfig
 	}
-	log := newLogger(stderr, cfg, "api")
+	gate := logger.NewGate()
+	log := newLogger(stderr, cfg, "api", gate)
 	log.Info("api starting", "config", cfg)
+
+	stopTracing, err := startTracing(ctx, cfg, "zago-api", log)
+	if err != nil {
+		log.Error("gagal menyalakan tracing", "error", err)
+		return ExitFailed
+	}
+	defer stopTracing() // dideklarasikan paling awal = dijalankan paling akhir (flush setelah semuanya berhenti)
 
 	res := &resources{log: log}
 	defer res.closeAll()
 
+	var (
+		appPool kernel.Pool
+		rdb     redis.UniversalClient
+	)
 	for _, open := range []func() (Resource, error){
-		func() (Resource, error) { return deps.Postgres(ctx, "postgres", cfg.DatabaseURL) },
-		func() (Resource, error) { return deps.Redis(ctx, "redis", cfg.RedisURL) },
+		func() (Resource, error) {
+			r, err := deps.Postgres(ctx, appPostgres(cfg))
+			appPool = r.Pool
+			return r, err
+		},
+		func() (Resource, error) {
+			r, err := deps.Redis(ctx, "redis", cfg.RedisURL)
+			rdb = r.Redis
+			return r, err
+		},
 	} {
 		r, err := open()
 		if err != nil {
@@ -106,10 +163,59 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 		res.add(r)
 	}
 
+	// Dideklarasikan SETELAH res.closeAll, jadi dijalankan SEBELUM pool ditutup (defer LIFO).
+	var auditor modulesdk.AuditRecorder
+	if appPool != nil {
+		sysLog, detach := AttachSystemLog(gate, appPool, log, "api", cfg.Environment)
+		defer detach()
+		auditor = audit.New(appPool, log, audit.WithSystemLog(sysLog))
+	} else {
+		log.Warn("tanpa pool PostgreSQL: system log dan audit tidak ditulis ke database")
+	}
+
+	// Toolkit HTTP kernel dirakit SEKALI di sini dari klien Redis tunggal (docs/10 §3).
+	var kern *httpserver.KernelServices
+	if rdb != nil {
+		kern, err = httpserver.NewKernelServices(httpserver.KernelDeps{
+			Redis: rdb, Log: log, SessionSecret: cfg.SessionSecret, Audit: auditor,
+		})
+		if err != nil {
+			log.Error("gagal merakit toolkit HTTP kernel", "error", err)
+			return ExitFailed
+		}
+	} else {
+		log.Warn("tanpa klien Redis: toolkit HTTP kernel (idempotency, rate limit, cursor) tidak dirakit")
+	}
+	devEndpoints := cfg.DevEndpointsEnabled()
+	if devEndpoints && kern != nil {
+		log.Warn("endpoint dev/test aktif: " + httpserver.EchoPath + " (tidak pernah aktif di staging/production)")
+	}
+
+	// /metrics di port terpisah (ADR-0016/0017). Dideklarasikan SETELAH res.closeAll dan detach,
+	// jadi stop dijalankan SEBELUM keduanya (defer LIFO): tak ada scrape yang menyentuh pool tertutup.
+	var httpMetrics *telemetry.HTTP
+	if port := cfg.MetricsPortFor(config.RoleAPI); port > 0 {
+		var reg *telemetry.Registry
+		reg, httpMetrics, err = setupAPIMetrics(log, appPool)
+		if err != nil {
+			log.Error("gagal menyiapkan metrik", "error", err)
+			return ExitFailed
+		}
+		stopMetrics, err := startMetricsServer(ctx, port, reg, log)
+		if err != nil {
+			log.Error("gagal membuka port metrics", "error", err)
+			return ExitFailed
+		}
+		defer stopMetrics()
+	}
+
 	handler := httpserver.NewHandler(httpserver.Options{
 		Logger:         log,
 		TrustedProxies: cfg.TrustedProxyPrefixes(),
 		ReadyCheckers:  res.checkers(),
+		Kernel:         kern,
+		DevEndpoints:   devEndpoints,
+		Metrics:        httpMetrics,
 	})
 	srv := httpserver.NewServer(fmt.Sprintf(":%d", cfg.Port), handler, log, httpserver.DefaultShutdownTimeout)
 
@@ -126,25 +232,45 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 	return ExitOK
 }
 
-// RunWorker menjalankan cmd/worker. Di M00 worker hanya membuka dependensi dan menunggu sinyal
-// berhenti; outbox relay dan job datang di M02/M05+ (docs/21). Shutdown: berhenti menerima
-// pekerjaan baru, tutup koneksi.
+// RunWorker menjalankan cmd/worker: membuka dependensi, menjalankan outbox relay (docs/10 §6.2),
+// lalu menunggu sinyal berhenti. Shutdown: berhenti menerima pekerjaan baru, TUNGGU relay selesai
+// (event yang sedang diproses tuntas atau di-rollback), baru tutup koneksi.
 func RunWorker(ctx context.Context, env map[string]string, deps Dependencies, stderr io.Writer) int {
 	cfg, err := config.LoadFrom(config.RoleWorker, env)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "worker: %v\n", err)
 		return ExitConfig
 	}
-	log := newLogger(stderr, cfg, "worker")
+	gate := logger.NewGate()
+	log := newLogger(stderr, cfg, "worker", gate)
 	log.Info("worker starting", "config", cfg)
+
+	stopTracing, err := startTracing(ctx, cfg, "zago-worker", log)
+	if err != nil {
+		log.Error("gagal menyalakan tracing", "error", err)
+		return ExitFailed
+	}
+	defer stopTracing()
 
 	res := &resources{log: log}
 	defer res.closeAll()
 
+	var appPool, maintenancePool kernel.Pool
 	for _, open := range []func() (Resource, error){
-		func() (Resource, error) { return deps.Postgres(ctx, "postgres", cfg.DatabaseURL) },
 		func() (Resource, error) {
-			return deps.Postgres(ctx, "postgres_maintenance", cfg.MaintenanceDatabaseURL)
+			r, err := deps.Postgres(ctx, appPostgres(cfg))
+			appPool = r.Pool
+			return r, err
+		},
+		func() (Resource, error) {
+			r, err := deps.Postgres(ctx, PostgresSpec{
+				Name:             "postgres_maintenance",
+				URL:              cfg.MaintenanceDatabaseURL,
+				MaxConns:         int32(cfg.DBMaintenanceMaxConns),
+				StatementTimeout: cfg.DBStatementTimeout,
+			})
+			maintenancePool = r.Pool
+			return r, err
 		},
 		func() (Resource, error) { return deps.Redis(ctx, "redis", cfg.RedisURL) },
 	} {
@@ -156,8 +282,54 @@ func RunWorker(ctx context.Context, env map[string]string, deps Dependencies, st
 		res.add(r)
 	}
 
+	// /metrics worker di WORKER_METRICS_PORT (ADR-0017). stop dijalankan SEBELUM res.closeAll (LIFO).
+	var workerMetrics *telemetry.Worker
+	if port := cfg.MetricsPortFor(config.RoleWorker); port > 0 {
+		var reg *telemetry.Registry
+		reg, workerMetrics, err = setupWorkerMetrics(log, appPool, maintenancePool)
+		if err != nil {
+			log.Error("gagal menyiapkan metrik", "error", err)
+			return ExitFailed
+		}
+		stopMetrics, err := startMetricsServer(ctx, port, reg, log)
+		if err != nil {
+			log.Error("gagal membuka port metrics", "error", err)
+			return ExitFailed
+		}
+		defer stopMetrics()
+	}
+
+	var relayDone sync.WaitGroup
+	if appPool != nil {
+		// defer di dalam if tetap berlaku sampai RunWorker selesai, SEBELUM res.closeAll (LIFO).
+		sysLog, detach := AttachSystemLog(gate, appPool, log, "worker", cfg.Environment)
+		defer detach()
+		relay := kernel.NewRelay(appPool, log, kernel.RelayConfig{
+			OnDead: onDeadHook(systemlog.RelayOnDead(sysLog), workerMetrics),
+		})
+		relayDone.Add(1)
+		go func() {
+			defer relayDone.Done()
+			_ = relay.Run(ctx) // berhenti saat ctx dibatalkan
+		}()
+		log.Info("outbox relay berjalan")
+	} else {
+		log.Warn("tanpa pool PostgreSQL: outbox relay tidak dijalankan")
+	}
+
 	log.Info("worker ready; menunggu sinyal berhenti")
 	<-ctx.Done()
 	log.Info("worker shutdown dimulai")
+	relayDone.Wait()
 	return ExitOK
+}
+
+// appPostgres adalah spesifikasi pool runtime (role app_user) dari konfigurasi.
+func appPostgres(cfg *config.Config) PostgresSpec {
+	return PostgresSpec{
+		Name:             "postgres",
+		URL:              cfg.DatabaseURL,
+		MaxConns:         int32(cfg.DBMaxConns),
+		StatementTimeout: cfg.DBStatementTimeout,
+	}
 }

@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/caarlos0/env/v11"
 
@@ -35,6 +36,11 @@ type Config struct {
 	MigrationDatabaseURL   string `env:"MIGRATION_DATABASE_URL"`   // role app_migrator (cmd/migrate)
 	RedisURL               string `env:"REDIS_URL"`
 
+	// pool PostgreSQL (docs/10 §6, M02). Batas statement berlaku di sisi server untuk SETIAP query.
+	DBMaxConns            int           `env:"DB_MAX_CONNS" envDefault:"10"`
+	DBMaintenanceMaxConns int           `env:"DB_MAINTENANCE_MAX_CONNS" envDefault:"2"`
+	DBStatementTimeout    time.Duration `env:"DB_STATEMENT_TIMEOUT" envDefault:"15s"`
+
 	// security
 	SessionSecret    string   `env:"SESSION_SECRET"` // ≥ 32 byte
 	CookieName       string   `env:"COOKIE_NAME" envDefault:"platform_session"`
@@ -59,6 +65,12 @@ type Config struct {
 	// storage and telemetry
 	StoragePath  string `env:"STORAGE_PATH" envDefault:"./data/uploads"`
 	OTLPEndpoint string `env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
+
+	// /metrics Prometheus (docs/14 §5, ADR-0016/0017): port TERPISAH dari PORT, tidak pernah publik.
+	// 0 = nonaktif. API membaca METRICS_PORT, worker membaca WORKER_METRICS_PORT (dua variabel
+	// karena `make dev` menjalankan keduanya di satu host dengan .env yang sama).
+	MetricsPort       int `env:"METRICS_PORT" envDefault:"0"`
+	WorkerMetricsPort int `env:"WORKER_METRICS_PORT" envDefault:"0"`
 }
 
 // Error mengumpulkan SEMUA masalah validasi sekaligus (nama variabel saja, tanpa nilai).
@@ -99,6 +111,26 @@ func finish(c *Config, role Role) (*Config, error) {
 
 // IsProduction melaporkan apakah ENVIRONMENT=production.
 func (c *Config) IsProduction() bool { return c.Environment == "production" }
+
+// DevEndpointsEnabled melaporkan apakah endpoint dev/test (mis. /api/v1/_kernel/echo) boleh
+// terdaftar: hanya ENVIRONMENT development atau test. Staging dan production tidak pernah
+// (ADR-0016).
+func (c *Config) DevEndpointsEnabled() bool {
+	return c.Environment == "development" || c.Environment == "test"
+}
+
+// MetricsPortFor mengembalikan port /metrics untuk role (0 = nonaktif): METRICS_PORT untuk API,
+// WORKER_METRICS_PORT untuk worker. Role lain tidak punya /metrics.
+func (c *Config) MetricsPortFor(role Role) int {
+	switch role {
+	case RoleAPI:
+		return c.MetricsPort
+	case RoleWorker:
+		return c.WorkerMetricsPort
+	default:
+		return 0
+	}
+}
 
 // Validate menerapkan aturan docs/10 §8 untuk role yang diberikan.
 func (c *Config) Validate(role Role) error {
@@ -167,6 +199,33 @@ func (c *Config) validateRuntime(role Role) []string {
 		}
 	}
 
+	if c.DBMaxConns < 1 || c.DBMaxConns > 200 {
+		p = append(p, "DB_MAX_CONNS harus 1–200")
+	}
+	if c.DBMaintenanceMaxConns < 1 || c.DBMaintenanceMaxConns > 50 {
+		p = append(p, "DB_MAINTENANCE_MAX_CONNS harus 1–50")
+	}
+	if c.DBStatementTimeout < 100*time.Millisecond || c.DBStatementTimeout > 10*time.Minute {
+		p = append(p, "DB_STATEMENT_TIMEOUT harus antara 100ms dan 10m")
+	}
+
+	for _, mp := range []struct {
+		name string
+		port int
+	}{{"METRICS_PORT", c.MetricsPort}, {"WORKER_METRICS_PORT", c.WorkerMetricsPort}} {
+		if mp.port < 0 || mp.port > 65535 {
+			p = append(p, mp.name+" harus 0–65535 (0 = nonaktif)")
+		}
+	}
+	if role == RoleAPI && c.MetricsPort > 0 && c.MetricsPort == c.Port {
+		p = append(p, "METRICS_PORT tidak boleh sama dengan PORT")
+	}
+
+	// Opsional: kosong = tracing no-op (docs/14 §6). Bila diisi, harus URL dasar kolektor OTLP/HTTP.
+	if c.OTLPEndpoint != "" && !validOTLPEndpoint(c.OTLPEndpoint) {
+		p = append(p, "OTEL_EXPORTER_OTLP_ENDPOINT harus URL http/https tanpa kredensial, query, atau fragment")
+	}
+
 	p = append(p, checkURL("PUBLIC_BASE_URL", c.PublicBaseURL, "http", "https")...)
 	if c.IsProduction() {
 		if !c.CookieSecure {
@@ -214,6 +273,16 @@ func checkURL(name, raw string, schemes ...string) []string {
 		return []string{fmt.Sprintf("%s harus URL absolut dengan skema %s", name, strings.Join(schemes, "/"))}
 	}
 	return nil
+}
+
+// validOTLPEndpoint memeriksa URL dasar kolektor OTLP: http/https dengan host, tanpa kredensial,
+// query, atau fragment (kredensial kolektor lewat header/env standar OTel, bukan di URL).
+func validOTLPEndpoint(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return false
+	}
+	return u.User == nil && u.RawQuery == "" && !u.ForceQuery && u.Fragment == ""
 }
 
 func cleanList(in []string) []string {

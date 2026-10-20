@@ -60,6 +60,8 @@ A `debug`-level line logging a cache hit goes to stdout only. An `error`-level l
 
 Logging uses the standard library `log/slog` with a JSON handler, wrapped by `pkg/logger`.
 
+**Implementation note (ADR-0015):** `pkg/logger` wraps `log/slog`; there is no `logger.Error(ctx, …)` function. The marker is an ordinary slog attribute on the standard call: `log.ErrorContext(ctx, msg, "error", err, logger.SystemLog("event.code"))`. The marker is always stripped before the JSON handler, so it never appears on stdout. The logger is created first in the composition root, before any pool exists, so it starts with an empty `logger.Gate`; `app.AttachSystemLog` attaches the `systemlog.Writer` sink once the pool is ready and detaches it **before** the pool closes (until then a marked line goes to stdout only). Only the call's own attributes become the entry's fields — attributes added through `With()` / `WithGroup()` do not — and the logger's minimum level still applies, so `system_logs` is for `warn` and `error`. A panicking sink is recovered and reported as a single stdout warning.
+
 ---
 
 # 4. Structured Log Format
@@ -112,6 +114,8 @@ Labels are low-cardinality by rule: never a user id, organization id, or raw URL
 
 `authz_denials_total` is worth calling out specifically: a normal application has a low, steady background rate of denials (users occasionally clicking something they don't have access to). A sudden spike, especially concentrated on one `action`, is a legitimate signal worth alerting on (§8) — this metric exists for security observability, not just performance. The `outbox_*` gauges are the worker's health signal: user-facing requests keep working when the worker is down, so *this* is how its absence is noticed.
 
+**Implementation note (ADR-0017):** each process serves its own `/metrics` on its own port: the API on `METRICS_PORT`, the worker on `WORKER_METRICS_PORT` (0 = off, 10 §8), never on the public port. The **API** exposes the HTTP metrics, `db_pool_*`, and the two `outbox_*` gauges, read from the database at scrape time — which is why a dead worker is still visible. The **worker** exposes `worker_job_*`, `outbox_events_dead_total` (incremented by the relay's dead-letter hook), and its own pool statistics. Beyond `db_pool_acquired_connections`, the pool collector also exports `db_pool_idle_connections` and `db_pool_max_connections`. Cardinality guards: `route` is the chi pattern, and a request with no matching route is labelled `unmatched`; an HTTP method outside the standard set is labelled `OTHER`, because clients can send any token. If the outbox read fails (for example the database is down) the scrape still returns `200`: the two gauges disappear and the cause is logged, so alert on `absent()`. Not yet implemented (they arrive with the milestone that owns them): `auth_*`, `authz_*`, `db_query_duration_seconds`, `redis_command_duration_seconds`, `websocket_*`, `module_health_status`; `worker_job_*` has no call site until the worker runs jobs other than the outbox relay (M08).
+
 ---
 
 # 6. Tracing
@@ -134,6 +138,8 @@ A span per layer boundary from the request-layering model (10 §6):
 ```
 
 The trace continues into `cmd/worker` because the outbox row carries `trace_id` — a slow approval email is traceable back to the exact HTTP request that triggered it, not just visible as an isolated slow job with no context. Export is OTLP (`OTEL_EXPORTER_OTLP_ENDPOINT`); with no endpoint configured, tracing is a no-op.
+
+**Implementation note (ADR-0017):** M02 delivers the **hook only**; no span is created anywhere yet, and the layer spans above arrive together with the layers that create them (the same goes for linking `trace_id` into logs and the outbox). `telemetry.SetupTracing` does nothing — touches no global state — when the endpoint is empty. When set, it exports OTLP/HTTP (protobuf) to the base URL plus `/v1/traces`, with resource attributes `service.name` (`zago-api` / `zago-worker`) and `deployment.environment.name`, the W3C `traceparent` and `baggage` propagators, and batch export that is flushed on shutdown (5 s, run last). An unreachable collector never stops the process: OpenTelemetry's own errors are routed to the logger at `WARN`. Sampling uses the SDK default (`ParentBased(AlwaysSample)`) until real spans exist to sample.
 
 ---
 
