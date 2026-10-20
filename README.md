@@ -38,14 +38,21 @@ Semua stack di Docker: `make docker-up` / `make docker-down`.
 
 | Perintah | Fungsi |
 |---|---|
-| `make verify` | **Gerbang tunggal**: lint + tes + migrate-roundtrip + build + smoke pada stack Docker sementara. Harus hijau sebelum merge. |
+| `make verify` | **Gerbang tunggal**: lint + `generate-check` + tes + migrate-roundtrip + build + smoke pada stack Docker sementara. Harus hijau sebelum merge. |
 | `make lint` / `make test` | lint Go + frontend + pemeriksaan struktural / tes backend (`-race`, testcontainers) + frontend |
-| `make generate` | regenerasi OpenAPI, SDK TS, kode sqlc, registri modul (bertahap per milestone) |
+| `make generate` / `make generate-check` | regenerasi OpenAPI (`docs/api/swagger.json`), kode sqlc, SDK TS dan registri modul (bertahap per milestone) / gagal bila keluaran generator di disk basi |
+| `make smoke` | semua `scripts/smoke/m*.sh` terhadap stack yang berjalan (`M00`: fondasi; `M02`: kernel lewat endpoint echo) |
 | `make migrate-up` / `migrate-down` / `migrate-version` | terapkan / mundurkan satu / tampilkan versi migrasi inti (`MIGRATION_DATABASE_URL`) |
 | `make db-seed` | pastikan baris platform ada (idempoten) |
 | `make migrate-roundtrip` / `make db-test` | up→down→up pada PostgreSQL sementara / tes constraint, trigger, cascade, grant skema (butuh Docker). Skema: [docs/erd.md](docs/erd.md) |
 | `make infra-up` | hanya datastore, untuk pengembangan native |
 | `make clean` | hapus artefak **dan volume data** (destruktif) |
+
+Endpoint khusus pengembangan (hanya saat `ENVIRONMENT` = `development`/`test`; tidak pernah ada di staging/production): `POST` dan
+`GET /api/v1/_kernel/echo` (+ `/items`) memperagakan envelope, idempotency, rate limit, dan pagination cursor; lihat `scripts/smoke/m02.sh`.
+Metrik Prometheus disajikan di **port terpisah** (bukan port API) bila `METRICS_PORT` (API) / `WORKER_METRICS_PORT` (worker) diisi;
+`.env.example` memakai 9090/9091 dan Compose tidak mem-publish-nya. Kecepatan `make test`: `make test-backend GO_TEST_PARALLEL=N`
+membatasi jumlah paket tes yang menyalakan container bersamaan (bawaan 3).
 
 `make verify` memakai compose project terpisah (`platform-verify`) sehingga tidak menghapus data pengembanganmu, tetapi
 port 5432/6379/8080/5173/1025/8025 harus bebas (hentikan `make dev`/`make docker-up` dulu).

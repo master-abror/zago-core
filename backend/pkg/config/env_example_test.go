@@ -48,3 +48,17 @@ func TestEnvExampleContainsNoRealisticSecrets(t *testing.T) {
 	require.True(t, strings.HasPrefix(env["SESSION_SECRET"], "dev-only"))
 	require.Equal(t, "development", env["ENVIRONMENT"])
 }
+
+// Port /metrics untuk pengembangan native (ADR-0016/0017): API 9090, worker 9091. Keduanya berbeda
+// karena `make dev` menjalankan API dan worker di satu host dengan .env yang sama.
+func TestEnvExampleEnablesDistinctMetricsPorts(t *testing.T) {
+	env := readEnvExample(t)
+	require.Equal(t, "9090", env["METRICS_PORT"])
+	require.Equal(t, "9091", env["WORKER_METRICS_PORT"])
+
+	api, err := config.LoadFrom(config.RoleAPI, env)
+	require.NoError(t, err)
+	wk, err := config.LoadFrom(config.RoleWorker, env)
+	require.NoError(t, err)
+	require.NotEqual(t, api.MetricsPortFor(config.RoleAPI), wk.MetricsPortFor(config.RoleWorker))
+}

@@ -254,3 +254,25 @@ func TestSecretsNeverLeak(t *testing.T) {
 	}
 	require.Contains(t, buf.String(), `"port":8080`)
 }
+
+func TestDevEndpointsEnabledOnlyInDevelopmentAndTest(t *testing.T) {
+	cases := []struct {
+		environment string
+		base        func() map[string]string
+		want        bool
+	}{
+		{"development", devEnv, true},
+		{"test", devEnv, true},
+		{"staging", devEnv, false},
+		{"production", prodEnv, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.environment, func(t *testing.T) {
+			env := tc.base()
+			env["ENVIRONMENT"] = tc.environment
+			cfg, err := config.LoadFrom(config.RoleAPI, env)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, cfg.DevEndpointsEnabled())
+		})
+	}
+}

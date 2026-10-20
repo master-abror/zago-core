@@ -1,0 +1,95 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API platform. Dokumen ini dihasilkan dari anotasi swag (`make generate`); sumber kebenaran bentuk field. Konvensi: docs/08.",
+        "title": "Open Source Modular Application Platform API",
+        "contact": {},
+        "version": "0.1"
+    },
+    "basePath": "/",
+    "paths": {
+        "/health": {
+            "get": {
+                "description": "200 selama proses mampu melayani request; tidak memeriksa dependensi.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Liveness",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_health.Report"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/live": {
+            "get": {
+                "description": "200 selama proses mampu melayani request; tidak memeriksa dependensi.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Liveness",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_health.Report"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/ready": {
+            "get": {
+                "description": "Memeriksa dependensi (PostgreSQL, Redis) secara paralel, masing-masing dengan timeout. Tanpa detail galat.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Readiness",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_health.Report"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_health.Report"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "backend_internal_health.Report": {
+            "type": "object",
+            "properties": {
+                "checks": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        }
+    }
+}

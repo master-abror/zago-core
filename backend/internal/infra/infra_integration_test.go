@@ -46,6 +46,10 @@ func start(t *testing.T, image, port string, env map[string]string) (testcontain
 	return c, host + ":" + mapped.Port()
 }
 
+func pgSpec(url string) app.PostgresSpec {
+	return app.PostgresSpec{Name: "postgres", URL: url, MaxConns: 4, StatementTimeout: 5 * time.Second}
+}
+
 func readyStatus(t *testing.T, checkers ...health.Checker) int {
 	t.Helper()
 	h := httpserver.NewHandler(httpserver.Options{
@@ -66,7 +70,7 @@ func TestReadyFlipsTo503WhenPostgresStops(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	pg, err := infra.Deps{}.Postgres(ctx, "postgres", "postgres://postgres:postgres@"+addr+"/platform")
+	pg, err := infra.Deps{}.Postgres(ctx, pgSpec("postgres://postgres:postgres@"+addr+"/platform"))
 	require.NoError(t, err)
 	defer pg.Close()
 
@@ -99,7 +103,7 @@ func TestReadyFlipsTo503WhenRedisStops(t *testing.T) {
 }
 
 func TestInvalidURLsAreRejectedWithoutLeakingCredentials(t *testing.T) {
-	_, err := infra.Deps{}.Postgres(context.Background(), "postgres", "postgres://u:TOP-SECRET@%zz/db")
+	_, err := infra.Deps{}.Postgres(context.Background(), pgSpec("postgres://u:TOP-SECRET@%zz/db"))
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), "TOP-SECRET")
 

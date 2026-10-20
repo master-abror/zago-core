@@ -28,6 +28,7 @@ func repoRoot() string {
 // startInstance menyalakan postgres:18 dengan init script role yang sama dengan compose dev.
 func startInstance(t *testing.T) (*instance, error) {
 	t.Helper()
+	ConfigureReaper()
 	if os.Getenv("REQUIRE_DOCKER") != "1" {
 		testcontainers.SkipIfProviderIsNotHealthy(t)
 	}
