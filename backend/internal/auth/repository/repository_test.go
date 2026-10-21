@@ -308,21 +308,34 @@ func TestTouchSessionActivity(t *testing.T) {
 	e := newEnv(t)
 	u := testkit.NewUser(t, e.db)
 	s := e.session(t, u.ID, nil, "touch", time.Hour)
+	lastActivity := func() time.Time {
+		got, err := e.q.GetSessionByTokenHash(e.ctx, hashOf("touch"))
+		require.NoError(t, err)
+		return got.LastActivityAt
+	}
 
 	later := s.LastActivityAt.Add(time.Minute)
 	n, err := e.q.TouchSessionActivity(e.ctx, repository.TouchSessionActivityParams{SessionID: s.ID, At: later})
 	require.NoError(t, err)
 	require.EqualValues(t, 1, n)
+	require.WithinDuration(t, later, lastActivity(), time.Millisecond)
 
+	// mundur: tetap 1 baris (sesi hidup) tetapi nilainya TIDAK mundur
 	n, err = e.q.TouchSessionActivity(e.ctx, repository.TouchSessionActivityParams{SessionID: s.ID, At: s.LastActivityAt})
 	require.NoError(t, err)
-	require.Zero(t, n, "tidak pernah mundur")
+	require.EqualValues(t, 1, n)
+	require.WithinDuration(t, later, lastActivity(), time.Millisecond, "tidak pernah mundur")
 
 	_, err = e.q.RevokeSession(e.ctx, repository.RevokeSessionParams{SessionID: s.ID, UserID: u.ID})
 	require.NoError(t, err)
 	n, err = e.q.TouchSessionActivity(e.ctx, repository.TouchSessionActivityParams{SessionID: s.ID, At: later.Add(time.Hour)})
 	require.NoError(t, err)
-	require.Zero(t, n, "sesi dicabut tidak dihidupkan lewat aktivitas")
+	require.Zero(t, n, "sesi dicabut: 0 baris, tidak dihidupkan lewat aktivitas")
+	require.WithinDuration(t, later, lastActivity(), time.Millisecond)
+
+	n, err = e.q.TouchSessionActivity(e.ctx, repository.TouchSessionActivityParams{SessionID: id.NewID(), At: later})
+	require.NoError(t, err)
+	require.Zero(t, n, "sesi tak dikenal: 0 baris")
 }
 
 // ---- security events ----

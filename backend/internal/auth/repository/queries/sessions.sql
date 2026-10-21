@@ -61,9 +61,11 @@ WHERE user_id = sqlc.arg('user_id')::uuid
 RETURNING id, token_hash;
 
 -- name: TouchSessionActivity :execrows
--- Maju saja (tidak pernah mundur) dan hanya untuk sesi yang belum dicabut.
+-- Maju saja, tidak pernah mundur (GREATEST). Hasil 1 baris = sesi belum dicabut; 0 baris = sesi
+-- sudah dicabut/tidak ada. Pemanggil memakainya juga sebagai pemeriksaan "masih hidup" terhadap
+-- sumber kebenaran (PostgreSQL), sehingga entri Redis basi paling lama bertahan satu interval
+-- aktivitas (docs/05 §12.1).
 UPDATE sessions
-SET last_activity_at = sqlc.arg('at')::timestamptz
+SET last_activity_at = GREATEST(last_activity_at, sqlc.arg('at')::timestamptz)
 WHERE id = sqlc.arg('session_id')::uuid
-  AND revoked_at IS NULL
-  AND last_activity_at < sqlc.arg('at')::timestamptz;
+  AND revoked_at IS NULL;

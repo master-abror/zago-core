@@ -268,10 +268,9 @@ func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) (R
 
 const touchSessionActivity = `-- name: TouchSessionActivity :execrows
 UPDATE sessions
-SET last_activity_at = $1::timestamptz
+SET last_activity_at = GREATEST(last_activity_at, $1::timestamptz)
 WHERE id = $2::uuid
   AND revoked_at IS NULL
-  AND last_activity_at < $1::timestamptz
 `
 
 type TouchSessionActivityParams struct {
@@ -279,7 +278,10 @@ type TouchSessionActivityParams struct {
 	SessionID uuid.UUID
 }
 
-// Maju saja (tidak pernah mundur) dan hanya untuk sesi yang belum dicabut.
+// Maju saja, tidak pernah mundur (GREATEST). Hasil 1 baris = sesi belum dicabut; 0 baris = sesi
+// sudah dicabut/tidak ada. Pemanggil memakainya juga sebagai pemeriksaan "masih hidup" terhadap
+// sumber kebenaran (PostgreSQL), sehingga entri Redis basi paling lama bertahan satu interval
+// aktivitas (docs/05 §12.1).
 func (q *Queries) TouchSessionActivity(ctx context.Context, arg TouchSessionActivityParams) (int64, error) {
 	result, err := q.db.Exec(ctx, touchSessionActivity, arg.At, arg.SessionID)
 	if err != nil {
