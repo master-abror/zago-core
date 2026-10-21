@@ -58,6 +58,12 @@ type Config struct {
 	PasswordHashConcurrency   int `env:"PASSWORD_HASH_CONCURRENCY" envDefault:"0"` // 0 = jumlah CPU
 	PasswordMinLength         int `env:"PASSWORD_MIN_LENGTH" envDefault:"12"`
 
+	// sesi (docs/05 §12.1): dua jam independen. Idle = sejak aktivitas terakhir; absolut = sejak
+	// sesi dibuat, tidak bisa diperpanjang. Nilai ini bawaan; deployment yang lebih ketat dapat
+	// menggantinya lewat sumber timeout (settings platform) tanpa mengubah kode sesi.
+	SessionIdleTimeout     time.Duration `env:"SESSION_IDLE_TIMEOUT" envDefault:"30m"`
+	SessionAbsoluteTimeout time.Duration `env:"SESSION_ABSOLUTE_TIMEOUT" envDefault:"12h"`
+
 	// server
 	Port          int    `env:"PORT" envDefault:"8080"`
 	Environment   string `env:"ENVIRONMENT" envDefault:"development"`
@@ -202,7 +208,7 @@ func (c *Config) validateRuntime(role Role) []string {
 	}
 
 	if role == RoleAPI {
-		p = append(p, c.validatePassword()...)
+		p = append(p, c.validateAuth()...)
 	}
 
 	for _, cidr := range c.TrustedProxies {
@@ -266,8 +272,17 @@ func (c *Config) PasswordPolicy() security.PasswordPolicy {
 	return security.PasswordPolicy{MinLength: c.PasswordMinLength}
 }
 
-func (c *Config) validatePassword() []string {
+func (c *Config) validateAuth() []string {
 	var p []string
+	if c.SessionIdleTimeout < time.Minute || c.SessionIdleTimeout > 24*time.Hour {
+		p = append(p, "SESSION_IDLE_TIMEOUT harus antara 1m dan 24h")
+	}
+	if c.SessionAbsoluteTimeout < 5*time.Minute || c.SessionAbsoluteTimeout > 30*24*time.Hour {
+		p = append(p, "SESSION_ABSOLUTE_TIMEOUT harus antara 5m dan 720h")
+	}
+	if c.SessionIdleTimeout > c.SessionAbsoluteTimeout {
+		p = append(p, "SESSION_IDLE_TIMEOUT tidak boleh melebihi SESSION_ABSOLUTE_TIMEOUT")
+	}
 	if _, err := security.Argon2ParamsFromInts(c.PasswordArgon2MemoryKiB, c.PasswordArgon2Time, c.PasswordArgon2Parallelism); err != nil {
 		p = append(p, "PASSWORD_ARGON2_MEMORY_KIB (8–1048576, minimal 8 x paralelisme), PASSWORD_ARGON2_TIME (1–16), "+
 			"dan PASSWORD_ARGON2_PARALLELISM (1–64) harus dalam rentang aman")
