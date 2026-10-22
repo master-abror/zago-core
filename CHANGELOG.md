@@ -4,6 +4,16 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
+### M03 — Authentication (SEDANG BERJALAN; parsial 1, sampai ◆CP1)
+
+#### Added
+- `pkg/security`: hasher Argon2id (PHC, rehash-on-login, hash dummy, batas 256 byte, semaphore konkurensi berbasis context) dan `PasswordPolicy`.
+- Config: `PASSWORD_ARGON2_MEMORY_KIB|TIME|PARALLELISM`, `PASSWORD_HASH_CONCURRENCY`, `PASSWORD_MIN_LENGTH`, `SESSION_IDLE_TIMEOUT`, `SESSION_ABSOLUTE_TIMEOUT`.
+- `internal/auth`: repositori sqlc (credentials, sessions, security events, lookup user/keanggotaan minimal) dengan `Store` yang mengikuti transaksi;
+  `SessionService` (Redis + PostgreSQL otoritatif, fallback saat Redis mati, rotasi, pencabutan, event `session.revoked`); `CSRF` terikat sesi;
+  cookie sesi `__Host-`, `OriginPolicy`, middleware `Authenticate`/`CSRF`/`RequireAuth`; kode error `csrf_failed`.
+- ADR-0020. Belum ada endpoint HTTP auth: dikerjakan di T4 (lihat docs/handover/HANDOVER-M03-partial-1.md).
+
 ### M02 — Kernel (2026-10-18; tag `m02-done`)
 
 #### Added
