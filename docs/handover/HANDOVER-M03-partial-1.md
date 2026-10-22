@@ -24,13 +24,12 @@ Tidak ada migrasi baru. `X-Dev-Actor` di endpoint echo MASIH dipakai sampai T4.
 | Exit `scripts/smoke/m03.sh` + migrasi smoke M02 dari `X-Dev-Actor` ke sesi | TODO | |
 
 ## 3. Bukti verifikasi
-- **Di mesin pengembang (2026-10-22, WSL2 + Docker Desktop, PG 18 / Redis 8 sungguhan):** setelah T1+T2:
-  `go test -race -count=1 ./backend/pkg/... ./backend/internal/auth/...` hijau (`pkg/*`, `auth/repository` 35 s, `auth/service` 54 s);
-  `make lint` 0 isu (golangci, svelte-check, prettier, lint-structure). `make generate-check` belum dilaporkan.
-- **Hanya di sandbox chat (PostgreSQL 16.2 + Redis 6.2 sungguhan, `uuidv7()` ditiru; bukan PG18/Redis 8):** T3 (`auth/transport/http`,
-  `service/csrf`), serta T1/T2 ulang; `go vet`, `gofmt`, `golangci-lint` v2.14.0 (0 isu). **Belum terbukti di mesin untuk T3**:
-  jalankan perintah §7.
-- **`make verify` penuh BELUM dijalankan sejak M02.** `scripts/smoke/m03.sh` belum ada.
+- **Di mesin pengembang (2026-10-22, WSL2 + Docker Desktop 4.90, PG 18 / Redis 8 sungguhan), setelah T1–T3: `make verify` HIJAU penuh (exit 0)** —
+  lint 0 isu (golangci, svelte-check, prettier, lint-structure), generate-check, seluruh tes (`auth/repository` 37 s, `auth/service` 47 s,
+  `auth/transport/http` 21 s, `pkg/*`, dst.), migrate-roundtrip, build, smoke M00 dan M02. Branch di-push ke `origin/milestone/m03-authentication`.
+- **Di sandbox chat (PG 16.2 + Redis 6.2 sungguhan, `uuidv7()` ditiru):** semua paket baru ditulis dan dimutasi di sana lebih dulu; `golangci-lint` v2.14.0 0 isu.
+  Bukan bukti utama — bukti utama adalah run di mesin di atas.
+- **Belum ada:** `scripts/smoke/m03.sh`; tidak ada endpoint auth yang bisa dismoke sebelum T4.
 - **Tes negatif yang ada:** token cookie sampah/berformat salah/tak pernah diterbitkan; sesi dicabut/idle/absolut; sesi user lain tak bisa
   dicabut/dirotasi; entri Redis basi dibatasi satu interval; rotasi serentak = satu pemenang; tulisan di transaksi rollback tidak
   meninggalkan jejak Redis; token tak muncul di Redis/PG/log; rehash basi tak menimpa password baru; CSRF hilang/salah/sesi lain/pasca-rotasi/
@@ -66,7 +65,7 @@ Tidak ada migrasi baru. `X-Dev-Actor` di endpoint echo MASIH dipakai sampai T4.
 | Rakitan router (belum memasang auth) | `backend/internal/httpserver/router.go`, `kernel.go`, `echo.go` (`devActor`) |
 
 ## 7. Cara menjalankan & memverifikasi
-Dari repo di `milestone/m03-authentication` setelah semua patch/commit diterapkan:
+Dari repo di `milestone/m03-authentication` (keadaan di atas sudah HIJAU; ulangi bila ada perubahan):
 ```bash
 make generate-check
 go test -race -count=1 ./backend/pkg/... ./backend/internal/auth/... 2>&1 | tail -40
@@ -75,7 +74,11 @@ make lint
 Lalu (Nizza AI dihentikan lebih dulu bila memakai port 5432/6379/8080): `make verify`.
 
 ## 8. Masalah diketahui / utang teknis
-- Bukti T3 hanya dari sandbox (PG16/Redis 6.2); belum dari `make verify`. `generate-check` belum dilaporkan untuk T1–T3.
+- **Insiden lingkungan 2026-10-22 (bukan kode):** `make verify` pertama crash di tahap `verify-smoke` (`SIGBUS` di binary `docker`, lalu
+  `Input/output error`), mirip catatan HANDOVER-M02 §8. Setelah itu `/var/run/docker.sock` hilang dan proses integrasi
+  `docker-desktop-user-distro proxy` tidak ada. Pulih setelah: Quit Docker Desktop → `wsl --shutdown` → buka Docker Desktop → matikan lalu
+  nyalakan toggle WSL integration distro. Sisa run diberesi dengan `docker compose -p platform-verify --profile full down -v --remove-orphans` (dari root repo).
+  Jangan memakai `sudo make verify` atau `apt install docker.io` sebagai jalan pintas.
 - Entri Redis basi bisa hidup sampai 1 menit bila penghapusan Redis gagal (ADR-0020 butir 7).
 - Parameter Argon2 bawaan belum disetel pada perangkat keras deploy (target 50–150 ms/hash); tes memakai parameter kecil.
 - Tes waktu-tak-terbedakan (email tak dikenal vs password salah) hanya diuji pada jalur (satu derivasi, bagian kritis sama), belum statistik waktu;

@@ -3,7 +3,7 @@
 **Terakhir diperbarui:** 2026-10-22 oleh sesi M03 (parsial 1)
 **Milestone aktif:** M03 — Authentication — IN PROGRESS (parsial 1, berhenti di ◆CP1: T1–T3 selesai; T4–T6 + smoke belum). Lanjutkan dari `docs/handover/HANDOVER-M03-partial-1.md`. M02 DONE (tag `m02-done`).
 **Branch:** `milestone/m03-authentication` (basis: tag `m02-done`, `8e7a8b1`); belum di-merge ke `main`
-**Kesehatan `make verify`:** M03 parsial 1: `go test -race ./backend/pkg/... ./backend/internal/auth/...` dan `make lint` hijau di mesin pengembang setelah T1+T2 (2026-10-22); T3 baru terbukti di sandbox (PG16/Redis 6.2); `make verify` penuh BELUM dijalankan sejak M02. Terakhir HIJAU penuh pada akhir M02 (2026-10-18): `lint-structure`, `generate-check`, 17 paket Go bertes dengan `-race`, migrate-roundtrip, build, `M00 smoke OK`, `M02 smoke OK` (WSL2 + Docker Desktop; stack proyek lain dihentikan lebih dulu). Riwayat flake lingkungan dan insiden cache modul: handover M02 §8. M01: hijau 2026-10-07; CI PR #2 hijau.
+**Kesehatan `make verify`:** HIJAU penuh setelah T1–T3 di mesin pengembang (2026-10-22, exit 0: lint 0 isu, generate-check, test termasuk `internal/auth/{repository,service,transport/http}`, migrate-roundtrip, build, smoke M00 + M02; PG 18 / Redis 8). Belum ada smoke M03 (menunggu T4–T6). Catatan lingkungan: crash Docker CLI saat `verify-smoke` (lihat HANDOVER-M03-partial-1 §8).
 
 | M | Nama | Status | Tag | Handover |
 |---|---|---|---|---|
