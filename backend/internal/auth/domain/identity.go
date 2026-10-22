@@ -2,7 +2,11 @@
 // (docs/05 §9, §19).
 package domain
 
-import "github.com/google/uuid"
+import (
+	"context"
+
+	"github.com/google/uuid"
+)
 
 // AuthLevel adalah tingkat autentikasi sesi; nilainya mengikuti CHECK sessions.auth_level.
 type AuthLevel string
@@ -22,4 +26,17 @@ type Identity struct {
 	OrganizationID *uuid.UUID // nil hanya untuk identitas murni tingkat platform
 	SessionID      uuid.UUID
 	AuthLevel      AuthLevel
+}
+
+type identityKey struct{}
+
+// WithIdentity menyimpan Identity pada context. Hanya middleware autentikasi yang memanggilnya.
+func WithIdentity(ctx context.Context, id Identity) context.Context {
+	return context.WithValue(ctx, identityKey{}, id)
+}
+
+// IdentityFromContext mengembalikan Identity request; ok=false bila request anonim.
+func IdentityFromContext(ctx context.Context) (Identity, bool) {
+	id, ok := ctx.Value(identityKey{}).(Identity)
+	return id, ok
 }
