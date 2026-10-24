@@ -12,4 +12,14 @@ var (
 	// ErrSessionNotFound: sesi yang dituju tidak ada, bukan milik pemanggil, atau sudah dicabut.
 	// Untuk operasi self-service atas sesi tertentu (404, tidak membocorkan keberadaan).
 	ErrSessionNotFound = errors.New("auth: sesi tidak ditemukan")
+
+	// ErrInvalidCredentials: email tidak dikenal, tanpa credential password, password salah, atau
+	// status akun yang tidak boleh dibedakan dari itu. SATU kesalahan untuk semua sebab agar
+	// login bukan oracle enumerasi akun (docs/05 §18).
+	ErrInvalidCredentials = errors.New("auth: email atau password salah")
+
+	// ErrAccountSuspended dan ErrAccountLocked hanya dikembalikan SETELAH password terverifikasi
+	// (docs/05 §18): sebelum itu setiap kegagalan adalah ErrInvalidCredentials.
+	ErrAccountSuspended = errors.New("auth: akun ditangguhkan")
+	ErrAccountLocked    = errors.New("auth: akun terkunci")
 )
