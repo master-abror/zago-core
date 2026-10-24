@@ -11,10 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/master-abror/zago-core/backend/internal/app"
 	"github.com/master-abror/zago-core/backend/internal/audit/repository"
+	authrepo "github.com/master-abror/zago-core/backend/internal/auth/repository"
+	"github.com/master-abror/zago-core/backend/internal/auth/service"
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
 	"github.com/master-abror/zago-core/backend/internal/infra"
 	"github.com/master-abror/zago-core/backend/internal/testkit"
@@ -29,13 +32,18 @@ import (
 
 var e2eClient = &http.Client{Timeout: 5 * time.Second}
 
+const (
+	e2eSessionSecret = "dev-only-change-me-dev-only-change-me"
+	e2eCookieName    = "platform_session" // COOKIE_SECURE=false: tanpa prefiks __Host-
+)
+
 func e2eEnv(db *testpg.DB, redisURL string, extra map[string]string) map[string]string {
 	env := map[string]string{
 		"ENVIRONMENT":              "development",
 		"DATABASE_URL":             testkit.PostgresURL(db, testpg.AppRole),
 		"MAINTENANCE_DATABASE_URL": testkit.PostgresURL(db, testpg.MaintenanceRole),
 		"REDIS_URL":                redisURL,
-		"SESSION_SECRET":           "dev-only-change-me-dev-only-change-me",
+		"SESSION_SECRET":           e2eSessionSecret,
 		"COOKIE_SECURE":            "false",
 		"ALLOWED_ORIGINS":          "http://localhost:5173",
 		"PUBLIC_BASE_URL":          "http://localhost:5173",
@@ -155,14 +163,36 @@ func requireReady(t *testing.T, base string) {
 	}, 30*time.Second, 100*time.Millisecond, "/health/ready harus 200 dengan PostgreSQL dan Redis nyata")
 }
 
-func echoPost(t *testing.T, base, key, requestID, actor, body string) (int, string, http.Header) {
+// e2eSession adalah sesi nyata (baris sessions di PostgreSQL + entri Redis) milik pengguna nyata.
+// Login belum ada di T4a; sesi dibuat lewat SessionService yang sama dengan yang dirakit
+// composition root, lalu dipakai sebagai cookie + token CSRF.
+type e2eSession struct {
+	token  string
+	csrf   string
+	userID uuid.UUID
+}
+
+func newE2ESession(t *testing.T, db *testpg.DB, rs *testkit.RedisServer) e2eSession {
+	t.Helper()
+	u := testkit.NewUser(t, db)
+	svc := service.NewSessionService(authrepo.NewStore(db.App), rs.Client(t),
+		service.StaticTimeouts{Idle: 30 * time.Minute, Absolute: 12 * time.Hour}, nil)
+	issued, err := svc.Create(context.Background(), service.CreateParams{UserID: u.ID})
+	require.NoError(t, err)
+	csrf, err := service.NewCSRF(e2eSessionSecret)
+	require.NoError(t, err)
+	return e2eSession{token: issued.Token, csrf: csrf.Token(issued.Session.ID), userID: u.ID}
+}
+
+func echoPost(t *testing.T, base, key, requestID string, sess e2eSession, body string) (int, string, http.Header) {
 	t.Helper()
 	req, err := http.NewRequest(http.MethodPost, base+httpserver.EchoPath, strings.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", key)
 	req.Header.Set("X-Request-ID", requestID)
-	req.Header.Set("X-Dev-Actor", actor)
+	req.Header.Set("Cookie", e2eCookieName+"="+sess.token)
+	req.Header.Set("X-CSRF-Token", sess.csrf)
 	return httpDo(t, req)
 }
 
@@ -173,15 +203,26 @@ func TestAPIEndToEndThroughEchoWithRealPostgresRedisAndMetrics(t *testing.T) {
 	base, stop := launchAPI(t, e2eEnv(db, rs.URL(), map[string]string{"METRICS_PORT": strconv.Itoa(metricsPort)}))
 	requireReady(t, base)
 
-	// 1) Echo lewat composition root: envelope, request_id, aktor; replay idempoten.
-	actor := id.NewID()
-	code, body, _ := echoPost(t, base, "e2e-key-0001", "e2e-req-0001", actor.String(), `{"message":"ujung ke ujung"}`)
+	// 0) Tanpa sesi ditolak; X-Dev-Actor (pengganti autentikasi M02) tidak lagi memberi identitas.
+	anon, err := http.NewRequest(http.MethodPost, base+httpserver.EchoPath, strings.NewReader(`{"message":"anonim"}`))
+	require.NoError(t, err)
+	anon.Header.Set("Content-Type", "application/json")
+	anon.Header.Set("Idempotency-Key", "e2e-key-anon")
+	anon.Header.Set("X-Dev-Actor", id.NewID().String())
+	anonCode, anonBody, _ := httpDo(t, anon)
+	require.Equal(t, http.StatusUnauthorized, anonCode, anonBody)
+	require.Contains(t, anonBody, `"code":"authentication_required"`)
+
+	// 1) Echo lewat composition root dengan sesi nyata: envelope, request_id, aktor; replay idempoten.
+	sess := newE2ESession(t, db, rs)
+	actor := sess.userID
+	code, body, _ := echoPost(t, base, "e2e-key-0001", "e2e-req-0001", sess, `{"message":"ujung ke ujung"}`)
 	require.Equal(t, http.StatusCreated, code, body)
 	require.Contains(t, body, `"message":"ujung ke ujung"`)
 	require.Contains(t, body, `"request_id":"e2e-req-0001"`)
 	require.Contains(t, body, `"actor_id":"`+actor.String()+`"`)
 
-	code, replayBody, replayHdr := echoPost(t, base, "e2e-key-0001", "e2e-req-0001", actor.String(), `{"message":"ujung ke ujung"}`)
+	code, replayBody, replayHdr := echoPost(t, base, "e2e-key-0001", "e2e-req-0001", sess, `{"message":"ujung ke ujung"}`)
 	require.Equal(t, http.StatusCreated, code)
 	require.Equal(t, "true", replayHdr.Get("Idempotent-Replayed"))
 	require.Equal(t, body, replayBody, "replay memutar ulang respons yang sama")

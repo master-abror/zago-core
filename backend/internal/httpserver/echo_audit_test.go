@@ -29,7 +29,8 @@ func TestEchoWritesOneActivityWithRequestIDActorAndClientAndLogsSameRequestID(t 
 		Redis: rdb, Log: log, SessionSecret: testSecret, Audit: audit.New(db.App, log),
 	})
 	require.NoError(t, err)
-	e := echoEnv{h: httpserver.NewHandler(httpserver.Options{Logger: log, Kernel: kern, DevEndpoints: true}), log: &logs}
+	auth := newAuthMW(t, log, newFakeSessions())
+	e := echoEnv{h: httpserver.NewHandler(httpserver.Options{Logger: log, Kernel: kern, Auth: auth, DevEndpoints: true}), log: &logs}
 
 	opts := append(okHeaders("key-audit-0001"), hdr("X-Request-ID", "req-audit-0001"), hdr("User-Agent", "audit-test/1.0"))
 	first := e.post(`{"message":"jejak audit"}`, opts...)

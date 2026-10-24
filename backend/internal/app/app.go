@@ -17,6 +17,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/master-abror/zago-core/backend/internal/audit"
+	authhttp "github.com/master-abror/zago-core/backend/internal/auth/transport/http"
 	"github.com/master-abror/zago-core/backend/internal/health"
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
@@ -186,6 +187,20 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 	} else {
 		log.Warn("tanpa klien Redis: toolkit HTTP kernel (idempotency, rate limit, cursor) tidak dirakit")
 	}
+
+	// Rantai autentikasi (docs/05 §9) butuh PostgreSQL (otoritatif) dan Redis (cache + toolkit).
+	// Tanpa salah satunya Auth tetap nil: rute yang butuh identitas menolak semua request (401).
+	var authMW *authhttp.Middleware
+	if appPool != nil && kern != nil {
+		authMW, err = newAuthMiddleware(cfg, appPool, rdb, kern.Responder, log)
+		if err != nil {
+			log.Error("gagal merakit autentikasi HTTP", "error", err)
+			return ExitFailed
+		}
+	} else {
+		log.Warn("tanpa PostgreSQL atau Redis: autentikasi HTTP tidak dirakit, rute terlindungi menolak semua request")
+	}
+
 	devEndpoints := cfg.DevEndpointsEnabled()
 	if devEndpoints && kern != nil {
 		log.Warn("endpoint dev/test aktif: " + httpserver.EchoPath + " (tidak pernah aktif di staging/production)")
@@ -214,6 +229,7 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 		TrustedProxies: cfg.TrustedProxyPrefixes(),
 		ReadyCheckers:  res.checkers(),
 		Kernel:         kern,
+		Auth:           authMW,
 		DevEndpoints:   devEndpoints,
 		Metrics:        httpMetrics,
 	})
