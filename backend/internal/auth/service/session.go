@@ -105,7 +105,7 @@ func (c cachedSession) identity() *domain.Identity {
 // meninggalkan jejak di Redis.
 type SessionService struct {
 	store    *repository.Store
-	rdb      *redis.Client
+	rdb      redis.UniversalClient
 	timeouts TimeoutSource
 	log      *slog.Logger
 	now      func() time.Time
@@ -123,8 +123,9 @@ func WithClock(now func() time.Time) Option { return func(s *SessionService) { s
 // WithActivityInterval mengganti interval pembaruan aktivitas (default 1 menit).
 func WithActivityInterval(d time.Duration) Option { return func(s *SessionService) { s.interval = d } }
 
-// NewSessionService membuat layanan sesi. rdb wajib; log opsional.
-func NewSessionService(store *repository.Store, rdb *redis.Client, timeouts TimeoutSource, log *slog.Logger, opts ...Option) *SessionService {
+// NewSessionService membuat layanan sesi. rdb wajib (klien tunggal composition root, ADR-0020);
+// log opsional.
+func NewSessionService(store *repository.Store, rdb redis.UniversalClient, timeouts TimeoutSource, log *slog.Logger, opts ...Option) *SessionService {
 	if log == nil {
 		log = slog.Default()
 	}
