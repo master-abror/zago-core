@@ -78,13 +78,7 @@ type echoHandlers struct{ k *KernelServices }
 // menolak semua request dengan 401 (fail closed).
 func mountEcho(r chi.Router, k *KernelServices, auth *authhttp.Middleware) {
 	h := &echoHandlers{k: k}
-	limit := k.RateLimiter.Middleware(EchoRule, func(req *http.Request) string {
-		ip := ClientIP(req.Context())
-		if ip == "" {
-			return ""
-		}
-		return "ip:" + ip
-	})
+	limit := k.RateLimiter.Middleware(EchoRule, ipRateKey)
 	r.With(limit).Get(EchoPath+"/items", h.items)
 	r.With(limit, requireAuth(k.Responder, auth), k.Idempotency.Require()).Post(EchoPath, h.create)
 }

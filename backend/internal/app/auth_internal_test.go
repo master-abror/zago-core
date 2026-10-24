@@ -14,8 +14,8 @@ import (
 	"github.com/master-abror/zago-core/backend/pkg/config"
 )
 
-// newAuthMiddleware hanya merakit objek (tanpa I/O): klien Redis di sini tidak pernah dihubungi.
-func TestNewAuthMiddlewareAssemblesFromConfigAndRejectsBadInputs(t *testing.T) {
+// newAuthStack hanya merakit objek (tanpa I/O): klien Redis dan pool di sini tidak pernah dipakai.
+func TestNewAuthStackAssemblesFromConfigAndRejectsBadInputs(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1"})
 	t.Cleanup(func() { _ = rdb.Close() })
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -25,19 +25,26 @@ func TestNewAuthMiddlewareAssemblesFromConfigAndRejectsBadInputs(t *testing.T) {
 		SessionSecret:      strings.Repeat("s", 40),
 		AllowedOrigins:     []string{"https://app.example.com"},
 		SessionIdleTimeout: 30 * time.Minute, SessionAbsoluteTimeout: 12 * time.Hour,
+		PasswordArgon2MemoryKiB: 64, PasswordArgon2Time: 1, PasswordArgon2Parallelism: 1, PasswordHashConcurrency: 1,
 	}
 
-	mw, err := newAuthMiddleware(&good, nil, rdb, rs, log)
+	stack, err := newAuthStack(&good, nil, rdb, nil, rs, log)
 	require.NoError(t, err)
-	require.NotNil(t, mw)
+	require.NotNil(t, stack.mw)
+	require.NotNil(t, stack.api)
 
 	badCookie := good
 	badCookie.CookieName = "__Host-x"
-	_, err = newAuthMiddleware(&badCookie, nil, rdb, rs, log)
+	_, err = newAuthStack(&badCookie, nil, rdb, nil, rs, log)
 	require.ErrorContains(t, err, "cookie sesi")
 
 	shortSecret := good
 	shortSecret.SessionSecret = "pendek"
-	_, err = newAuthMiddleware(&shortSecret, nil, rdb, rs, log)
+	_, err = newAuthStack(&shortSecret, nil, rdb, nil, rs, log)
 	require.ErrorContains(t, err, "csrf")
+
+	badParams := good
+	badParams.PasswordArgon2MemoryKiB = 0
+	_, err = newAuthStack(&badParams, nil, rdb, nil, rs, log)
+	require.ErrorContains(t, err, "hasher password")
 }

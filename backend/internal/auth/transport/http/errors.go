@@ -14,4 +14,11 @@ import (
 var (
 	// CSRFFailed: token CSRF hilang/salah/milik sesi lain, atau Origin tidak diizinkan.
 	CSRFFailed = httpx.Register(httpx.Code{Name: "csrf_failed", Status: http.StatusForbidden, Message: "CSRF validation failed."})
+
+	// InvalidCredentials: SATU kode untuk email tak dikenal, password salah, dan status akun yang
+	// belum boleh terlihat (docs/05 §18).
+	InvalidCredentials = httpx.Register(httpx.Code{Name: "invalid_credentials", Status: http.StatusUnauthorized, Message: "Invalid email or password."})
+	// AccountSuspended dan AccountLocked hanya muncul SETELAH password terverifikasi.
+	AccountSuspended = httpx.Register(httpx.Code{Name: "account_suspended", Status: http.StatusForbidden, Message: "This account is suspended."})
+	AccountLocked    = httpx.Register(httpx.Code{Name: "account_locked", Status: http.StatusLocked, Message: "This account is locked."})
 )

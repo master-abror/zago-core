@@ -67,6 +67,7 @@ type echoEnv struct {
 	audit    *fakeAudit
 	log      *bytes.Buffer
 	sessions *fakeSessions
+	authSvc  *fakeAuthSvc
 }
 
 // fakeSessions menggantikan SessionService di tes handler (SessionService diuji terhadap
@@ -135,11 +136,13 @@ func buildEcho(t *testing.T, rdb redis.UniversalClient, devEndpoints, withAuth b
 	})
 	require.NoError(t, err)
 	sessions := newFakeSessions()
+	authSvc := newFakeAuthSvc()
 	opts := httpserver.Options{Logger: log, Kernel: kern, DevEndpoints: devEndpoints}
 	if withAuth {
 		opts.Auth = newAuthMW(t, log, sessions)
+		opts.AuthAPI = newAuthHandlers(t, log, authSvc)
 	}
-	return echoEnv{h: httpserver.NewHandler(opts), audit: aud, log: &buf, sessions: sessions}
+	return echoEnv{h: httpserver.NewHandler(opts), audit: aud, log: &buf, sessions: sessions, authSvc: authSvc}
 }
 
 func liveEcho(t *testing.T) echoEnv {
