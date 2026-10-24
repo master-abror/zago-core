@@ -1,0 +1,233 @@
+package httpserver_test
+
+import (
+	"context"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+
+	"github.com/master-abror/zago-core/backend/internal/auth/domain"
+	"github.com/master-abror/zago-core/backend/internal/auth/repository"
+	"github.com/master-abror/zago-core/backend/internal/auth/service"
+	authhttp "github.com/master-abror/zago-core/backend/internal/auth/transport/http"
+	"github.com/master-abror/zago-core/backend/internal/httpserver"
+	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
+	"github.com/master-abror/zago-core/backend/internal/testkit"
+)
+
+// Tes rute /auth/* lewat httpserver.NewHandler: rantai middleware nyata (Authenticate -> CSRF ->
+// RequireAuth) di atas sesi palsu dan layanan auth palsu. Yang dibuktikan di sini adalah
+// pemasangan: siapa boleh memanggil apa, kapan CSRF dituntut, dan rate limit login.
+
+const loginBody = `{"email":"alice@example.test","password":"correct-horse-battery"}`
+
+// fakeAuthSvc mengembalikan sesi milik pengguna A dengan tokenA, sehingga cookie hasil login
+// langsung dikenali fakeSessions.
+type fakeAuthSvc struct {
+	mu          sync.Mutex
+	loginCalls  int
+	logoutCalls int
+	loginErr    error
+	gotLogout   domain.Identity
+}
+
+func newFakeAuthSvc() *fakeAuthSvc { return &fakeAuthSvc{} }
+
+func (f *fakeAuthSvc) Login(_ context.Context, _ service.LoginInput) (service.LoginResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.loginCalls++
+	if f.loginErr != nil {
+		return service.LoginResult{}, f.loginErr
+	}
+	return service.LoginResult{
+		Issued: service.Issued{Token: tokenA, Session: repository.Session{ID: sessionA, UserID: actorA, ExpiresAt: time.Now().Add(time.Hour)}},
+		User:   service.LoginUser{ID: actorA, Email: "alice@example.test", DisplayName: "Alice"},
+	}, nil
+}
+
+func (f *fakeAuthSvc) Logout(_ context.Context, id domain.Identity) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.logoutCalls++
+	f.gotLogout = id
+	return nil
+}
+
+func (f *fakeAuthSvc) Profile(_ context.Context, userID uuid.UUID) (service.Profile, error) {
+	return service.Profile{ID: userID, Email: "alice@example.test", DisplayName: "Alice", Locale: "id-ID", Timezone: "Asia/Jakarta"}, nil
+}
+
+func (f *fakeAuthSvc) calls() (login, logout int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.loginCalls, f.logoutCalls
+}
+
+func newAuthHandlers(t *testing.T, log *slog.Logger, svc authhttp.Service) *authhttp.Handlers {
+	t.Helper()
+	cookie, err := authhttp.NewCookie("platform_session", false)
+	require.NoError(t, err)
+	h, err := authhttp.NewHandlers(authhttp.HandlerDeps{Service: svc, Cookie: cookie, CSRF: testCSRF, Responder: httpx.NewResponder(log)})
+	require.NoError(t, err)
+	return h
+}
+
+func (e echoEnv) login(opts ...reqOpt) *httptest.ResponseRecorder {
+	return e.do(http.MethodPost, httpserver.AuthPath+"/login", loginBody, opts...)
+}
+
+// sessionSetCookies mengembalikan semua Set-Cookie bernama cookie sesi, sesuai urutan header.
+func sessionSetCookies(rec *httptest.ResponseRecorder) []*http.Cookie {
+	var out []*http.Cookie
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == testCookieName {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func TestAuthLoginIsPublicAndSetsTheSessionCookie(t *testing.T) {
+	e := liveEcho(t)
+
+	rec := e.login() // tanpa cookie dan tanpa CSRF: login adalah rute anonim
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	cks := sessionSetCookies(rec)
+	require.Len(t, cks, 1)
+	require.Equal(t, tokenA, cks[0].Value)
+	require.True(t, cks[0].HttpOnly)
+	var out authhttp.LoginResponse
+	require.NoError(t, json.Unmarshal(decode(t, rec).Data, &out))
+	require.True(t, testCSRF.Verify(sessionA, out.CSRFToken))
+	login, _ := e.authSvc.calls()
+	require.Equal(t, 1, login)
+}
+
+func TestAuthLoginChecksTheOriginEvenThoughItIsAnonymous(t *testing.T) {
+	e := liveEcho(t)
+
+	for _, bad := range []string{"https://evil.example", "null"} {
+		requireError(t, e.login(hdr("Origin", bad)), http.StatusForbidden, "csrf_failed")
+	}
+	login, _ := e.authSvc.calls()
+	require.Zero(t, login, "Origin asing tidak boleh sampai ke layanan login")
+
+	require.Equal(t, http.StatusOK, e.login(hdr("Origin", testOrigin)).Code)
+}
+
+func TestAuthLoginWithAStaleCookieClearsItThenIssuesAFreshOne(t *testing.T) {
+	e := liveEcho(t)
+
+	rec := e.login(hdr("Cookie", testCookieName+"=cookie-lama-yang-sudah-mati"))
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	cks := sessionSetCookies(rec)
+	require.Len(t, cks, 2, "satu penghapusan cookie basi, satu cookie baru")
+	require.Less(t, cks[0].MaxAge, 0)
+	require.Equal(t, tokenA, cks[1].Value, "yang terakhir menang di peramban")
+}
+
+func TestAuthLoginFailureIs401WithoutACookie(t *testing.T) {
+	e := liveEcho(t)
+	e.authSvc.loginErr = domain.ErrInvalidCredentials
+
+	rec := e.login()
+
+	requireError(t, rec, http.StatusUnauthorized, "invalid_credentials")
+	require.Empty(t, sessionSetCookies(rec))
+}
+
+func TestAuthLoginIsRateLimitedPerClientIP(t *testing.T) {
+	e := liveEcho(t)
+	e.authSvc.loginErr = domain.ErrInvalidCredentials
+
+	for i := 0; i < httpserver.LoginRule.Limit; i++ {
+		rec := e.login()
+		require.Equal(t, http.StatusUnauthorized, rec.Code, "percobaan ke-"+strconv.Itoa(i+1))
+	}
+	rec := e.login()
+
+	requireError(t, rec, http.StatusTooManyRequests, "rate_limit_exceeded")
+	require.Equal(t, "0", rec.Header().Get("X-RateLimit-Remaining"))
+	login, _ := e.authSvc.calls()
+	require.Equal(t, httpserver.LoginRule.Limit, login, "permintaan yang dibatasi tidak sampai ke layanan")
+}
+
+func TestAuthMeRequiresASession(t *testing.T) {
+	e := liveEcho(t)
+
+	requireError(t, e.do(http.MethodGet, httpserver.AuthPath+"/me", ""), http.StatusUnauthorized, "authentication_required")
+
+	rec := e.do(http.MethodGet, httpserver.AuthPath+"/me", "", hdr("Cookie", testCookieName+"="+tokenA))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var out authhttp.MeResponse
+	require.NoError(t, json.Unmarshal(decode(t, rec).Data, &out))
+	require.Equal(t, actorA, out.User.ID)
+	require.Equal(t, sessionA, out.Session.ID)
+	require.Nil(t, out.OrganizationID)
+}
+
+func TestAuthMeWithAnUnknownCookieIs401AndClearsIt(t *testing.T) {
+	e := liveEcho(t)
+
+	rec := e.do(http.MethodGet, httpserver.AuthPath+"/me", "", hdr("Cookie", testCookieName+"=token-tidak-dikenal"))
+
+	requireError(t, rec, http.StatusUnauthorized, "authentication_required")
+	cks := sessionSetCookies(rec)
+	require.Len(t, cks, 1)
+	require.Less(t, cks[0].MaxAge, 0)
+}
+
+func TestAuthCSRFEndpointIssuesATokenForTheCallersSession(t *testing.T) {
+	e := liveEcho(t)
+
+	requireError(t, e.do(http.MethodGet, httpserver.AuthPath+"/csrf", ""), http.StatusUnauthorized, "authentication_required")
+
+	rec := e.do(http.MethodGet, httpserver.AuthPath+"/csrf", "", hdr("Cookie", testCookieName+"="+tokenB))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var out authhttp.CSRFResponse
+	require.NoError(t, json.Unmarshal(decode(t, rec).Data, &out))
+	require.True(t, testCSRF.Verify(sessionB, out.CSRFToken))
+	require.False(t, testCSRF.Verify(sessionA, out.CSRFToken))
+}
+
+func TestAuthLogoutNeedsASessionAndAValidCSRFToken(t *testing.T) {
+	e := liveEcho(t)
+	path := httpserver.AuthPath + "/logout"
+
+	requireError(t, e.do(http.MethodPost, path, ""), http.StatusUnauthorized, "authentication_required")
+	requireError(t, e.do(http.MethodPost, path, "", hdr("Cookie", testCookieName+"="+tokenA)), http.StatusForbidden, "csrf_failed")
+	requireError(t, e.do(http.MethodPost, path, "",
+		hdr("Cookie", testCookieName+"="+tokenA), hdr(authhttp.HeaderCSRF, testCSRF.Token(sessionB))), http.StatusForbidden, "csrf_failed")
+	_, logout := e.authSvc.calls()
+	require.Zero(t, logout, "tanpa sesi dan CSRF yang sah, logout tidak boleh jalan")
+
+	rec := e.do(http.MethodPost, path, "", sessionHeaders(tokenA, sessionA)...)
+	require.Equal(t, http.StatusNoContent, rec.Code, rec.Body.String())
+	_, logout = e.authSvc.calls()
+	require.Equal(t, 1, logout)
+	require.Equal(t, sessionA, e.authSvc.gotLogout.SessionID)
+	cks := sessionSetCookies(rec)
+	require.Len(t, cks, 1)
+	require.Less(t, cks[0].MaxAge, 0, "cookie dihapus")
+}
+
+func TestAuthRoutesAreNotMountedWithoutTheirDependencies(t *testing.T) {
+	// Tanpa Auth/AuthAPI, endpoint /auth/* tidak ada (404), bukan terbuka tanpa perlindungan.
+	e := buildEcho(t, testkit.Redis(t).Client(t), true, false)
+
+	require.Equal(t, http.StatusNotFound, e.login().Code)
+	require.Equal(t, http.StatusNotFound, e.do(http.MethodGet, httpserver.AuthPath+"/me", "").Code)
+	login, logout := e.authSvc.calls()
+	require.Zero(t, login+logout)
+}

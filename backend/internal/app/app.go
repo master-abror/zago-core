@@ -17,7 +17,6 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/master-abror/zago-core/backend/internal/audit"
-	authhttp "github.com/master-abror/zago-core/backend/internal/auth/transport/http"
 	"github.com/master-abror/zago-core/backend/internal/health"
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
@@ -190,9 +189,9 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 
 	// Rantai autentikasi (docs/05 §9) butuh PostgreSQL (otoritatif) dan Redis (cache + toolkit).
 	// Tanpa salah satunya Auth tetap nil: rute yang butuh identitas menolak semua request (401).
-	var authMW *authhttp.Middleware
+	var auth authStack
 	if appPool != nil && kern != nil {
-		authMW, err = newAuthMiddleware(cfg, appPool, rdb, kern.Responder, log)
+		auth, err = newAuthStack(cfg, appPool, rdb, auditor, kern.Responder, log)
 		if err != nil {
 			log.Error("gagal merakit autentikasi HTTP", "error", err)
 			return ExitFailed
@@ -229,7 +228,8 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 		TrustedProxies: cfg.TrustedProxyPrefixes(),
 		ReadyCheckers:  res.checkers(),
 		Kernel:         kern,
-		Auth:           authMW,
+		Auth:           auth.mw,
+		AuthAPI:        auth.api,
 		DevEndpoints:   devEndpoints,
 		Metrics:        httpMetrics,
 	})

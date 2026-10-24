@@ -39,6 +39,9 @@ type Options struct {
 	// nil = tanpa autentikasi: rute yang butuh identitas menolak SEMUA request dengan 401
 	// (fail closed), tidak pernah membiarkannya lolos.
 	Auth *authhttp.Middleware
+	// AuthAPI adalah handler endpoint /auth/*. Dipasang hanya bila Kernel, Auth, dan AuthAPI semua
+	// ada (rate limit login butuh Redis; rute terlindungi butuh Auth).
+	AuthAPI *authhttp.Handlers
 }
 
 // NewHandler membangun handler root. Urutan middleware (terluar -> terdalam): RequestID,
@@ -79,6 +82,9 @@ func NewHandler(o Options) http.Handler {
 	r.Group(func(api chi.Router) {
 		if o.Auth != nil {
 			api.Use(o.Auth.Authenticate, o.Auth.CSRF)
+		}
+		if o.Kernel != nil && o.Auth != nil && o.AuthAPI != nil {
+			mountAuth(api, o.Kernel, o.Auth, o.AuthAPI)
 		}
 		if o.DevEndpoints && o.Kernel != nil {
 			mountEcho(api, o.Kernel, o.Auth)
