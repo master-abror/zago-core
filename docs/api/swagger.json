@@ -257,6 +257,119 @@
                 }
             }
         },
+        "/api/v1/security/sessions": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "security"
+                ],
+                "summary": "Sesi aktif milik pengguna",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_auth_transport_http_SessionsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/security/sessions/revoke-others": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "security"
+                ],
+                "summary": "Cabut semua sesi lain milik pengguna",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_auth_transport_http_RevokeOthersResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/security/sessions/{id}": {
+            "delete": {
+                "description": "Boleh mencabut sesi saat ini (setara logout; cookie ikut dihapus). Sesi yang tidak ada, milik orang lain, atau sudah dicabut = 404.",
+                "tags": [
+                    "security"
+                ],
+                "summary": "Cabut satu sesi milik pengguna",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID sesi",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "200 selama proses mampu melayani request; tidak memeriksa dependensi.",
@@ -412,6 +525,14 @@
                 }
             }
         },
+        "backend_internal_auth_transport_http.RevokeOthersResponse": {
+            "type": "object",
+            "properties": {
+                "revoked": {
+                    "type": "integer"
+                }
+            }
+        },
         "backend_internal_auth_transport_http.SessionSummary": {
             "type": "object",
             "properties": {
@@ -420,6 +541,49 @@
                 },
                 "id": {
                     "type": "string"
+                }
+            }
+        },
+        "backend_internal_auth_transport_http.SessionView": {
+            "type": "object",
+            "properties": {
+                "auth_level": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "current": {
+                    "type": "boolean"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "last_activity_at": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "string"
+                },
+                "user_agent": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_auth_transport_http.SessionsResponse": {
+            "type": "object",
+            "properties": {
+                "sessions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/backend_internal_auth_transport_http.SessionView"
+                    }
                 }
             }
         },
@@ -512,6 +676,28 @@
             "properties": {
                 "data": {
                     "$ref": "#/definitions/backend_internal_auth_transport_http.RefreshResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_auth_transport_http_RevokeOthersResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_auth_transport_http.RevokeOthersResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_auth_transport_http_SessionsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_auth_transport_http.SessionsResponse"
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
