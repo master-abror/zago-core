@@ -23,6 +23,7 @@ import (
 	"github.com/master-abror/zago-core/backend/internal/auth/service"
 	authhttp "github.com/master-abror/zago-core/backend/internal/auth/transport/http"
 	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
+	idgen "github.com/master-abror/zago-core/backend/pkg/id"
 )
 
 // Tes handler dengan layanan palsu (AuthService nyata diuji terhadap PostgreSQL+Redis di paket
@@ -392,7 +393,7 @@ func TestCSRFEndpointReturnsATokenBoundToTheCallersSession(t *testing.T) {
 	var out authhttp.CSRFResponse
 	dataOf(t, w, &out)
 	require.True(t, r.csrf.Verify(hSession, out.CSRFToken))
-	require.False(t, r.csrf.Verify(uuid.New(), out.CSRFToken), "tidak berlaku untuk sesi lain")
+	require.False(t, r.csrf.Verify(idgen.NewID(), out.CSRFToken), "tidak berlaku untuk sesi lain")
 
 	w = call(r.h.CSRF, httptest.NewRequest(http.MethodGet, "/api/v1/auth/csrf", nil))
 	require.Equal(t, http.StatusUnauthorized, w.Code)

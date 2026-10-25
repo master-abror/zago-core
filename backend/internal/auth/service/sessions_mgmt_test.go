@@ -11,6 +11,7 @@ import (
 	"github.com/master-abror/zago-core/backend/internal/auth/service"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
 	"github.com/master-abror/zago-core/backend/internal/testkit"
+	"github.com/master-abror/zago-core/backend/pkg/id"
 )
 
 // Manajemen sesi terhadap PostgreSQL+Redis sungguhan: daftar, cabut satu, cabut yang lain.
@@ -90,7 +91,7 @@ func TestRevokeSessionRejectsForeignUnknownAndAlreadyRevokedSessionsWithoutSideE
 
 	for name, target := range map[string]uuid.UUID{
 		"sesi pengguna lain": victimIdent.SessionID,
-		"sesi tak dikenal":   uuid.New(),
+		"sesi tak dikenal":   id.NewID(),
 		"sesi sudah dicabut": goneIdent.SessionID,
 	} {
 		err := a.auth.RevokeSession(a.ctx, attackerIdent, target)
