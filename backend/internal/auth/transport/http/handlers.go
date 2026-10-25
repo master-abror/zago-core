@@ -27,6 +27,9 @@ type Service interface {
 	Profile(ctx context.Context, userID uuid.UUID) (service.Profile, error)
 	Refresh(ctx context.Context, id domain.Identity) (service.Issued, error)
 	SwitchOrganization(ctx context.Context, id domain.Identity, orgID uuid.UUID) (service.Issued, error)
+	ListSessions(ctx context.Context, id domain.Identity) ([]service.SessionInfo, error)
+	RevokeSession(ctx context.Context, id domain.Identity, target uuid.UUID) error
+	RevokeOtherSessions(ctx context.Context, id domain.Identity) (int, error)
 }
 
 // HandlerDeps adalah dependensi Handlers. Now opsional (bawaan time.Now).
@@ -348,6 +351,8 @@ func (h *Handlers) fail(w http.ResponseWriter, r *http.Request, err error) {
 		err = AccountSuspended.New()
 	case errors.Is(err, domain.ErrAccountLocked):
 		err = AccountLocked.New()
+	case errors.Is(err, domain.ErrSessionNotFound):
+		err = httpx.ResourceNotFound.New()
 	case errors.Is(err, domain.ErrNotOrganizationMember):
 		err = httpx.PermissionDenied.New()
 	case errors.Is(err, domain.ErrUnauthenticated):

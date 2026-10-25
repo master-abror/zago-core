@@ -42,6 +42,9 @@ type fakeAuthSvc struct {
 	switchErr   error
 	gotSwitch   domain.Identity
 	gotOrg      uuid.UUID
+
+	revokeCalls int
+	gotRevoke   uuid.UUID
 }
 
 // rotated adalah sesi hasil rotasi: pengguna A dengan tokenB/sessionB (dikenali fakeSessions).
@@ -66,6 +69,31 @@ func (f *fakeAuthSvc) SwitchOrganization(_ context.Context, id domain.Identity, 
 		return service.Issued{}, f.switchErr
 	}
 	return rotated(), nil
+}
+
+func (f *fakeAuthSvc) ListSessions(_ context.Context, id domain.Identity) ([]service.SessionInfo, error) {
+	return []service.SessionInfo{{ID: id.SessionID, AuthLevel: "password", Current: true, ExpiresAt: time.Now().Add(time.Hour)}}, nil
+}
+
+func (f *fakeAuthSvc) RevokeSession(_ context.Context, _ domain.Identity, target uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.revokeCalls++
+	f.gotRevoke = target
+	return nil
+}
+
+func (f *fakeAuthSvc) RevokeOtherSessions(_ context.Context, _ domain.Identity) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.revokeCalls++
+	return 2, nil
+}
+
+func (f *fakeAuthSvc) revocations() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.revokeCalls
 }
 
 func (f *fakeAuthSvc) rotations() int {
@@ -312,4 +340,48 @@ func TestAuthSwitchOrganizationNeedsASessionAndCSRFAndMapsNonMembership(t *testi
 	cks := sessionSetCookies(rec)
 	require.Len(t, cks, 1)
 	require.Equal(t, tokenB, cks[0].Value)
+}
+
+func TestSecuritySessionRoutesNeedASessionAndCSRFForStateChanges(t *testing.T) {
+	e := liveEcho(t)
+	base := httpserver.SecurityPath + "/sessions"
+	target := uuid.MustParse("0198a000-0000-7000-8000-0000000000e1")
+
+	// Daftar: butuh sesi, tidak butuh CSRF (GET).
+	requireError(t, e.do(http.MethodGet, base, ""), http.StatusUnauthorized, "authentication_required")
+	rec := e.do(http.MethodGet, base, "", hdr("Cookie", testCookieName+"="+tokenA))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var list authhttp.SessionsResponse
+	require.NoError(t, json.Unmarshal(decode(t, rec).Data, &list))
+	require.Len(t, list.Sessions, 1)
+	require.Equal(t, sessionA, list.Sessions[0].ID)
+	require.True(t, list.Sessions[0].Current)
+
+	// DELETE dan revoke-others: anonim 401, tanpa CSRF 403, tidak ada pencabutan sebelum sah.
+	requireError(t, e.do(http.MethodDelete, base+"/"+target.String(), ""), http.StatusUnauthorized, "authentication_required")
+	requireError(t, e.do(http.MethodDelete, base+"/"+target.String(), "", hdr("Cookie", testCookieName+"="+tokenA)), http.StatusForbidden, "csrf_failed")
+	requireError(t, e.do(http.MethodPost, base+"/revoke-others", ""), http.StatusUnauthorized, "authentication_required")
+	requireError(t, e.do(http.MethodPost, base+"/revoke-others", "", hdr("Cookie", testCookieName+"="+tokenA)), http.StatusForbidden, "csrf_failed")
+	require.Zero(t, e.authSvc.revocations())
+
+	rec = e.do(http.MethodDelete, base+"/"+target.String(), "", sessionHeaders(tokenA, sessionA)...)
+	require.Equal(t, http.StatusNoContent, rec.Code, rec.Body.String())
+	require.Equal(t, target, e.authSvc.gotRevoke)
+	require.Empty(t, sessionSetCookies(rec), "sesi lain: cookie tidak disentuh")
+
+	rec = e.do(http.MethodPost, base+"/revoke-others", "", sessionHeaders(tokenA, sessionA)...)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var out authhttp.RevokeOthersResponse
+	require.NoError(t, json.Unmarshal(decode(t, rec).Data, &out))
+	require.Equal(t, 2, out.Revoked)
+	require.Equal(t, 2, e.authSvc.revocations())
+}
+
+func TestSecurityRevokeOthersIsNotShadowedByTheSessionIDRoute(t *testing.T) {
+	e := liveEcho(t)
+
+	// "revoke-others" adalah rute statis POST; sebagai {id} pada DELETE ia hanya ID cacat (404).
+	rec := e.do(http.MethodDelete, httpserver.SecurityPath+"/sessions/revoke-others", "", sessionHeaders(tokenA, sessionA)...)
+	requireError(t, rec, http.StatusNotFound, "resource_not_found")
+	require.Zero(t, e.authSvc.revocations())
 }

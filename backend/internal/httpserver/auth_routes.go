@@ -10,8 +10,11 @@ import (
 	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
 )
 
-// AuthPath adalah prefiks endpoint autentikasi.
-const AuthPath = "/api/v1/auth"
+// AuthPath dan SecurityPath adalah prefiks endpoint autentikasi dan keamanan akun.
+const (
+	AuthPath     = "/api/v1/auth"
+	SecurityPath = "/api/v1/security"
+)
 
 // LoginRule membatasi percobaan login per IP klien. Sensitive: bila Redis mati, pembatasan jatuh
 // ke memori proses (bukan fail open), karena login adalah target tebakan password. Pembatasan per
@@ -37,4 +40,8 @@ func mountAuth(r chi.Router, k *KernelServices, mw *authhttp.Middleware, h *auth
 	r.With(mw.RequireAuth).Get(AuthPath+"/csrf", h.CSRF)
 	r.With(mw.RequireAuth).Post(AuthPath+"/refresh", h.Refresh)
 	r.With(mw.RequireAuth).Post(AuthPath+"/switch-organization", h.SwitchOrganization)
+
+	r.With(mw.RequireAuth).Get(SecurityPath+"/sessions", h.ListSessions)
+	r.With(mw.RequireAuth).Delete(SecurityPath+"/sessions/{id}", h.RevokeSession)
+	r.With(mw.RequireAuth).Post(SecurityPath+"/sessions/revoke-others", h.RevokeOtherSessions)
 }
