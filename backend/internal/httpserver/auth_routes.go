@@ -29,10 +29,12 @@ func ipRateKey(r *http.Request) string {
 
 // mountAuth memasang endpoint /auth/*. Login publik (anonim), dibatasi per IP; sisanya butuh
 // sesi (RequireAuth). Authenticate dan CSRF sudah dipasang di grup API oleh NewHandler, jadi
-// logout (POST) otomatis menuntut X-CSRF-Token.
+// setiap POST terautentikasi (logout, refresh, switch-organization) menuntut X-CSRF-Token.
 func mountAuth(r chi.Router, k *KernelServices, mw *authhttp.Middleware, h *authhttp.Handlers) {
 	r.With(k.RateLimiter.Middleware(LoginRule, ipRateKey)).Post(AuthPath+"/login", h.Login)
 	r.With(mw.RequireAuth).Post(AuthPath+"/logout", h.Logout)
 	r.With(mw.RequireAuth).Get(AuthPath+"/me", h.Me)
 	r.With(mw.RequireAuth).Get(AuthPath+"/csrf", h.CSRF)
+	r.With(mw.RequireAuth).Post(AuthPath+"/refresh", h.Refresh)
+	r.With(mw.RequireAuth).Post(AuthPath+"/switch-organization", h.SwitchOrganization)
 }

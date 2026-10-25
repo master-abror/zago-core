@@ -26,10 +26,14 @@ const (
 	EventLoginFailed  = "auth.login.failed"
 	EventLogout       = "auth.logout"
 
+	EventSessionRefreshed     = "auth.session.refreshed"
+	EventOrganizationSwitched = "auth.organization.switched"
+
 	eventResultSuccess = "success"
 	eventResultFailure = "failure"
 
-	revokeReasonLogout = "logout"
+	revokeReasonLogout             = "logout"
+	revokeReasonSwitchOrganization = "switch_organization"
 )
 
 // AuthService adalah use case autentikasi di atas SessionService: login, logout, profil.
@@ -224,6 +228,77 @@ func (s *AuthService) Logout(ctx context.Context, id domain.Identity) error {
 		s.record(ctx, id.UserID, id.OrganizationID, "auth.logout", sid)
 		return nil
 	})
+}
+
+// Refresh mengganti token sesi pemanggil (docs/05 §12.2, ADR-0020): sesi lama dicabut, sesi baru
+// lahir dengan organisasi dan batas absolut yang SAMA (refresh tidak memperpanjang umur sesi)
+// dan idle clock mulai ulang. Token CSRF lama tidak berlaku lagi. Sesi yang sudah tidak sah
+// menghasilkan domain.ErrUnauthenticated.
+func (s *AuthService) Refresh(ctx context.Context, id domain.Identity) (Issued, error) {
+	var out Issued
+	err := s.tx.WithinTx(ctx, func(ctx context.Context) error {
+		ip, ua := clientInfo(ctx)
+		iss, err := s.sessions.Rotate(ctx, id, RotateOptions{IP: ip, UserAgent: ua})
+		if err != nil {
+			return err
+		}
+		sid := iss.Session.ID
+		if err := s.insertEvent(ctx, securityEvent{
+			Type: EventSessionRefreshed, Result: eventResultSuccess, UserID: id.UserID, OrgID: id.OrganizationID, SessionID: &sid,
+			Metadata: map[string]any{"previous_session_id": id.SessionID.String()},
+		}); err != nil {
+			return fmt.Errorf("auth: catat event refresh: %w", err)
+		}
+		out = iss
+		return nil
+	})
+	if err != nil {
+		return Issued{}, err
+	}
+	return out, nil
+}
+
+// SwitchOrganization memindahkan sesi ke organisasi lain tempat user menjadi anggota aktif
+// (docs/05 §12.2): keanggotaan diperiksa dan token dirotasi dalam SATU transaksi, jadi sesi tidak
+// pernah menunjuk organisasi yang bukan haknya. Bukan anggota (atau organisasi tak ada/tak aktif)
+// = domain.ErrNotOrganizationMember tanpa efek samping.
+func (s *AuthService) SwitchOrganization(ctx context.Context, id domain.Identity, orgID uuid.UUID) (Issued, error) {
+	var out Issued
+	err := s.tx.WithinTx(ctx, func(ctx context.Context) error {
+		member, err := s.store.Q(ctx).HasActiveMembership(ctx, repository.HasActiveMembershipParams{UserID: id.UserID, OrganizationID: orgID})
+		if err != nil {
+			return fmt.Errorf("auth: periksa keanggotaan: %w", err)
+		}
+		if !member {
+			return domain.ErrNotOrganizationMember
+		}
+
+		ip, ua := clientInfo(ctx)
+		iss, err := s.sessions.Rotate(ctx, id, RotateOptions{
+			Reason: revokeReasonSwitchOrganization, ChangeOrganization: true, OrganizationID: &orgID, IP: ip, UserAgent: ua,
+		})
+		if err != nil {
+			return err
+		}
+
+		meta := map[string]any{"previous_session_id": id.SessionID.String()}
+		if id.OrganizationID != nil {
+			meta["from_organization_id"] = id.OrganizationID.String()
+		}
+		sid := iss.Session.ID
+		if err := s.insertEvent(ctx, securityEvent{
+			Type: EventOrganizationSwitched, Result: eventResultSuccess, UserID: id.UserID, OrgID: &orgID, SessionID: &sid, Metadata: meta,
+		}); err != nil {
+			return fmt.Errorf("auth: catat event pindah organisasi: %w", err)
+		}
+		s.record(ctx, id.UserID, &orgID, "auth.switch_organization", sid)
+		out = iss
+		return nil
+	})
+	if err != nil {
+		return Issued{}, err
+	}
+	return out, nil
 }
 
 // Profile adalah data diri pengguna untuk GET /auth/me.

@@ -37,6 +37,41 @@ type fakeAuthSvc struct {
 	logoutCalls int
 	loginErr    error
 	gotLogout   domain.Identity
+
+	rotateCalls int
+	switchErr   error
+	gotSwitch   domain.Identity
+	gotOrg      uuid.UUID
+}
+
+// rotated adalah sesi hasil rotasi: pengguna A dengan tokenB/sessionB (dikenali fakeSessions).
+func rotated() service.Issued {
+	return service.Issued{Token: tokenB, Session: repository.Session{ID: sessionB, UserID: actorA, ExpiresAt: time.Now().Add(time.Hour)}}
+}
+
+func (f *fakeAuthSvc) Refresh(_ context.Context, id domain.Identity) (service.Issued, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.rotateCalls++
+	f.gotSwitch = id
+	return rotated(), nil
+}
+
+func (f *fakeAuthSvc) SwitchOrganization(_ context.Context, id domain.Identity, orgID uuid.UUID) (service.Issued, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.rotateCalls++
+	f.gotSwitch, f.gotOrg = id, orgID
+	if f.switchErr != nil {
+		return service.Issued{}, f.switchErr
+	}
+	return rotated(), nil
+}
+
+func (f *fakeAuthSvc) rotations() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.rotateCalls
 }
 
 func newFakeAuthSvc() *fakeAuthSvc { return &fakeAuthSvc{} }
@@ -230,4 +265,51 @@ func TestAuthRoutesAreNotMountedWithoutTheirDependencies(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, e.do(http.MethodGet, httpserver.AuthPath+"/me", "").Code)
 	login, logout := e.authSvc.calls()
 	require.Zero(t, login+logout)
+}
+
+func TestAuthRefreshNeedsASessionAndCSRFAndRotatesTheCookie(t *testing.T) {
+	e := liveEcho(t)
+	path := httpserver.AuthPath + "/refresh"
+
+	requireError(t, e.do(http.MethodPost, path, ""), http.StatusUnauthorized, "authentication_required")
+	requireError(t, e.do(http.MethodPost, path, "", hdr("Cookie", testCookieName+"="+tokenA)), http.StatusForbidden, "csrf_failed")
+	require.Zero(t, e.authSvc.rotations(), "tanpa sesi dan CSRF sah, rotasi tidak boleh jalan")
+
+	rec := e.do(http.MethodPost, path, "", sessionHeaders(tokenA, sessionA)...)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, 1, e.authSvc.rotations())
+	require.Equal(t, sessionA, e.authSvc.gotSwitch.SessionID, "layanan menerima identitas dari sesi")
+	cks := sessionSetCookies(rec)
+	require.Len(t, cks, 1)
+	require.Equal(t, tokenB, cks[0].Value)
+	var out authhttp.RefreshResponse
+	require.NoError(t, json.Unmarshal(decode(t, rec).Data, &out))
+	require.True(t, testCSRF.Verify(sessionB, out.CSRFToken))
+	require.False(t, testCSRF.Verify(sessionA, out.CSRFToken))
+}
+
+func TestAuthSwitchOrganizationNeedsASessionAndCSRFAndMapsNonMembership(t *testing.T) {
+	e := liveEcho(t)
+	path := httpserver.AuthPath + "/switch-organization"
+	org := uuid.MustParse("0198a000-0000-7000-8000-0000000000d1")
+	body := `{"organization_id":"` + org.String() + `"}`
+
+	requireError(t, e.do(http.MethodPost, path, body, hdr("Content-Type", "application/json")), http.StatusUnauthorized, "authentication_required")
+	requireError(t, e.do(http.MethodPost, path, body, hdr("Content-Type", "application/json"), hdr("Cookie", testCookieName+"="+tokenA)),
+		http.StatusForbidden, "csrf_failed")
+	require.Zero(t, e.authSvc.rotations())
+
+	e.authSvc.switchErr = domain.ErrNotOrganizationMember
+	rec := e.do(http.MethodPost, path, body, append(sessionHeaders(tokenA, sessionA), hdr("Content-Type", "application/json"))...)
+	requireError(t, rec, http.StatusForbidden, "permission_denied")
+	require.Empty(t, sessionSetCookies(rec), "penolakan tidak menyentuh cookie")
+
+	e.authSvc.switchErr = nil
+	rec = e.do(http.MethodPost, path, body, append(sessionHeaders(tokenA, sessionA), hdr("Content-Type", "application/json"))...)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, org, e.authSvc.gotOrg)
+	cks := sessionSetCookies(rec)
+	require.Len(t, cks, 1)
+	require.Equal(t, tokenB, cks[0].Value)
 }
