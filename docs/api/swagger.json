@@ -157,6 +157,106 @@
                 }
             }
         },
+        "/api/v1/auth/refresh": {
+            "post": {
+                "description": "Mengganti cookie sesi dan token CSRF; idle clock mulai ulang, batas absolut sesi TIDAK bertambah (ADR-0020).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Ganti token sesi (rotasi)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_auth_transport_http_RefreshResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/switch-organization": {
+            "post": {
+                "description": "Hanya ke organisasi tempat pengguna menjadi anggota aktif. Token sesi dan token CSRF diganti.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Pindah organisasi aktif sesi",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Organisasi tujuan",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_auth_transport_http.SwitchOrganizationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_auth_transport_http_SwitchOrganizationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied (bukan anggota aktif) | csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "200 selama proses mampu melayani request; tidak memeriksa dependensi.",
@@ -301,6 +401,17 @@
                 }
             }
         },
+        "backend_internal_auth_transport_http.RefreshResponse": {
+            "type": "object",
+            "properties": {
+                "csrf_token": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                }
+            }
+        },
         "backend_internal_auth_transport_http.SessionSummary": {
             "type": "object",
             "properties": {
@@ -308,6 +419,28 @@
                     "type": "string"
                 },
                 "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_auth_transport_http.SwitchOrganizationRequest": {
+            "type": "object",
+            "properties": {
+                "organization_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_auth_transport_http.SwitchOrganizationResponse": {
+            "type": "object",
+            "properties": {
+                "csrf_token": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "organization_id": {
                     "type": "string"
                 }
             }
@@ -368,6 +501,28 @@
             "properties": {
                 "data": {
                     "$ref": "#/definitions/backend_internal_auth_transport_http.MeResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_auth_transport_http_RefreshResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_auth_transport_http.RefreshResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_auth_transport_http_SwitchOrganizationResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_auth_transport_http.SwitchOrganizationResponse"
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
