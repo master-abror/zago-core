@@ -38,7 +38,16 @@ var (
 	hSession = uuid.MustParse("0198a000-0000-7000-8000-0000000000c2")
 	hOrg     = uuid.MustParse("0198a000-0000-7000-8000-0000000000c3")
 	hNow     = time.Date(2026, 10, 25, 9, 0, 0, 0, time.UTC)
+
+	hSession2 = uuid.MustParse("0198a000-0000-7000-8000-0000000000c4")
+	hOrg2     = uuid.MustParse("0198a000-0000-7000-8000-0000000000c5")
 )
+
+const rotatedToken = "token-sesi-baru-0123456789abcdef0123456789abcd"
+
+func rotatedIssued() service.Issued {
+	return service.Issued{Token: rotatedToken, Session: repository.Session{ID: hSession2, UserID: hUser, ExpiresAt: hNow.Add(11 * time.Hour)}}
+}
 
 type fakeSvc struct {
 	mu         sync.Mutex
@@ -50,6 +59,14 @@ type fakeSvc struct {
 	profileErr error
 	gotLogin   service.LoginInput
 	gotLogout  domain.Identity
+
+	refreshRes service.Issued
+	refreshErr error
+	switchRes  service.Issued
+	switchErr  error
+	gotRefresh domain.Identity
+	gotSwitch  domain.Identity
+	gotOrg     uuid.UUID
 }
 
 func (f *fakeSvc) Login(_ context.Context, in service.LoginInput) (service.LoginResult, error) {
@@ -73,6 +90,23 @@ func (f *fakeSvc) Profile(_ context.Context, _ uuid.UUID) (service.Profile, erro
 	defer f.mu.Unlock()
 	f.calls++
 	return f.profile, f.profileErr
+}
+
+func (f *fakeSvc) Refresh(_ context.Context, id domain.Identity) (service.Issued, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	f.gotRefresh = id
+	return f.refreshRes, f.refreshErr
+}
+
+func (f *fakeSvc) SwitchOrganization(_ context.Context, id domain.Identity, orgID uuid.UUID) (service.Issued, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	f.gotSwitch = id
+	f.gotOrg = orgID
+	return f.switchRes, f.switchErr
 }
 
 func (f *fakeSvc) callCount() int {
@@ -360,5 +394,126 @@ func TestLogoutKeepsTheCookieWhenRevocationFailsAndNeedsAnIdentity(t *testing.T)
 	r2 := newHandlerRig(t)
 	w = call(r2.h.Logout, httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil))
 	require.Equal(t, http.StatusUnauthorized, w.Code)
+	require.Zero(t, r2.svc.callCount())
+}
+
+func TestRefreshSetsANewCookieAndAFreshCSRFTokenBoundToTheNewSession(t *testing.T) {
+	r := newHandlerRig(t)
+	r.svc.refreshRes = rotatedIssued()
+
+	w := call(r.h.Refresh, withIdentity(httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", nil)))
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+	require.Equal(t, hSession, r.svc.gotRefresh.SessionID, "layanan menerima identitas pemanggil")
+	cks := sessionCookies(w)
+	require.Len(t, cks, 1)
+	require.Equal(t, rotatedToken, cks[0].Value)
+	require.True(t, cks[0].HttpOnly)
+	require.Equal(t, 11*3600, cks[0].MaxAge, "cookie baru berakhir di batas absolut sesi yang sama")
+
+	var out authhttp.RefreshResponse
+	dataOf(t, w, &out)
+	require.True(t, r.csrf.Verify(hSession2, out.CSRFToken))
+	require.False(t, r.csrf.Verify(hSession, out.CSRFToken), "token CSRF lama tidak boleh disalin")
+	require.True(t, out.ExpiresAt.Equal(hNow.Add(11*time.Hour)))
+	require.NotContains(t, w.Body.String(), rotatedToken)
+}
+
+func TestRefreshFailuresMapToStableCodesWithoutTouchingTheCookie(t *testing.T) {
+	cases := []struct {
+		name   string
+		err    error
+		status int
+		code   string
+	}{
+		{"sesi sudah tidak sah", domain.ErrUnauthenticated, http.StatusUnauthorized, "authentication_required"},
+		{"infrastruktur", errors.New("redis: rahasia-internal"), http.StatusInternalServerError, "internal_error"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newHandlerRig(t)
+			r.svc.refreshErr = tc.err
+
+			w := call(r.h.Refresh, withIdentity(httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", nil)))
+
+			require.Equal(t, tc.status, w.Code, w.Body.String())
+			require.Equal(t, tc.code, errCode(t, w))
+			require.Empty(t, w.Result().Cookies())
+			require.NotContains(t, w.Body.String(), "rahasia-internal")
+		})
+	}
+
+	r := newHandlerRig(t)
+	w := call(r.h.Refresh, httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", nil))
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+	require.Zero(t, r.svc.callCount(), "tanpa identitas layanan tidak dipanggil")
+}
+
+func TestSwitchOrganizationRotatesTheCookieAndReturnsTheNewCSRFToken(t *testing.T) {
+	r := newHandlerRig(t)
+	r.svc.switchRes = rotatedIssued()
+
+	w := call(r.h.SwitchOrganization, withIdentity(jsonReq(http.MethodPost, `{"organization_id":"`+hOrg2.String()+`"}`)))
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Equal(t, hOrg2, r.svc.gotOrg)
+	require.Equal(t, hSession, r.svc.gotSwitch.SessionID)
+	cks := sessionCookies(w)
+	require.Len(t, cks, 1)
+	require.Equal(t, rotatedToken, cks[0].Value)
+	var out authhttp.SwitchOrganizationResponse
+	dataOf(t, w, &out)
+	require.Equal(t, hOrg2, out.OrganizationID)
+	require.True(t, r.csrf.Verify(hSession2, out.CSRFToken))
+	require.False(t, r.csrf.Verify(hSession, out.CSRFToken))
+	require.NotContains(t, w.Body.String(), rotatedToken)
+}
+
+func TestSwitchOrganizationRejectsBadBodiesWithoutCallingTheService(t *testing.T) {
+	cases := []struct {
+		name        string
+		body        string
+		contentType string
+		status      int
+		code        string
+	}{
+		{"objek kosong", `{}`, "application/json", http.StatusBadRequest, "validation_failed"},
+		{"id kosong", `{"organization_id":""}`, "application/json", http.StatusBadRequest, "validation_failed"},
+		{"bukan uuid", `{"organization_id":"org-1"}`, "application/json", http.StatusBadRequest, "validation_failed"},
+		{"uuid nol", `{"organization_id":"00000000-0000-0000-0000-000000000000"}`, "application/json", http.StatusBadRequest, "validation_failed"},
+		{"bukan string", `{"organization_id":123}`, "application/json", http.StatusBadRequest, "validation_failed"},
+		{"field tak dikenal", `{"organization_id":"` + hOrg2.String() + `","platform":true}`, "application/json", http.StatusBadRequest, "validation_failed"},
+		{"bukan JSON", `organization_id=x`, "text/plain", http.StatusUnsupportedMediaType, "unsupported_media_type"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newHandlerRig(t)
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/switch-organization", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", tc.contentType)
+
+			w := call(r.h.SwitchOrganization, withIdentity(req))
+
+			require.Equal(t, tc.status, w.Code, w.Body.String())
+			require.Equal(t, tc.code, errCode(t, w))
+			require.Zero(t, r.svc.callCount())
+			require.Empty(t, w.Result().Cookies())
+		})
+	}
+}
+
+func TestSwitchOrganizationMapsNonMembershipTo403AndKeepsTheCookie(t *testing.T) {
+	r := newHandlerRig(t)
+	r.svc.switchErr = domain.ErrNotOrganizationMember
+
+	w := call(r.h.SwitchOrganization, withIdentity(jsonReq(http.MethodPost, `{"organization_id":"`+hOrg2.String()+`"}`)))
+
+	require.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+	require.Equal(t, "permission_denied", errCode(t, w))
+	require.Empty(t, w.Result().Cookies())
+
+	r2 := newHandlerRig(t)
+	w = call(r2.h.SwitchOrganization, jsonReq(http.MethodPost, `{"organization_id":"`+hOrg2.String()+`"}`))
+	require.Equal(t, http.StatusUnauthorized, w.Code, "tanpa identitas")
 	require.Zero(t, r2.svc.callCount())
 }

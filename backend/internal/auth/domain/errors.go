@@ -22,4 +22,8 @@ var (
 	// (docs/05 §18): sebelum itu setiap kegagalan adalah ErrInvalidCredentials.
 	ErrAccountSuspended = errors.New("auth: akun ditangguhkan")
 	ErrAccountLocked    = errors.New("auth: akun terkunci")
+
+	// ErrNotOrganizationMember: user bukan anggota aktif organisasi tujuan (atau organisasinya
+	// tidak ada / tidak aktif). Satu kesalahan untuk semuanya: tidak ada oracle keberadaan organisasi.
+	ErrNotOrganizationMember = errors.New("auth: bukan anggota aktif organisasi")
 )

@@ -14,6 +14,7 @@ import (
 	authhttp "github.com/master-abror/zago-core/backend/internal/auth/transport/http"
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
 	"github.com/master-abror/zago-core/backend/internal/testkit"
+	"github.com/master-abror/zago-core/backend/pkg/id"
 	"github.com/master-abror/zago-core/backend/pkg/security"
 )
 
@@ -196,4 +197,126 @@ func TestAuthFlowEndToEndWithRealPostgresAndRedis(t *testing.T) {
 	require.NoError(t, db.Migrator.QueryRow(ctx,
 		`SELECT count(*) FROM activities WHERE actor_user_id = $1 AND action IN ('auth.login', 'auth.logout')`, u.ID).Scan(&activities))
 	require.Equal(t, 2, activities)
+}
+
+func TestAuthRefreshAndSwitchOrganizationEndToEnd(t *testing.T) {
+	db := testkit.NewDB(t)
+	rs := testkit.Redis(t)
+	base, _ := launchAPI(t, e2eEnv(db, rs.URL(), map[string]string{
+		"PASSWORD_ARGON2_MEMORY_KIB": "8192", "PASSWORD_ARGON2_TIME": "1", "PASSWORD_ARGON2_PARALLELISM": "2",
+	}))
+	requireReady(t, base)
+	ctx := context.Background()
+
+	orgA := testkit.NewOrganization(t, db)
+	orgB := testkit.NewOrganization(t, db)
+	orgC := testkit.NewOrganization(t, db) // user bukan anggota
+	u := testkit.NewUser(t, db, testkit.InOrganization(orgA))
+	_, err := db.Migrator.Exec(ctx,
+		`INSERT INTO organization_memberships (id, organization_id, user_id, status, joined_at) VALUES ($1, $2, $3, 'active', now())`,
+		id.NewID(), orgB.ID, u.ID)
+	require.NoError(t, err)
+	params, err := security.Argon2ParamsFromInts(8192, 1, 2)
+	require.NoError(t, err)
+	hasher, err := security.NewArgon2idHasher(params, 1)
+	require.NoError(t, err)
+	hash, err := hasher.Hash(ctx, e2ePassword)
+	require.NoError(t, err)
+	_, err = db.Migrator.Exec(ctx,
+		`INSERT INTO credentials (user_id, credential_type, secret_hash) VALUES ($1, 'password', $2)`, u.ID, hash)
+	require.NoError(t, err)
+
+	authURL := func(p string) string { return base + httpserver.AuthPath + p }
+	withSession := func(token, csrf string) map[string]string {
+		return map[string]string{"Cookie": e2eCookieName + "=" + token, authhttp.HeaderCSRF: csrf}
+	}
+	meOrg := func(token string) (int, string) {
+		code, body, _ := authE2ERequest(t, http.MethodGet, authURL("/me"), "", map[string]string{"Cookie": e2eCookieName + "=" + token})
+		if code != http.StatusOK {
+			return code, ""
+		}
+		var mr authhttp.MeResponse
+		authE2EData(t, body, &mr)
+		if mr.OrganizationID == nil {
+			return code, ""
+		}
+		return code, mr.OrganizationID.String()
+	}
+
+	// Login: organisasi awal adalah keanggotaan tertua (A).
+	b, err := json.Marshal(map[string]string{"email": u.Email, "password": e2ePassword})
+	require.NoError(t, err)
+	code, body, hdr := authE2ERequest(t, http.MethodPost, authURL("/login"), string(b), nil)
+	require.Equal(t, http.StatusOK, code, body)
+	token1 := authE2ECookies(hdr)[0].Value
+	var lr authhttp.LoginResponse
+	authE2EData(t, body, &lr)
+	code, org := meOrg(token1)
+	require.Equal(t, http.StatusOK, code)
+	require.Equal(t, orgA.ID.String(), org)
+
+	// Refresh: token dan CSRF berganti, organisasi tetap, token lama mati.
+	code, body, hdr = authE2ERequest(t, http.MethodPost, authURL("/refresh"), "", withSession(token1, lr.CSRFToken))
+	require.Equal(t, http.StatusOK, code, body)
+	token2 := authE2ECookies(hdr)[0].Value
+	var rr authhttp.RefreshResponse
+	authE2EData(t, body, &rr)
+	require.NotEqual(t, token1, token2)
+	require.NotEqual(t, lr.CSRFToken, rr.CSRFToken)
+	code, _ = meOrg(token1)
+	require.Equal(t, http.StatusUnauthorized, code, "token lama mati setelah rotasi")
+	code, org = meOrg(token2)
+	require.Equal(t, http.StatusOK, code)
+	require.Equal(t, orgA.ID.String(), org)
+
+	// Token CSRF lama tidak berlaku untuk sesi baru.
+	code, body, _ = authE2ERequest(t, http.MethodPost, authURL("/refresh"), "", withSession(token2, lr.CSRFToken))
+	require.Equal(t, http.StatusForbidden, code, body)
+
+	// Pindah ke organisasi yang bukan haknya ditolak tanpa efek.
+	toOrg := func(o testkit.Organization) string {
+		out, err := json.Marshal(map[string]string{"organization_id": o.ID.String()})
+		require.NoError(t, err)
+		return string(out)
+	}
+	code, body, hdr = authE2ERequest(t, http.MethodPost, authURL("/switch-organization"), toOrg(orgC), withSession(token2, rr.CSRFToken))
+	require.Equal(t, http.StatusForbidden, code, body)
+	errCode, _ := authE2EError(t, body)
+	require.Equal(t, "permission_denied", errCode)
+	require.Empty(t, authE2ECookies(hdr))
+	code, org = meOrg(token2)
+	require.Equal(t, http.StatusOK, code, "sesi tidak tersentuh oleh penolakan")
+	require.Equal(t, orgA.ID.String(), org)
+
+	// Pindah ke B (anggota aktif): token berganti dan identitas kini di B.
+	code, body, hdr = authE2ERequest(t, http.MethodPost, authURL("/switch-organization"), toOrg(orgB), withSession(token2, rr.CSRFToken))
+	require.Equal(t, http.StatusOK, code, body)
+	token3 := authE2ECookies(hdr)[0].Value
+	var sr authhttp.SwitchOrganizationResponse
+	authE2EData(t, body, &sr)
+	require.Equal(t, orgB.ID, sr.OrganizationID)
+	require.NotEqual(t, rr.CSRFToken, sr.CSRFToken)
+	code, _ = meOrg(token2)
+	require.Equal(t, http.StatusUnauthorized, code)
+	code, org = meOrg(token3)
+	require.Equal(t, http.StatusOK, code)
+	require.Equal(t, orgB.ID.String(), org)
+
+	// Jejak: event keamanan berurutan dan activity pindah organisasi.
+	rows, err := db.Migrator.Query(ctx,
+		`SELECT event_type FROM security_events WHERE user_id = $1 ORDER BY created_at, id`, u.ID)
+	require.NoError(t, err)
+	var got []string
+	for rows.Next() {
+		var typ string
+		require.NoError(t, rows.Scan(&typ))
+		got = append(got, typ)
+	}
+	require.NoError(t, rows.Err())
+	rows.Close()
+	require.Equal(t, []string{service.EventLoginSuccess, service.EventSessionRefreshed, service.EventOrganizationSwitched}, got)
+	var switched int
+	require.NoError(t, db.Migrator.QueryRow(ctx,
+		`SELECT count(*) FROM activities WHERE actor_user_id = $1 AND action = 'auth.switch_organization'`, u.ID).Scan(&switched))
+	require.Equal(t, 1, switched)
 }

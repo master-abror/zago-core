@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	loginMaxBodyBytes = 4 << 10
-	maxEmailLen       = 254 // batas praktis RFC 5321
+	loginMaxBodyBytes  = 4 << 10
+	switchMaxBodyBytes = 1 << 10
+	maxEmailLen        = 254 // batas praktis RFC 5321
 )
 
 // Service adalah use case yang dipanggil handler (diimplementasikan service.AuthService).
@@ -24,6 +25,8 @@ type Service interface {
 	Login(ctx context.Context, in service.LoginInput) (service.LoginResult, error)
 	Logout(ctx context.Context, id domain.Identity) error
 	Profile(ctx context.Context, userID uuid.UUID) (service.Profile, error)
+	Refresh(ctx context.Context, id domain.Identity) (service.Issued, error)
+	SwitchOrganization(ctx context.Context, id domain.Identity, orgID uuid.UUID) (service.Issued, error)
 }
 
 // HandlerDeps adalah dependensi Handlers. Now opsional (bawaan time.Now).
@@ -240,6 +243,101 @@ func (h *Handlers) CSRF(w http.ResponseWriter, r *http.Request) {
 	h.rs.OK(w, r, CSRFResponse{CSRFToken: h.csrf.Token(id.SessionID)}, nil)
 }
 
+// RefreshResponse adalah data respons POST /auth/refresh. Token CSRF lama tidak berlaku lagi
+// (terikat ke sesi lama): klien wajib memakai yang baru.
+type RefreshResponse struct {
+	CSRFToken string    `json:"csrf_token"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// Refresh godoc
+//
+//	@Summary		Ganti token sesi (rotasi)
+//	@Description	Mengganti cookie sesi dan token CSRF; idle clock mulai ulang, batas absolut sesi TIDAK bertambah (ADR-0020).
+//	@Tags			auth
+//	@Produce		json
+//	@Param			X-CSRF-Token	header		string	true	"Token CSRF sesi"
+//	@Success		200				{object}	httpx.Envelope[authhttp.RefreshResponse]
+//	@Failure		401				{object}	httpx.ErrorEnvelope	"authentication_required"
+//	@Failure		403				{object}	httpx.ErrorEnvelope	"csrf_failed"
+//	@Router			/api/v1/auth/refresh [post]
+func (h *Handlers) Refresh(w http.ResponseWriter, r *http.Request) {
+	id, ok := domain.IdentityFromContext(r.Context())
+	if !ok {
+		h.rs.Error(w, r, httpx.AuthenticationRequired.New())
+		return
+	}
+	iss, err := h.svc.Refresh(r.Context(), id)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	h.ck.Set(w, iss.Token, iss.Session.ExpiresAt, h.now())
+	noStore(w)
+	h.rs.OK(w, r, RefreshResponse{CSRFToken: h.csrf.Token(iss.Session.ID), ExpiresAt: iss.Session.ExpiresAt}, nil)
+}
+
+// SwitchOrganizationRequest adalah body POST /auth/switch-organization.
+type SwitchOrganizationRequest struct {
+	OrganizationID string `json:"organization_id"`
+}
+
+// SwitchOrganizationResponse adalah data respons POST /auth/switch-organization.
+type SwitchOrganizationResponse struct {
+	OrganizationID uuid.UUID `json:"organization_id"`
+	CSRFToken      string    `json:"csrf_token"`
+	ExpiresAt      time.Time `json:"expires_at"`
+}
+
+// SwitchOrganization godoc
+//
+//	@Summary		Pindah organisasi aktif sesi
+//	@Description	Hanya ke organisasi tempat pengguna menjadi anggota aktif. Token sesi dan token CSRF diganti.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			X-CSRF-Token	header		string							true	"Token CSRF sesi"
+//	@Param			body			body		authhttp.SwitchOrganizationRequest	true	"Organisasi tujuan"
+//	@Success		200				{object}	httpx.Envelope[authhttp.SwitchOrganizationResponse]
+//	@Failure		400				{object}	httpx.ErrorEnvelope	"validation_failed"
+//	@Failure		401				{object}	httpx.ErrorEnvelope	"authentication_required"
+//	@Failure		403				{object}	httpx.ErrorEnvelope	"permission_denied (bukan anggota aktif) | csrf_failed"
+//	@Router			/api/v1/auth/switch-organization [post]
+func (h *Handlers) SwitchOrganization(w http.ResponseWriter, r *http.Request) {
+	id, ok := domain.IdentityFromContext(r.Context())
+	if !ok {
+		h.rs.Error(w, r, httpx.AuthenticationRequired.New())
+		return
+	}
+	var req SwitchOrganizationRequest
+	if err := httpx.DecodeJSON(w, r, &req, switchMaxBodyBytes); err != nil {
+		h.rs.Error(w, r, err)
+		return
+	}
+	orgID, err := uuid.Parse(strings.TrimSpace(req.OrganizationID))
+	if err != nil || orgID == uuid.Nil {
+		var f httpx.Fields
+		if strings.TrimSpace(req.OrganizationID) == "" {
+			f.Add("organization_id", "required", "Organization is required.")
+		} else {
+			f.Add("organization_id", "invalid", "Organization ID is invalid.")
+		}
+		h.rs.Error(w, r, f.Err())
+		return
+	}
+
+	iss, err := h.svc.SwitchOrganization(r.Context(), id, orgID)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	h.ck.Set(w, iss.Token, iss.Session.ExpiresAt, h.now())
+	noStore(w)
+	h.rs.OK(w, r, SwitchOrganizationResponse{
+		OrganizationID: orgID, CSRFToken: h.csrf.Token(iss.Session.ID), ExpiresAt: iss.Session.ExpiresAt,
+	}, nil)
+}
+
 // fail memetakan kesalahan layanan ke kode error API. Kesalahan tak dikenal diteruskan apa
 // adanya: Responder menjadikannya 500 internal_error tanpa membocorkan teksnya.
 func (h *Handlers) fail(w http.ResponseWriter, r *http.Request, err error) {
@@ -250,6 +348,8 @@ func (h *Handlers) fail(w http.ResponseWriter, r *http.Request, err error) {
 		err = AccountSuspended.New()
 	case errors.Is(err, domain.ErrAccountLocked):
 		err = AccountLocked.New()
+	case errors.Is(err, domain.ErrNotOrganizationMember):
+		err = httpx.PermissionDenied.New()
 	case errors.Is(err, domain.ErrUnauthenticated):
 		err = httpx.AuthenticationRequired.New()
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
