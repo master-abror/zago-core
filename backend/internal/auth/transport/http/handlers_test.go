@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
@@ -67,6 +68,13 @@ type fakeSvc struct {
 	gotRefresh domain.Identity
 	gotSwitch  domain.Identity
 	gotOrg     uuid.UUID
+
+	sessions    []service.SessionInfo
+	sessionsErr error
+	revokeErr   error
+	gotRevoke   uuid.UUID
+	revokedN    int
+	othersErr   error
 }
 
 func (f *fakeSvc) Login(_ context.Context, in service.LoginInput) (service.LoginResult, error) {
@@ -107,6 +115,28 @@ func (f *fakeSvc) SwitchOrganization(_ context.Context, id domain.Identity, orgI
 	f.gotSwitch = id
 	f.gotOrg = orgID
 	return f.switchRes, f.switchErr
+}
+
+func (f *fakeSvc) ListSessions(_ context.Context, _ domain.Identity) ([]service.SessionInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	return f.sessions, f.sessionsErr
+}
+
+func (f *fakeSvc) RevokeSession(_ context.Context, _ domain.Identity, target uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	f.gotRevoke = target
+	return f.revokeErr
+}
+
+func (f *fakeSvc) RevokeOtherSessions(_ context.Context, _ domain.Identity) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	return f.revokedN, f.othersErr
 }
 
 func (f *fakeSvc) callCount() int {
@@ -516,4 +546,93 @@ func TestSwitchOrganizationMapsNonMembershipTo403AndKeepsTheCookie(t *testing.T)
 	w = call(r2.h.SwitchOrganization, jsonReq(http.MethodPost, `{"organization_id":"`+hOrg2.String()+`"}`))
 	require.Equal(t, http.StatusUnauthorized, w.Code, "tanpa identitas")
 	require.Zero(t, r2.svc.callCount())
+}
+
+// withPathID menyetel parameter {id} seperti yang dilakukan router chi.
+func withPathID(r *http.Request, id string) *http.Request {
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", id)
+	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+}
+
+func TestListSessionsReturnsViewsWithoutAnyTokenMaterial(t *testing.T) {
+	r := newHandlerRig(t)
+	ua := "Mozilla/5.0 (uji)"
+	r.svc.sessions = []service.SessionInfo{
+		{ID: hSession, CreatedAt: hNow, LastActivityAt: hNow, ExpiresAt: hNow.Add(time.Hour), IPAddress: "203.0.113.9", UserAgent: &ua, AuthLevel: "password", Current: true},
+		{ID: hSession2, CreatedAt: hNow.Add(-time.Hour), LastActivityAt: hNow, ExpiresAt: hNow.Add(time.Hour), AuthLevel: "password"},
+	}
+
+	w := call(r.h.ListSessions, withIdentity(httptest.NewRequest(http.MethodGet, "/api/v1/security/sessions", nil)))
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+	var out authhttp.SessionsResponse
+	dataOf(t, w, &out)
+	require.Len(t, out.Sessions, 2)
+	require.True(t, out.Sessions[0].Current)
+	require.False(t, out.Sessions[1].Current)
+	require.Equal(t, "203.0.113.9", out.Sessions[0].IPAddress)
+	require.NotContains(t, w.Body.String(), "token", "tidak ada materi token pada daftar sesi")
+
+	r.svc.sessions = nil
+	w = call(r.h.ListSessions, withIdentity(httptest.NewRequest(http.MethodGet, "/api/v1/security/sessions", nil)))
+	require.Contains(t, w.Body.String(), `"sessions":[]`, "daftar kosong adalah [] bukan null")
+
+	w = call(r.h.ListSessions, httptest.NewRequest(http.MethodGet, "/api/v1/security/sessions", nil))
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestRevokeSessionClearsTheCookieOnlyWhenTheCurrentSessionIsRevoked(t *testing.T) {
+	r := newHandlerRig(t)
+
+	w := call(r.h.RevokeSession, withPathID(withIdentity(httptest.NewRequest(http.MethodDelete, "/x", nil)), hSession2.String()))
+	require.Equal(t, http.StatusNoContent, w.Code, w.Body.String())
+	require.Equal(t, hSession2, r.svc.gotRevoke)
+	require.Empty(t, sessionCookies(w), "mencabut sesi lain tidak menyentuh cookie")
+
+	w = call(r.h.RevokeSession, withPathID(withIdentity(httptest.NewRequest(http.MethodDelete, "/x", nil)), hSession.String()))
+	require.Equal(t, http.StatusNoContent, w.Code)
+	cks := sessionCookies(w)
+	require.Len(t, cks, 1)
+	require.Less(t, cks[0].MaxAge, 0, "mencabut sesi saat ini setara logout: cookie dihapus")
+}
+
+func TestRevokeSessionTreatsBadIDsAndMissingSessionsAs404(t *testing.T) {
+	r := newHandlerRig(t)
+
+	w := call(r.h.RevokeSession, withPathID(withIdentity(httptest.NewRequest(http.MethodDelete, "/x", nil)), "bukan-uuid"))
+	require.Equal(t, http.StatusNotFound, w.Code)
+	require.Equal(t, "resource_not_found", errCode(t, w))
+	require.Zero(t, r.svc.callCount(), "ID cacat tidak sampai ke layanan")
+
+	r.svc.revokeErr = domain.ErrSessionNotFound
+	w = call(r.h.RevokeSession, withPathID(withIdentity(httptest.NewRequest(http.MethodDelete, "/x", nil)), hSession2.String()))
+	require.Equal(t, http.StatusNotFound, w.Code)
+	require.Equal(t, "resource_not_found", errCode(t, w))
+	require.Empty(t, w.Result().Cookies())
+
+	w = call(r.h.RevokeSession, withPathID(httptest.NewRequest(http.MethodDelete, "/x", nil), hSession2.String()))
+	require.Equal(t, http.StatusUnauthorized, w.Code, "tanpa identitas")
+}
+
+func TestRevokeOtherSessionsReportsHowManyWereRevoked(t *testing.T) {
+	r := newHandlerRig(t)
+	r.svc.revokedN = 3
+
+	w := call(r.h.RevokeOtherSessions, withIdentity(httptest.NewRequest(http.MethodPost, "/x", nil)))
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var out authhttp.RevokeOthersResponse
+	dataOf(t, w, &out)
+	require.Equal(t, 3, out.Revoked)
+	require.Empty(t, w.Result().Cookies(), "sesi saat ini tetap hidup")
+
+	r.svc.othersErr = errors.New("rahasia-internal")
+	w = call(r.h.RevokeOtherSessions, withIdentity(httptest.NewRequest(http.MethodPost, "/x", nil)))
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+	require.NotContains(t, w.Body.String(), "rahasia-internal")
+
+	w = call(r.h.RevokeOtherSessions, httptest.NewRequest(http.MethodPost, "/x", nil))
+	require.Equal(t, http.StatusUnauthorized, w.Code)
 }
