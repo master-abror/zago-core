@@ -16,6 +16,7 @@ import (
 	"github.com/master-abror/zago-core/backend/internal/auth/service"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
 	"github.com/master-abror/zago-core/backend/internal/testkit"
+	idgen "github.com/master-abror/zago-core/backend/pkg/id"
 	"github.com/master-abror/zago-core/backend/pkg/security"
 	modulesdk "github.com/master-abror/zago-core/packages/module-sdk"
 )
@@ -428,6 +429,6 @@ func TestProfileReturnsTheUserAndTreatsAMissingUserAsUnauthenticated(t *testing.
 	require.Equal(t, u.Email, p.Email)
 	require.Equal(t, u.DisplayName, p.DisplayName)
 
-	_, err = a.auth.Profile(a.ctx, uuid.New())
+	_, err = a.auth.Profile(a.ctx, idgen.NewID())
 	require.ErrorIs(t, err, domain.ErrUnauthenticated)
 }

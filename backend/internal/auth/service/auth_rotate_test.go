@@ -140,7 +140,7 @@ func TestSwitchOrganizationRejectsNonMembersWithoutAnySideEffect(t *testing.T) {
 
 	targets := map[string]uuid.UUID{
 		"organisasi tanpa keanggotaan": strangerOrg.ID,
-		"organisasi yang tidak ada":    uuid.New(),
+		"organisasi yang tidak ada":    id.NewID(),
 		"keanggotaan masih invited":    invited.ID,
 		"keanggotaan suspended":        suspendedMember.ID,
 		"organisasi suspended":         suspendedOrg.ID,
