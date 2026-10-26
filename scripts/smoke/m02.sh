@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # scripts/smoke/m02.sh — kernel: envelope, rate limit, pagination keyset + cursor bertanda tangan,
 # idempotency, validasi, dan request id lewat endpoint dev/test /api/v1/_kernel/echo (ADR-0016).
+# POST echo butuh sesi: skrip membuat Super Admin smoke lewat bootstrap-admin, login, lalu memakai
+# cookie + X-CSRF-Token (scripts/smoke/auth-lib.sh; M03 menghapus X-Dev-Actor).
 # Idempoten (kunci idempotensi unik per eksekusi) dan gagal keras bila ada langkah gagal.
-#   BASE   alamat API (default http://localhost:8080)
-# Catatan: echo dibatasi 30 permintaan/menit per IP; skrip memakai 11-12. Bila sisa jatah di awal
+#   BASE   alamat API (default http://localhost:8080; harus localhost karena skrip membuat Super Admin)
+# Catatan: echo dibatasi 30 permintaan/menit per IP; skrip memakai 12-13. Bila sisa jatah di awal
 # kurang dari kebutuhan (atau sudah 429), skrip menunggu jendela berganti (maks 65 dtk) lalu lanjut,
 # jadi aman dijalankan berulang.
 set -euo pipefail
@@ -11,7 +13,6 @@ set -euo pipefail
 BASE=${BASE:-http://localhost:8080}
 ECHO="$BASE/api/v1/_kernel/echo"
 RUN="$(date +%s)-$$"
-ACTOR=${SMOKE_ACTOR:-0198f3a0-0000-7000-8000-0000000000a2}
 
 step() { echo "▶ $*"; }
 fail() { echo "✗ $*" >&2; exit 1; }
@@ -35,14 +36,17 @@ has() { # has <pola-ERE> <konteks>
 post() { # post <idempotency-key|-> <body> [header tambahan...]
   local key=$1 body=$2
   shift 2
-  local args=(-X POST -H 'Content-Type: application/json' -H "X-Dev-Actor: $ACTOR" --data "$body")
+  local args=(-X POST -H 'Content-Type: application/json' -b "$JAR" -H "X-CSRF-Token: $CSRF" --data "$body")
   [ "$key" = "-" ] || args+=(-H "Idempotency-Key: $key")
   http "${args[@]}" "$@" "$ECHO"
 }
 first_id() { grep -o '"id":"[^"]*"' <<<"$BODY" | head -n1 | cut -d'"' -f4; }
 next_cursor() { sed -n 's/.*"next_cursor":"\([^"]*\)".*/\1/p' <<<"$BODY"; }
 
-NEEDED=16 # kebutuhan permintaan skrip + sisa aman
+NEEDED=17 # kebutuhan permintaan skrip + sisa aman
+
+# shellcheck source=scripts/smoke/auth-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/auth-lib.sh"
 
 step "echo terpasang (development/test) dan membalas dengan envelope {data, meta}"
 http "$ECHO/items?limit=2"
@@ -107,17 +111,25 @@ http "$ECHO/items?limit=2&q=zzz&cursor=$cursor"
 want 400 "cursor beda filter"
 has '"cursor_mismatch"' "cursor beda filter"
 
+smoke_admin_session
+
 step "Idempotency-Key wajib → 400 validation_failed"
 post - '{"message":"smoke m02"}'
 want 400 "tanpa Idempotency-Key"
 has '"validation_failed"' "tanpa Idempotency-Key"
 has 'Idempotency-Key' "tanpa Idempotency-Key"
 
-step "X-Dev-Actor bukan UUID → 400 validation_failed"
-http -X POST -H 'Content-Type: application/json' -H 'X-Dev-Actor: bukan-uuid' -H "Idempotency-Key: smoke-m02-bad-$RUN" \
+step "tanpa sesi → 401 authentication_required"
+http -X POST -H 'Content-Type: application/json' -H "Idempotency-Key: smoke-m02-anon-$RUN" \
   --data '{"message":"x"}' "$ECHO"
-want 400 "aktor tak valid"
-has '"validation_failed"' "aktor tak valid"
+want 401 "POST tanpa sesi"
+has '"authentication_required"' "POST tanpa sesi"
+
+step "sesi tanpa X-CSRF-Token → 403 csrf_failed"
+http -b "$JAR" -X POST -H 'Content-Type: application/json' -H "Idempotency-Key: smoke-m02-nocsrf-$RUN" \
+  --data '{"message":"x"}' "$ECHO"
+want 403 "POST tanpa CSRF"
+has '"csrf_failed"' "POST tanpa CSRF"
 
 step "POST echo → 201, request_id mengalir dari header ke badan"
 KEY="smoke-m02-$RUN"
@@ -127,6 +139,7 @@ want 201 "POST echo"
 has '"data":\{' "envelope sukses POST"
 has '"message":"smoke m02"' "POST echo"
 has "\"request_id\":\"$REQID\"" "request_id di badan"
+has "\"actor_id\":\"$ADMIN_ID\"" "actor_id = pengguna yang login"
 [ "$(header X-Request-ID)" = "$REQID" ] || fail "X-Request-ID respons != $REQID"
 FIRST_BODY=$BODY
 

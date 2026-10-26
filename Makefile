@@ -154,8 +154,9 @@ docker-build:    ## Build image produksi (build context = root repo)
 	docker build -f deploy/docker/web.Dockerfile --target production -t platform-web:local .
 
 # ---------- 2.7 Smoke & verifikasi ----------
-smoke:           ## Jalankan semua smoke script milestone terhadap stack yang berjalan
-	@for f in scripts/smoke/m*.sh; do echo "== $$f"; bash $$f || exit 1; done
+smoke:           ## Jalankan semua smoke script milestone terhadap stack yang berjalan (satu direktori state sementara untuk semua skrip)
+	@dir=$$(mktemp -d); trap 'rm -rf "$$dir"' EXIT; export SMOKE_STATE_DIR="$$dir"; \
+	for f in scripts/smoke/m*.sh; do echo "== $$f"; bash $$f || exit 1; done
 
 verify:          ## Gerbang tunggal: lint + generate-check + test + migrate-roundtrip + build + smoke
 	@test -f .env || { cp .env.example .env && echo "verify: .env dibuat dari .env.example (nilai pengembangan)"; }
