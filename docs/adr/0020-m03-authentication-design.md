@@ -53,3 +53,36 @@ setiap keputusan yang diambil saat membangun T1–T3 dan, bila menyimpang dari t
 - Tidak ada migrasi baru di T1–T3; blok sqlc kedua (`internal/auth/repository`) ditambahkan di `sqlc.yaml`.
 - Doc-sync yang tertunda sampai akhir M03 dicatat di HANDOVER-M03-partial-1 §4.
 - Risiko diterima: sampai satu menit entri Redis basi bila penghapusan Redis gagal (butir 7); dapat dipersempit dengan mengecilkan interval.
+
+## Bagian 2 — keputusan T4 (◆CP2, 2026-10-26)
+17. **Rantai `Authenticate → CSRF` dipasang di grup rute API** (`httpserver.Options.Auth`); `/health*` berada di luar grup (probe tidak menyentuh sesi dan tidak terblokir saat sesi terganggu).
+    Tanpa `Auth`, rute yang butuh identitas menolak SEMUA request dengan 401 (fail closed), dan `/auth/*` tidak dipasang (404) kecuali Kernel, Auth, dan AuthAPI semuanya ada.
+18. **`X-Dev-Actor` dihapus.** POST echo memakai `RequireAuth`; subject idempotensi tetap dari `kernel.Actor` yang kini diisi `Authenticate` (tidak ada kode baru untuk subject).
+19. **`SessionService` menerima `redis.UniversalClient`** (satu klien composition root; `*redis.Client` tetap memenuhi).
+20. **Login: satu kegagalan untuk semua sebab sebelum password terverifikasi.** `invalid_credentials` (401) untuk email tak dikenal, akun tanpa credential password, password salah, kosong atau >256 byte;
+    verifikasi Argon2id SELALU berjalan (`CompareDummy` bila tak ada hash). Setelah password benar: `suspended` dan `deactivated` → `account_suspended` (403); `locked` → `account_locked` (**423**,
+    jawaban atas pertanyaan terbuka parsial 1 #1; docs/08 §11 tidak menetapkan); `pending` dan `deleted` tetap `invalid_credentials`.
+21. **Login sukses = SATU transaksi:** organisasi awal, rehash atau sentuh credential, `last_login_at`, sesi, event keamanan, dan activity `auth.login`. Kegagalan menulis activity = rollback total
+    (tidak ada sesi dan tidak ada entri Redis; entri Redis ditulis setelah commit). Rehash dihitung sebelum transaksi (CPU berat di luar tx) dan gagalnya rehash tidak menggagalkan login.
+22. **Login gagal dicatat (`auth.login.failed`, result `failure`, metadata `reason` = `bad_password` | `status_<status>`) HANYA untuk akun yang dikenal.** Email tak dikenal atau tanpa credential tidak menulis baris
+    (tak ada pemilik yang berhak melihatnya; banjir tebakan tidak boleh jadi banjir tulis). Best-effort (dilog bila gagal), tanpa activity, memakai konteks tanpa pembatalan.
+23. **Nama event keamanan:** `auth.login.success`, `auth.login.failed`, `auth.logout`, `auth.session.refreshed`, `auth.organization.switched`, `auth.session.revoked`, `auth.sessions.revoked_others`.
+    `result` mengikuti CHECK skema (`success` | `failure`; bukan `failed`). Metadata tidak pernah memuat email, password, atau token. Activity: `auth.login`, `auth.logout`, `auth.switch_organization`,
+    `auth.session.revoke`, `auth.sessions.revoke_others`; refresh tidak menulis activity (frekuensi tinggi; event keamanan cukup).
+24. **Rate limit login:** aturan `auth.login` 10/menit per IP, `Sensitive` (fallback memori bila Redis mati, bukan fail open). Kunci per akun, jeda progresif, dan kunci akun menyusul di T5.
+25. **Bentuk respons:** token sesi hanya di cookie; `csrf_token` di body; `Cache-Control: no-store` pada login/me/csrf/refresh/switch/daftar sesi. Login anonim tetap melewati cek Origin. Login dengan cookie basi
+    menghasilkan dua `Set-Cookie` (hapus lalu baru; peramban memakai yang terakhir). **Login tidak mencabut sesi lama pemanggil** (belum diputuskan pemilik proyek; pertanyaan terbuka parsial 2 #4).
+26. **Logout** idempoten (sesi yang sudah tak ada bukan kesalahan) dan butuh sesi (anonim = 401); bila pencabutan gagal, cookie dibiarkan agar klien bisa mengulang.
+27. **Refresh** = rotasi (ADR-0020 butir 9): token dan CSRF baru, organisasi dan batas absolut sama, token CSRF lama gugur; event membawa `previous_session_id`.
+28. **Switch-organization:** keanggotaan aktif pada organisasi aktif diperiksa dan token dirotasi dalam SATU transaksi. Semua penolakan (organisasi tak ada, bukan anggota, keanggotaan `invited`/`suspended`,
+    organisasi `suspended`) = `ErrNotOrganizationMember` → 403 `permission_denied` tanpa efek samping dan tanpa oracle keberadaan organisasi. Event dan activity dicatat di organisasi TUJUAN.
+    Pindah ke organisasi yang sama tetap merotasi. Identitas tingkat platform belum bisa memasuki organisasi tanpa keanggotaan (menunggu M04).
+29. **Manajemen sesi:** daftar hanya sesi aktif milik pemanggil, tanpa token atau hash, dengan penanda `current`; `DELETE /security/sessions/{id}` memberi 404 seragam (ID cacat, tak dikenal, milik orang lain,
+    sudah dicabut); mencabut sesi saat ini = logout (cookie dihapus); `revoke-others` tanpa event bila yang dicabut nol; pencabutan atomik bersama event dan activity.
+30. **Kode error baru:** `invalid_credentials` 401, `account_suspended` 403, `account_locked` 423. Dipakai ulang: `authentication_required`, `csrf_failed`, `permission_denied`, `resource_not_found`.
+31. **OpenAPI:** endpoint `auth` dan `security` beranotasi swagger dan masuk `docs/api/swagger.json`; echo tetap dikecualikan (`kernel-dev`).
+32. **Tes:** handler memakai sesi palsu (`fakeSessions`) dengan CSRF dan cookie nyata; service dan e2e memakai PostgreSQL + Redis sungguhan. UUID di tes dibangkitkan lewat `id.NewID` (lint-structure).
+
+## Konsekuensi (bagian 2)
+- Tidak ada migrasi dan tidak ada env baru di T4. Smoke M02 merah sampai `bootstrap-admin` (T6) memungkinkan login di skrip (HANDOVER-M03-partial-2 §8, §10).
+- Doc-sync tambahan yang tertunda sampai akhir M03: HANDOVER-M03-partial-2 §4.
