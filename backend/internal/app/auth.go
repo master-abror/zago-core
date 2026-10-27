@@ -48,7 +48,8 @@ func newAuthStack(cfg *config.Config, pool kernel.Pool, rdb redis.UniversalClien
 		log,
 	)
 	authSvc, err := service.NewAuthService(service.AuthDeps{
-		Store: store, Tx: kernel.NewTxManager(pool, log), Sessions: sessions, Hasher: hasher, Audit: audit, Log: log,
+		Store: store, Tx: kernel.NewTxManager(pool, log), Sessions: sessions, Hasher: hasher,
+		Policy: cfg.PasswordPolicy(), Bus: kernel.NewBus(pool, log), Audit: audit, Log: log,
 	})
 	if err != nil {
 		return authStack{}, fmt.Errorf("layanan auth: %w", err)
@@ -65,7 +66,11 @@ func newAuthStack(cfg *config.Config, pool kernel.Pool, rdb redis.UniversalClien
 	if err != nil {
 		return authStack{}, fmt.Errorf("middleware auth: %w", err)
 	}
-	api, err := authhttp.NewHandlers(authhttp.HandlerDeps{Service: authSvc, Cookie: cookie, CSRF: csrf, Responder: rs})
+	cursors, err := httpx.NewCursorCodec(cfg.SessionSecret)
+	if err != nil {
+		return authStack{}, fmt.Errorf("cursor: %w", err)
+	}
+	api, err := authhttp.NewHandlers(authhttp.HandlerDeps{Service: authSvc, Cookie: cookie, CSRF: csrf, Cursors: cursors, Responder: rs})
 	if err != nil {
 		return authStack{}, fmt.Errorf("handler auth: %w", err)
 	}

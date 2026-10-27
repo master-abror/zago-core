@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/master-abror/zago-core/backend/internal/auth/domain"
 	authhttp "github.com/master-abror/zago-core/backend/internal/auth/transport/http"
 	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
 )
@@ -20,6 +21,21 @@ const (
 // ke memori proses (bukan fail open), karena login adalah target tebakan password. Pembatasan per
 // akun, jeda progresif, dan kunci akun menyusul di T5.
 var LoginRule = httpx.Rule{Name: "auth.login", Limit: 10, Window: time.Minute, Sensitive: true}
+
+// PasswordRule membatasi ganti password per pengguna (ADR-0020 butir 45): endpoint terautentikasi ini
+// memverifikasi password saat ini, jadi pencuri sesi bisa memakainya untuk menebak. Sensitive: bila
+// Redis mati, pembatasan jatuh ke memori proses. Tidak mengunci akun (itu urusan login, T5).
+var PasswordRule = httpx.Rule{Name: "security.password", Limit: 5, Window: time.Minute, Sensitive: true}
+
+// userRateKey mengidentifikasi pengguna terautentikasi untuk rate limit; kosong (tidak dibatasi)
+// bila tak ada identitas (RequireAuth sudah menolaknya lebih dulu).
+func userRateKey(r *http.Request) string {
+	id, ok := domain.IdentityFromContext(r.Context())
+	if !ok {
+		return ""
+	}
+	return "user:" + id.UserID.String()
+}
 
 // ipRateKey mengidentifikasi klien untuk rate limit; kosong (tidak dibatasi) bila IP tak diketahui.
 func ipRateKey(r *http.Request) string {
@@ -44,4 +60,8 @@ func mountAuth(r chi.Router, k *KernelServices, mw *authhttp.Middleware, h *auth
 	r.With(mw.RequireAuth).Get(SecurityPath+"/sessions", h.ListSessions)
 	r.With(mw.RequireAuth).Delete(SecurityPath+"/sessions/{id}", h.RevokeSession)
 	r.With(mw.RequireAuth).Post(SecurityPath+"/sessions/revoke-others", h.RevokeOtherSessions)
+
+	// Tanpa Idempotency-Key (ADR-0020 butir 42). RequireAuth lebih dulu: kunci rate limit memakai identitas.
+	r.With(mw.RequireAuth, k.RateLimiter.Middleware(PasswordRule, userRateKey)).Post(SecurityPath+"/password", h.ChangePassword)
+	r.With(mw.RequireAuth).Get(SecurityPath+"/events", h.ListSecurityEvents)
 }

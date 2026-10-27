@@ -76,6 +76,16 @@ type fakeSvc struct {
 	gotRevoke   uuid.UUID
 	revokedN    int
 	othersErr   error
+
+	changeRes service.ChangePasswordResult
+	changeErr error
+	gotChange service.ChangePasswordInput
+	gotChgID  domain.Identity
+
+	events       []service.SecurityEventInfo
+	eventsErr    error
+	gotEventsLim int
+	gotEventsPos *service.EventPosition
 }
 
 func (f *fakeSvc) Login(_ context.Context, in service.LoginInput) (service.LoginResult, error) {
@@ -140,10 +150,33 @@ func (f *fakeSvc) RevokeOtherSessions(_ context.Context, _ domain.Identity) (int
 	return f.revokedN, f.othersErr
 }
 
+func (f *fakeSvc) ChangePassword(_ context.Context, id domain.Identity, in service.ChangePasswordInput) (service.ChangePasswordResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	f.gotChgID, f.gotChange = id, in
+	return f.changeRes, f.changeErr
+}
+
+func (f *fakeSvc) ListSecurityEvents(_ context.Context, _ domain.Identity, limit int, before *service.EventPosition) ([]service.SecurityEventInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	f.gotEventsLim, f.gotEventsPos = limit, before
+	return f.events, f.eventsErr
+}
+
 func (f *fakeSvc) callCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.calls
+}
+
+func newCursors(t *testing.T) *httpx.CursorCodec {
+	t.Helper()
+	c, err := httpx.NewCursorCodec(secret)
+	require.NoError(t, err)
+	return c
 }
 
 type handlerRig struct {
@@ -164,7 +197,7 @@ func newHandlerRig(t *testing.T) *handlerRig {
 		OrganizationID: func() *uuid.UUID { o := hOrg; return &o }(),
 	}}
 	h, err := authhttp.NewHandlers(authhttp.HandlerDeps{
-		Service: svc, Cookie: cookie, CSRF: csrf,
+		Service: svc, Cookie: cookie, CSRF: csrf, Cursors: newCursors(t),
 		Responder: httpx.NewResponder(slog.New(slog.NewTextHandler(io.Discard, nil))),
 		Now:       func() time.Time { return hNow },
 	})
@@ -214,13 +247,14 @@ func TestNewHandlersRequiresDependencies(t *testing.T) {
 	r := newHandlerRig(t)
 	cookie, err := authhttp.NewCookie("platform_session", false)
 	require.NoError(t, err)
-	full := authhttp.HandlerDeps{Service: r.svc, Cookie: cookie, CSRF: r.csrf, Responder: httpx.NewResponder(slog.New(slog.NewTextHandler(io.Discard, nil)))}
+	full := authhttp.HandlerDeps{Service: r.svc, Cookie: cookie, CSRF: r.csrf, Cursors: newCursors(t), Responder: httpx.NewResponder(slog.New(slog.NewTextHandler(io.Discard, nil)))}
 
 	_, err = authhttp.NewHandlers(full)
 	require.NoError(t, err)
 	for name, mutate := range map[string]func(*authhttp.HandlerDeps){
 		"service":   func(d *authhttp.HandlerDeps) { d.Service = nil },
 		"csrf":      func(d *authhttp.HandlerDeps) { d.CSRF = nil },
+		"cursors":   func(d *authhttp.HandlerDeps) { d.Cursors = nil },
 		"responder": func(d *authhttp.HandlerDeps) { d.Responder = nil },
 		"cookie":    func(d *authhttp.HandlerDeps) { d.Cookie = authhttp.Cookie{} },
 	} {

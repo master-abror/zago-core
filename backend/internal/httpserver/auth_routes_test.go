@@ -45,6 +45,12 @@ type fakeAuthSvc struct {
 
 	revokeCalls int
 	gotRevoke   uuid.UUID
+
+	changeCalls int
+	changeErr   error
+	gotChangeID domain.Identity
+	eventsCalls int
+	gotEventsID domain.Identity
 }
 
 // rotated adalah sesi hasil rotasi: pengguna A dengan tokenB/sessionB (dikenali fakeSessions).
@@ -88,6 +94,31 @@ func (f *fakeAuthSvc) RevokeOtherSessions(_ context.Context, _ domain.Identity) 
 	defer f.mu.Unlock()
 	f.revokeCalls++
 	return 2, nil
+}
+
+func (f *fakeAuthSvc) ChangePassword(_ context.Context, id domain.Identity, _ service.ChangePasswordInput) (service.ChangePasswordResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.changeCalls++
+	f.gotChangeID = id
+	if f.changeErr != nil {
+		return service.ChangePasswordResult{}, f.changeErr
+	}
+	return service.ChangePasswordResult{Issued: rotated(), RevokedOthers: 1}, nil
+}
+
+func (f *fakeAuthSvc) ListSecurityEvents(_ context.Context, id domain.Identity, _ int, _ *service.EventPosition) ([]service.SecurityEventInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.eventsCalls++
+	f.gotEventsID = id
+	return nil, nil
+}
+
+func (f *fakeAuthSvc) passwordCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.changeCalls
 }
 
 func (f *fakeAuthSvc) revocations() int {
@@ -139,7 +170,9 @@ func newAuthHandlers(t *testing.T, log *slog.Logger, svc authhttp.Service) *auth
 	t.Helper()
 	cookie, err := authhttp.NewCookie("platform_session", false)
 	require.NoError(t, err)
-	h, err := authhttp.NewHandlers(authhttp.HandlerDeps{Service: svc, Cookie: cookie, CSRF: testCSRF, Responder: httpx.NewResponder(log)})
+	cursors, err := httpx.NewCursorCodec(testSecret)
+	require.NoError(t, err)
+	h, err := authhttp.NewHandlers(authhttp.HandlerDeps{Service: svc, Cookie: cookie, CSRF: testCSRF, Cursors: cursors, Responder: httpx.NewResponder(log)})
 	require.NoError(t, err)
 	return h
 }
@@ -384,4 +417,78 @@ func TestSecurityRevokeOthersIsNotShadowedByTheSessionIDRoute(t *testing.T) {
 	rec := e.do(http.MethodDelete, httpserver.SecurityPath+"/sessions/revoke-others", "", sessionHeaders(tokenA, sessionA)...)
 	requireError(t, rec, http.StatusNotFound, "resource_not_found")
 	require.Zero(t, e.authSvc.revocations())
+}
+
+// ---- POST /security/password dan GET /security/events (T4d-2, ADR-0020 butir 42–46) ----
+
+const passwordBodyJSON = `{"current_password":"password-lama-yang-benar-12","new_password":"password-baru-yang-kuat-34"}`
+
+func TestSecurityPasswordNeedsASessionAndAValidCSRFToken(t *testing.T) {
+	e := liveEcho(t)
+	path := httpserver.SecurityPath + "/password"
+
+	requireError(t, e.do(http.MethodPost, path, passwordBodyJSON), http.StatusUnauthorized, "authentication_required")
+	requireError(t, e.do(http.MethodPost, path, passwordBodyJSON, hdr("Cookie", testCookieName+"="+tokenA)), http.StatusForbidden, "csrf_failed")
+	requireError(t, e.do(http.MethodPost, path, passwordBodyJSON,
+		hdr("Cookie", testCookieName+"="+tokenA), hdr(authhttp.HeaderCSRF, testCSRF.Token(sessionB))), http.StatusForbidden, "csrf_failed")
+	requireError(t, e.do(http.MethodPost, path, passwordBodyJSON,
+		hdr("Cookie", testCookieName+"="+tokenA), hdr(authhttp.HeaderCSRF, testCSRF.Token(sessionA)), hdr("Origin", "https://evil.example")),
+		http.StatusForbidden, "csrf_failed")
+	require.Zero(t, e.authSvc.passwordCalls(), "tanpa sesi dan CSRF yang sah, ganti password tidak boleh jalan")
+
+	rec := e.do(http.MethodPost, path, passwordBodyJSON, sessionHeaders(tokenA, sessionA)...)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, 1, e.authSvc.passwordCalls())
+	require.Equal(t, sessionA, e.authSvc.gotChangeID.SessionID)
+	require.Equal(t, actorA, e.authSvc.gotChangeID.UserID)
+	cks := sessionSetCookies(rec)
+	require.Len(t, cks, 1)
+	require.Equal(t, tokenB, cks[0].Value, "cookie sesi hasil rotasi")
+	var out authhttp.ChangePasswordResponse
+	require.NoError(t, json.Unmarshal(decode(t, rec).Data, &out))
+	require.True(t, testCSRF.Verify(sessionB, out.CSRFToken))
+}
+
+func TestSecurityPasswordDoesNotRequireAnIdempotencyKey(t *testing.T) {
+	e := liveEcho(t)
+
+	rec := e.do(http.MethodPost, httpserver.SecurityPath+"/password", passwordBodyJSON, sessionHeaders(tokenA, sessionA)...)
+
+	require.Equal(t, http.StatusOK, rec.Code, "ADR-0020 butir 42: tanpa Idempotency-Key")
+	require.Empty(t, rec.Header().Get("Idempotent-Replayed"))
+}
+
+func TestSecurityPasswordIsRateLimitedPerUserNotPerSession(t *testing.T) {
+	e := liveEcho(t)
+	e.authSvc.changeErr = domain.ErrInvalidCredentials
+	path := httpserver.SecurityPath + "/password"
+
+	for i := 0; i < httpserver.PasswordRule.Limit; i++ {
+		rec := e.do(http.MethodPost, path, passwordBodyJSON, sessionHeaders(tokenA, sessionA)...)
+		require.Equal(t, http.StatusUnauthorized, rec.Code, "percobaan ke-"+strconv.Itoa(i+1))
+	}
+	rec := e.do(http.MethodPost, path, passwordBodyJSON, sessionHeaders(tokenA, sessionA)...)
+
+	requireError(t, rec, http.StatusTooManyRequests, "rate_limit_exceeded")
+	require.Equal(t, httpserver.PasswordRule.Limit, e.authSvc.passwordCalls(), "permintaan yang dibatasi tidak sampai ke layanan")
+	require.Empty(t, sessionSetCookies(rec))
+
+	// Pengguna lain (satu IP yang sama) tidak ikut terkunci: kuncinya per pengguna.
+	other := e.do(http.MethodPost, path, passwordBodyJSON, sessionHeaders(tokenB, sessionB)...)
+	require.Equal(t, http.StatusUnauthorized, other.Code, other.Body.String())
+}
+
+func TestSecurityEventsRequireASessionButNoCSRFTokenAndUseTheCallersIdentity(t *testing.T) {
+	e := liveEcho(t)
+	path := httpserver.SecurityPath + "/events"
+
+	requireError(t, e.do(http.MethodGet, path, ""), http.StatusUnauthorized, "authentication_required")
+	require.Zero(t, e.authSvc.eventsCalls)
+
+	rec := e.do(http.MethodGet, path+"?user_id="+actorB.String(), "", hdr("Cookie", testCookieName+"="+tokenA))
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, actorA, e.authSvc.gotEventsID.UserID, "identitas dari sesi, bukan dari query")
+	require.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 }
