@@ -142,3 +142,35 @@ Menjawab pertanyaan terbuka #11 dan #12 (HANDOVER-M03-partial-4 §9) sebelum kod
 ## Konsekuensi (bagian 4)
 - Tidak ada migrasi dan tidak ada query sqlc baru (memakai `RehashPasswordIfUnchanged`, `ListSecurityEventsByUser`). Anotasi swagger baru butuh `make generate` (`docs/api/swagger.json`).
 - Doc-sync tertunda (akhir M03): docs/08 §6 (daftar idempotency), docs/05 §13.1 (event outbox terwujud, urutan butir 44) dan §14 (`auth.password.changed`, `auth.password.change_failed`), docs/08 §10.1 (respons password/events), ADR-0014 (catatan).
+
+## Bagian 5 — keputusan T5 (parsial 6, 2026-10-27)
+Menjawab pertanyaan terbuka #10 dan #11 (HANDOVER-M03-partial-5 §9) serta perilaku saat Redis mati, sebelum kode kunci akun ditulis. Acuan: docs/05 §12.3, §18, §20; docs/08 §7; ADR-0014; ADR-0019.
+
+47. **Kunci Redis tidak pernah terlihat oleh klien (jawaban #10).** Selama `auth:lock:{user_id}` aktif, `Login` SELALU menjawab `invalid_credentials` (401). Verifikasi tetap memakan biaya setara (`CompareDummy`) dan password yang benar PUN tidak
+    menghasilkan sesi. Alasan: bila kunci menjawab 423 setelah password benar, penyerang yang menebak selama kunci tahu persis kapan tebakannya benar (oracle password) dan kunci menjadi tak berguna; bila menjawab berbeda untuk akun terkunci,
+    ia menjadi oracle keberadaan akun. `account_locked` (423) hanya untuk `users.status='locked'` (kunci administratif; butir 20, setelah password benar). Menyimpang dari kata-kata docs/05 §18 (423 untuk kunci sementara), sejalan dengan
+    docs/05 §20 ("locked (Redis) account → failure; lock expires by TTL"). Harga yang diterima: pemilik tidak diberi tahu sebabnya di respons; ia melihatnya di riwayat event (butir 48) dan, kelak, lewat notifikasi (M05/M08).
+48. **Event `auth.account.locked` (jawaban #11).** Ditulis SEKALI per kunci (hanya bila pemasangan kunci benar-benar baru), event keamanan `result=failure`, metadata `{failures, lock_seconds}`, best-effort dengan konteks tanpa pembatalan
+    (pola butir 22), hanya untuk akun yang dikenal. `auth.account.unlocked` TIDAK ditulis (TTL tidak punya pemicu). Nama baru di luar katalog docs/05 §14 (doc-sync tertunda). Kunci tidak mencabut sesi yang sudah ada; ia hanya menutup login baru.
+49. **Penghitung dan kunci per akun.** Kegagalan = password salah pada akun yang dikenal (bukan: email tak dikenal, status setelah password benar, ganti password — butir 45). Bawaan: 5 kegagalan dalam jendela 15 menit memasang kunci 15 menit.
+    **Jeda progresif = durasi kunci berlipat per pengulangan** (15 → 30 → 60 menit, batas atas 60 menit; penghitung `strike` ber-TTL 24 jam), BUKAN tidur sisi server (menahan goroutine = vektor DoS) dan BUKAN penolakan antar-percobaan
+    sebelum kunci (menjadi oracle keberadaan akun). Percobaan selama kunci aktif tidak dihitung dan tidak memperpanjang kunci (tak ada kunci permanen lewat percobaan berulang). Login sukses mereset penghitung dan strike akun.
+50. **Penghitung per IP.** Setiap kegagalan password (email dikenal MAUPUN tak dikenal) menaikkan penghitung IP; bawaan 30 kegagalan per jendela 15 menit lalu login dari IP itu ditolak 429 `rate_limit_exceeded` dengan `Retry-After` (sisa jendela).
+    Gerbang IP diperiksa SEBELUM pencarian user (tak membocorkan keberadaan akun dan menghemat CPU Argon2). Penghitung IP TIDAK direset oleh login sukses (penyerang dengan akun sah sendiri tak boleh bisa mereset). `LoginRule` (10/menit/IP, Sensitive) tetap berlaku.
+    Batas yang diterima: banyak pengguna di balik satu NAT berbagi 30 kegagalan per 15 menit; password spraying lintas banyak IP tidak tertangani (M15).
+51. **Redis mati: fallback memori per proses, bukan fail open dan bukan fail closed.** Login tetap berjalan (degraded; docs/21 "Redis mati → login/lookup tetap jalan") dengan semantik penghitung/kunci yang sama di memori. Tabel memori dibatasi 10.000 identitas;
+    bila penuh oleh jendela AKTIF, identitas baru ditolak 429 (pola ADR-0014; jendela aktif tak pernah diusir). Setiap operasi Redis berbatas 250 ms (ADR-0019); setelah galat, fallback dipakai langsung selama 1 detik sebelum Redis dicoba lagi.
+    Galat penjaga TIDAK pernah menggagalkan login yang sah. Harga yang diterima: ambang efektif ×jumlah instance saat degraded, dan status memori tidak disalin kembali ke Redis.
+52. **Waktu dikendalikan jam aplikasi.** Nilai kunci/penghitung menyimpan waktu kedaluwarsa dari jam aplikasi (skrip Lua menerima `now`); TTL Redis hanya untuk pembersihan (sisa + margin). Tes memakai jam palsu tanpa tidur nyata.
+    Kunci Redis: `auth:lock:{user_id}`, `auth:fail:{user_id}`, `auth:strike:{user_id}`, `auth:ipfail:{ip}`. Email tak pernah masuk kunci atau nilai; IP hanya sebagai kunci (pola limiter).
+53. **Urutan `Login` (T5):** gerbang IP → cari user/credential → bila dikenal dan kunci aktif: `CompareDummy` lalu `invalid_credentials` (tanpa catat/hitung) → verifikasi password → salah: event `auth.login.failed` + naikkan penghitung akun dan IP (+ pasang kunci dan event butir 48
+    bila ambang tercapai); email tak dikenal: hanya penghitung IP → benar: status (butir 20) → transaksi login (butir 21) → reset penghitung akun setelah commit (best-effort).
+54. **Laju `refresh` dan `switch-organization`:** aturan per pengguna 30/menit, non-Sensitive (fail open bila Redis mati, seperti aturan umum). Hanya melengkapi pembatasan; sesi sah sudah dipersyaratkan.
+55. **Konfigurasi baru (semua dengan bawaan aman; nilai tak sah = konfigurasi ditolak saat start, bukan diam-diam dikoreksi):** `LOGIN_MAX_FAILURES` (5), `LOGIN_FAILURE_WINDOW` (15m), `LOGIN_LOCK_DURATION` (15m), `LOGIN_LOCK_MAX` (60m, ≥ durasi dasar),
+    `LOGIN_IP_MAX_FAILURES` (30). Wajib dicatat di `.env.example` (dijaga `env_example_test.go`) dan docs/10 §8.
+
+## Konsekuensi (bagian 5)
+- Tidak ada migrasi dan tidak ada query sqlc baru. Respons login 429 dari gerbang IP bisa menambah anotasi swagger (`make generate` bila berubah).
+- Smoke (T5/C): `scripts/smoke/m03.sh` memakai SATU password salah per run lalu login sukses (membuktikan reset akun); penghitung IP tidak direset, jadi >30 run dalam 15 menit dari satu IP menembus gerbang IP. Jumlah login m02+m03 harus tetap < 10/menit.
+- Utang: pembuka kunci administratif (sementara: `redis-cli DEL auth:lock:<uuid>`; M04/M05); notifikasi pemilik saat kunci (M05/M08); password spraying lintas IP, CAPTCHA/MFA (M15/Fase 2); kebijakan retensi `security_events` (M06/M15).
+- Doc-sync tertunda (akhir M03): docs/05 §12.3 (kunci tak terlihat, jeda progresif = durasi berlipat, kunci per IP, fallback memori) dan §18 (423 hanya administratif) dan §14 (`auth.account.locked`), docs/08 §7 (gerbang IP login) dan §11, docs/10 §8 (5 env baru).
