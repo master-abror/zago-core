@@ -114,3 +114,31 @@ setiap keputusan yang diambil saat membangun T1–T3 dan, bila menyimpang dari t
 - Tidak ada migrasi dan tidak ada env baru di T6. `make bootstrap-admin` kini nyata (`EMAIL=…`, opsional `NAME=…`, `PASSWORD_STDIN=1`); `make smoke` menyediakan satu direktori state sementara untuk semua skrip.
 - Alur dev dari nol: `make setup` dan `make dev` menjalankan `migrate-up` tetapi TIDAK `db-seed`; `make db-seed` harus dijalankan sebelum `make bootstrap-admin` (compose `migrate` juga hanya `up`). Dicatat di handover parsial 3 §9.
 - Doc-sync tambahan yang tertunda sampai akhir M03: HANDOVER-M03-partial-3 §4.
+
+## Bagian 4 — keputusan T4d-2 (parsial 5, 2026-10-27)
+Menjawab pertanyaan terbuka #11 dan #12 (HANDOVER-M03-partial-4 §9) sebelum kode `POST /security/password` dan `GET /security/events` ditulis.
+
+42. **`POST /security/password` TIDAK memakai `Idempotency-Key`** (menyimpang dari docs/08 §6, yang mendaftarkannya). Alasan: (a) respons sukses merotasi sesi, jadi membawa cookie baru (`Set-Cookie`) dan `csrf_token` baru di body;
+    ADR-0014 butir 7 tak pernah menyimpan `Set-Cookie`, dan token CSRF tidak boleh mengendap 24 jam di Redis; (b) request ulang dengan cookie LAMA ditolak `Authenticate` (401, sesi sudah dirotasi) sebelum idempotency
+    sempat berjalan (subject-nya butuh sesi), sehingga pemutaran ulang tidak pernah tercapai; (c) pelindung eksekusi ganda diganti jaminan di dalam transaksi: ganti hash bersifat compare-and-swap
+    (`RehashPasswordIfUnchanged`, hash yang baru diverifikasi harus masih hash di baris) dan rotasi sesi dalam transaksi yang sama. Dua request bersamaan dengan password lama yang sama: hanya satu yang commit; yang kalah
+    menerima `invalid_credentials` (password saat ini yang ia kirim sudah tidak berlaku) tanpa efek samping. Endpoint sesi lain (logout, refresh, switch-organization, revoke-others) juga tidak memakai `Idempotency-Key`.
+    Doc-sync tertunda: docs/08 §6 (hapus `POST /security/password` dari daftar) dan catatan di ADR-0014.
+43. **Ganti password menulis event outbox `auth.password.changed`** (docs/05 §13.1 "outbox (notification)") lewat `kernel.Bus.Publish` pada transaksi yang SAMA dengan perubahan hash, rotasi sesi, pencabutan sesi lain, event
+    keamanan, dan activity. Bentuk: `aggregate_type='user'`, `aggregate_id`=user, `organization_id`=organisasi sesi (NULL = platform), payload `{"user_id","revoked_other_sessions"}` — tanpa email, password, hash, atau token.
+    Publish gagal = `FailTx` = rollback total (fail-closed; password tidak berubah). Belum ada konsumen (notifikasi/email = M05/M08): relay menandai event tanpa handler `processed` (ADR-0010 butir 2), jadi tidak menumpuk.
+    `AuthDeps.Bus` opsional (nil = tidak menulis event, agar tes layanan lain tak berubah); composition root (`app/auth.go`) selalu memasangnya (`kernel.NewBus(pool, log)`). Bootstrap tetap tanpa event outbox (butir 39).
+44. **Urutan ganti password:** validasi bentuk (kedua field wajib, password saat ini > 256 byte tidak dihash) → verifikasi password saat ini (Argon2id; salah = `invalid_credentials`, TIDAK mengubah apa pun) → `PasswordPolicy` untuk
+    password baru (gagal = `validation_failed`, field `new_password`; password baru sama dengan yang lama ditolak) → hash baru dihitung DI LUAR transaksi (pola butir 21) → satu transaksi: CAS hash, rotasi sesi pemanggil
+    (alasan `password_change`), cabut semua sesi lain, event keamanan `auth.password.changed` (metadata: `previous_session_id`, `revoked_other_sessions`), activity `auth.password.change`, event outbox. Efek Redis/Pub/Sub setelah commit.
+    Respons 200: `csrf_token` baru dan `revoked_other_sessions` di body, cookie baru, `Cache-Control: no-store`; password tidak pernah dipantulkan.
+45. **Password saat ini yang salah dicatat** sebagai event keamanan `auth.password.change_failed` (result `failure`, metadata `reason=bad_current_password`; best-effort, konteks tanpa pembatalan; pola butir 22) karena itu
+    sinyal pencurian sesi (penyerang menebak password lewat sesi curian). Nama baru di luar katalog docs/05 §14 (doc-sync tertunda). **Tidak menaikkan penghitung kunci akun** (T5): mengunci akun dari endpoint
+    terautentikasi memberi pencuri sesi alat untuk mengunci pemilik. Pembatasan: aturan `security.password` 5/menit per pengguna (`user:<uuid>`), `Sensitive` (fallback memori bila Redis mati).
+46. **`GET /security/events`:** hanya event milik pemanggil (`user_id` selalu dari identitas sesi; tidak ada parameter pengguna), urut terbaru dulu, keyset `(created_at, id)` dengan kursor ber-HMAC kernel `httpx`
+    (ADR-0013: `limit` bawaan 50, maksimum 100). Bidang yang dipublikasikan: `id`, `event_type`, `result`, `created_at`, `ip_address`, `user_agent`, `organization_id`, `session_id`. `metadata` dan `request_id` TIDAK dipublikasikan
+    (internal; mencegah kebocoran bila metadata kelak memuat bidang baru). Tanpa filter di v1.0. Butuh autentikasi saja (docs/05 §17: "own" by construction); `Cache-Control: no-store`.
+
+## Konsekuensi (bagian 4)
+- Tidak ada migrasi dan tidak ada query sqlc baru (memakai `RehashPasswordIfUnchanged`, `ListSecurityEventsByUser`). Anotasi swagger baru butuh `make generate` (`docs/api/swagger.json`).
+- Doc-sync tertunda (akhir M03): docs/08 §6 (daftar idempotency), docs/05 §13.1 (event outbox terwujud, urutan butir 44) dan §14 (`auth.password.changed`, `auth.password.change_failed`), docs/08 §10.1 (respons password/events), ADR-0014 (catatan).
