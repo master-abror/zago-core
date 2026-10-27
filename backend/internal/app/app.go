@@ -186,6 +186,20 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 	} else {
 		log.Warn("tanpa klien Redis: toolkit HTTP kernel (idempotency, rate limit, cursor) tidak dirakit")
 	}
+
+	// Rantai autentikasi (docs/05 §9) butuh PostgreSQL (otoritatif) dan Redis (cache + toolkit).
+	// Tanpa salah satunya Auth tetap nil: rute yang butuh identitas menolak semua request (401).
+	var auth authStack
+	if appPool != nil && kern != nil {
+		auth, err = newAuthStack(cfg, appPool, rdb, auditor, kern.Responder, log)
+		if err != nil {
+			log.Error("gagal merakit autentikasi HTTP", "error", err)
+			return ExitFailed
+		}
+	} else {
+		log.Warn("tanpa PostgreSQL atau Redis: autentikasi HTTP tidak dirakit, rute terlindungi menolak semua request")
+	}
+
 	devEndpoints := cfg.DevEndpointsEnabled()
 	if devEndpoints && kern != nil {
 		log.Warn("endpoint dev/test aktif: " + httpserver.EchoPath + " (tidak pernah aktif di staging/production)")
@@ -214,6 +228,8 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 		TrustedProxies: cfg.TrustedProxyPrefixes(),
 		ReadyCheckers:  res.checkers(),
 		Kernel:         kern,
+		Auth:           auth.mw,
+		AuthAPI:        auth.api,
 		DevEndpoints:   devEndpoints,
 		Metrics:        httpMetrics,
 	})
