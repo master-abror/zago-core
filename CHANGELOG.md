@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M03 — Authentication (SEDANG BERJALAN; parsial 3, sampai ◆CP3)
+### M03 — Authentication (SEDANG BERJALAN; parsial 5, sampai ◆CP5)
 
 #### Added
 - `pkg/security`: hasher Argon2id (PHC, rehash-on-login, hash dummy, batas 256 byte, semaphore konkurensi berbasis context) dan `PasswordPolicy`.
@@ -12,7 +12,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `internal/auth`: repositori sqlc (credentials, sessions, security events, lookup user/keanggotaan minimal) dengan `Store` yang mengikuti transaksi;
   `SessionService` (Redis + PostgreSQL otoritatif, fallback saat Redis mati, rotasi, pencabutan, event `session.revoked`); `CSRF` terikat sesi;
   cookie sesi `__Host-`, `OriginPolicy`, middleware `Authenticate`/`CSRF`/`RequireAuth`; kode error `csrf_failed`.
-- ADR-0020 (bagian 1–3).
+- ADR-0020 (bagian 1–4).
 - ADR-0021: port host compose dapat disetel lewat `.env` (`POSTGRES_HOST_PORT`, `REDIS_HOST_PORT`, `API_HOST_PORT`, `WEB_HOST_PORT`, `MAILPIT_SMTP_HOST_PORT`, `MAILPIT_UI_HOST_PORT`; bawaan = port lama), `scripts/env-ports.sh` untuk membuat `.env` konsisten, runbook `deploy/vps/README.md`. `api`/`worker` meng-override `SMTP_PORT=1025`; `verify-smoke.sh` dan smoke m00/m02 membaca port dari environment/`.env`.
 - Endpoint autentikasi (T4): `POST /api/v1/auth/login` (anonim, rate limit 10/menit/IP, cek Origin), `POST /auth/logout`, `GET /auth/me`, `GET /auth/csrf`, `POST /auth/refresh`,
   `POST /auth/switch-organization`, `GET /api/v1/security/sessions`, `DELETE /security/sessions/{id}`, `POST /security/sessions/revoke-others`. Semua beranotasi swagger (`docs/api/swagger.json`).
@@ -21,6 +21,10 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `api bootstrap-admin` (T6) dan `make bootstrap-admin EMAIL=… [NAME=…] [PASSWORD_STDIN=1]`: membuat Super Admin pertama (role sistem `super-admin`, user, kredensial Argon2id, assignment platform) dalam satu transaksi,
   idempoten dan tidak pernah menimpa password; password dari stdin atau acak sekali-tampil; activity + security event `auth.bootstrap_admin` tanpa email/password. Logika di `internal/bootstrap`, wiring `app.BootstrapAdmin`.
 - `scripts/smoke/auth-lib.sh`: bootstrap + login untuk smoke yang butuh sesi (password acak per `make smoke`, menolak BASE non-localhost).
+- `POST /api/v1/security/password` (T4d-2): ganti password pemanggil — verifikasi password saat ini, kebijakan password, hash di luar transaksi, lalu satu transaksi (CAS hash, rotasi sesi, cabut semua sesi lain, event keamanan
+  `auth.password.changed`, activity `auth.password.change`, event outbox `auth.password.changed`); respons memuat cookie dan `csrf_token` baru. Tanpa `Idempotency-Key` (ADR-0020 butir 42). Password saat ini yang salah = 401 `invalid_credentials`
+  tanpa efek samping dan dicatat sebagai `auth.password.change_failed`; dibatasi 5/menit per pengguna (`security.password`).
+- `GET /api/v1/security/events` (T4d-2): riwayat event keamanan milik sesi pemanggil, keyset dengan kursor ber-HMAC (`limit` bawaan 50, maks 100); `metadata` dan `request_id` tidak dipublikasikan.
 - Kode error: `invalid_credentials` (401), `account_suspended` (403), `account_locked` (423).
 - Event keamanan: `auth.login.success|failed`, `auth.logout`, `auth.session.refreshed`, `auth.organization.switched`, `auth.session.revoked`, `auth.sessions.revoked_others`.
 
@@ -30,7 +34,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `scripts/smoke/m02.sh` memakai sesi nyata (login + cookie + `X-CSRF-Token`): langkah "X-Dev-Actor non-UUID" diganti "tanpa sesi → 401" dan "CSRF hilang → 403"; `make smoke` menyediakan direktori state sementara bersama.
 
 #### Known issues
-- Belum ada: ganti password + riwayat event keamanan (T4d-2), kunci akun + rate limit per akun (T5), smoke M03 (lihat docs/handover/HANDOVER-M03-partial-3.md §10).
+- Belum ada: kunci akun + rate limit per akun (T5) dan smoke M03 (lihat docs/handover/HANDOVER-M03-partial-5.md §10). Alur ganti password belum dibuktikan di stack asli (hanya tes Go).
 
 ### M02 — Kernel (2026-10-18; tag `m02-done`)
 
