@@ -86,3 +86,31 @@ setiap keputusan yang diambil saat membangun T1–T3 dan, bila menyimpang dari t
 ## Konsekuensi (bagian 2)
 - Tidak ada migrasi dan tidak ada env baru di T4. Smoke M02 merah sampai `bootstrap-admin` (T6) memungkinkan login di skrip (HANDOVER-M03-partial-2 §8, §10).
 - Doc-sync tambahan yang tertunda sampai akhir M03: HANDOVER-M03-partial-2 §4.
+
+## Bagian 3 — keputusan T6 (◆CP3, 2026-10-27)
+33. **`bootstrap-admin` adalah subcommand binary `api`** (`go run ./backend/cmd/api bootstrap-admin --email …`, docs/16 §2.4), bukan binary baru. Logika di `internal/bootstrap`; wiring tipis `app.BootstrapAdmin`
+    (pola `app.Migrate`: argumen/konfigurasi/input buruk = `ExitConfig` SEBELUM menyentuh database; kegagalan runtime = `ExitFailed`). Konfigurasi dimuat dengan role API (environment yang sama dengan `api`); yang dipakai hanya
+    `DATABASE_URL`, parameter Argon2id, dan `PASSWORD_MIN_LENGTH`.
+34. **Hak DB: cukup `app_user`** (`DATABASE_URL`); tidak ada DDL dan tidak butuh role migrator. Menutup utang parsial 2 §8. Dibuktikan oleh tes integrasi yang memakai role `app_user` dan oleh smoke di stack asli.
+35. **Satu transaksi, diserialkan advisory lock** `0x7a61676f02` (berbeda dari kunci seeder platform `…01`). Urutan: platform row harus sudah ada (`ErrNoPlatform` bila belum → jalankan `make db-seed`; bootstrap TIDAK membuat
+    baris platform) → role Super Admin → user → kredensial password → assignment platform → activity + security event. Gagal di langkah mana pun = rollback total (tak ada role/user setengah jadi).
+36. **Role Super Admin dibuat minimal:** `role_type='system'`, slug `super-admin`, `organization_id`/`group_id` NULL, tanpa permission. **M04 wajib mengadopsi baris ini lewat upsert by slug `super-admin`** saat menyinkronkan
+    role sistem dari kode (E:B-04), bukan membuat baris kedua (`uq_roles_global_slug` akan menolaknya).
+37. **Idempoten dan tidak pernah menimpa password.** Run berulang tidak menambah baris apa pun (termasuk audit). User aktif yang belum punya kredensial password mendapat satu; yang sudah punya tidak disentuh. Assignment yang
+    dicabut dibuat ulang (baris baru). User dengan email itu yang tidak `active` atau soft-deleted → `ErrUserUnavailable`, tidak diubah apa pun (pemulihan akun bukan tugas bootstrap). Email dinormalisasi ke huruf kecil
+    dan hanya alamat polos yang diterima (bukan `Nama <a@b>`).
+38. **Password:** satu baris dari stdin (`--password-stdin`; CR/LF akhir dibuang; ditolak `PasswordPolicy` bila < minimum atau > 256 byte) atau acak ≥ 24 karakter (`crypto/rand`, sampling seragam, tanpa karakter yang mudah tertukar).
+    Password acak dicetak SEKALI sebagai baris `password: …` di stdout (peringatan "simpan sekarang" di stderr) dan hanya bila transaksi commit dan kredensial benar-benar dibuat. Password tak pernah lewat argv, environment, atau log;
+    galat koneksi disamarkan (password dan URL). **Tidak ada prompt interaktif tanpa-echo** (butuh `golang.org/x/term`, dependensi baru; ditunda — lihat handover parsial 3 §9).
+39. **Audit:** activity `auth.bootstrap_admin` (`actor_type='system'`, `resource_type='user'`, `scope_type='platform'`) dan security event `auth.bootstrap_admin` (result `success`) pada transaksi yang sama dengan perubahan state.
+    Metadata hanya penanda boolean (`user_created`, `role_created`, `credential_created`, `assignment_created`, `password_generated`): tanpa email, tanpa password. Run tanpa perubahan tidak menulis audit. Tidak ada event outbox (belum ada konsumen).
+40. **Smoke M02 memakai sesi nyata** (`scripts/smoke/auth-lib.sh`, di-source): `make db-seed` + `make bootstrap-admin` (password dari stdin) lalu `POST /auth/login` dengan cookie jar curl dan `X-CSRF-Token`. Password Super Admin smoke ACAK per
+    eksekusi `make smoke` (disimpan 0600 di direktori sementara yang dihapus di akhir; tidak ada password tetap di repo). Skrip menolak `BASE` selain localhost karena MEMBUAT Super Admin. Langkah "X-Dev-Actor non-UUID" diganti
+    "tanpa sesi → 401" dan "CSRF hilang → 403"; POST echo juga menegaskan `actor_id` = pengguna yang login.
+41. **Login nyata dengan kredensial hasil bootstrap dibuktikan di smoke (stack asli), bukan di tes Go:** harness Redis + `SessionService` hidup di paket tes lain. Tes Go membuktikan hash Argon2id yang tersimpan cocok dengan
+    password (acak atau stdin) lewat hasher yang sama dengan login.
+
+## Konsekuensi (bagian 3)
+- Tidak ada migrasi dan tidak ada env baru di T6. `make bootstrap-admin` kini nyata (`EMAIL=…`, opsional `NAME=…`, `PASSWORD_STDIN=1`); `make smoke` menyediakan satu direktori state sementara untuk semua skrip.
+- Alur dev dari nol: `make setup` dan `make dev` menjalankan `migrate-up` tetapi TIDAK `db-seed`; `make db-seed` harus dijalankan sebelum `make bootstrap-admin` (compose `migrate` juga hanya `up`). Dicatat di handover parsial 3 §9.
+- Doc-sync tambahan yang tertunda sampai akhir M03: HANDOVER-M03-partial-3 §4.
