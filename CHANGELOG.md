@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M03 — Authentication (SEDANG BERJALAN; parsial 2, sampai ◆CP2)
+### M03 — Authentication (SEDANG BERJALAN; parsial 3, sampai ◆CP3)
 
 #### Added
 - `pkg/security`: hasher Argon2id (PHC, rehash-on-login, hash dummy, batas 256 byte, semaphore konkurensi berbasis context) dan `PasswordPolicy`.
@@ -12,20 +12,24 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `internal/auth`: repositori sqlc (credentials, sessions, security events, lookup user/keanggotaan minimal) dengan `Store` yang mengikuti transaksi;
   `SessionService` (Redis + PostgreSQL otoritatif, fallback saat Redis mati, rotasi, pencabutan, event `session.revoked`); `CSRF` terikat sesi;
   cookie sesi `__Host-`, `OriginPolicy`, middleware `Authenticate`/`CSRF`/`RequireAuth`; kode error `csrf_failed`.
-- ADR-0020 (bagian 1–2).
+- ADR-0020 (bagian 1–3).
 - Endpoint autentikasi (T4): `POST /api/v1/auth/login` (anonim, rate limit 10/menit/IP, cek Origin), `POST /auth/logout`, `GET /auth/me`, `GET /auth/csrf`, `POST /auth/refresh`,
   `POST /auth/switch-organization`, `GET /api/v1/security/sessions`, `DELETE /security/sessions/{id}`, `POST /security/sessions/revoke-others`. Semua beranotasi swagger (`docs/api/swagger.json`).
   Login tanpa oracle enumerasi akun (verifikasi Argon2id selalu berjalan; status akun baru terlihat setelah password benar); sesi + event keamanan + activity ditulis dalam satu transaksi.
 - `AuthService` (login, logout, profil, refresh, switch-organization, daftar/cabut sesi) di `internal/auth/service`; handler di paket `authhttp`; perakitan di `internal/app/auth.go`.
+- `api bootstrap-admin` (T6) dan `make bootstrap-admin EMAIL=… [NAME=…] [PASSWORD_STDIN=1]`: membuat Super Admin pertama (role sistem `super-admin`, user, kredensial Argon2id, assignment platform) dalam satu transaksi,
+  idempoten dan tidak pernah menimpa password; password dari stdin atau acak sekali-tampil; activity + security event `auth.bootstrap_admin` tanpa email/password. Logika di `internal/bootstrap`, wiring `app.BootstrapAdmin`.
+- `scripts/smoke/auth-lib.sh`: bootstrap + login untuk smoke yang butuh sesi (password acak per `make smoke`, menolak BASE non-localhost).
 - Kode error: `invalid_credentials` (401), `account_suspended` (403), `account_locked` (423).
 - Event keamanan: `auth.login.success|failed`, `auth.logout`, `auth.session.refreshed`, `auth.organization.switched`, `auth.session.revoked`, `auth.sessions.revoked_others`.
 
 #### Changed
 - `httpserver.Options` punya `Auth` dan `AuthAPI`; grup rute API memakai `Authenticate → CSRF`, `/health*` di luarnya. `SessionService` menerima `redis.UniversalClient`.
 - **Breaking (dev/test):** endpoint echo `POST` kini butuh sesi + `X-CSRF-Token`; header `X-Dev-Actor` dihapus.
+- `scripts/smoke/m02.sh` memakai sesi nyata (login + cookie + `X-CSRF-Token`): langkah "X-Dev-Actor non-UUID" diganti "tanpa sesi → 401" dan "CSRF hilang → 403"; `make smoke` menyediakan direktori state sementara bersama.
 
 #### Known issues
-- `scripts/smoke/m02.sh` masih memakai `X-Dev-Actor` dan gagal sampai `bootstrap-admin` (T6) dan migrasi skrip (lihat docs/handover/HANDOVER-M03-partial-2.md §8, §10).
+- Belum ada: ganti password + riwayat event keamanan (T4d-2), kunci akun + rate limit per akun (T5), smoke M03 (lihat docs/handover/HANDOVER-M03-partial-3.md §10).
 
 ### M02 — Kernel (2026-10-18; tag `m02-done`)
 
