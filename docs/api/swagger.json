@@ -257,6 +257,117 @@
                 }
             }
         },
+        "/api/v1/security/events": {
+            "get": {
+                "description": "Hanya event milik pemanggil, terbaru dulu, paginasi cursor (meta.pagination). Tidak ada parameter pengguna.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "security"
+                ],
+                "summary": "Riwayat event keamanan milik pengguna",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Jumlah baris (bawaan 50, maksimum 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor dari meta.pagination.next_cursor",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_auth_transport_http_SecurityEventView"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed (termasuk cursor rusak)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/security/password": {
+            "post": {
+                "description": "Memverifikasi password saat ini, menerapkan kebijakan password, mengganti hash, merotasi sesi saat ini (cookie dan csrf_token baru), dan mencabut semua sesi lain. Password saat ini yang salah = 401 invalid_credentials dan tidak ada yang berubah (sesi tetap berlaku). Tanpa Idempotency-Key (ADR-0020 butir 42).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "security"
+                ],
+                "summary": "Ganti password (pemanggil sendiri)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Password saat ini dan password baru",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_auth_transport_http.ChangePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_auth_transport_http_ChangePasswordResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed (new_password: too_short | too_long | same_as_current)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required | invalid_credentials (password saat ini salah)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "429": {
+                        "description": "rate_limit_exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/security/sessions": {
             "get": {
                 "produces": [
@@ -446,6 +557,31 @@
                 }
             }
         },
+        "backend_internal_auth_transport_http.ChangePasswordRequest": {
+            "type": "object",
+            "properties": {
+                "current_password": {
+                    "type": "string"
+                },
+                "new_password": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_auth_transport_http.ChangePasswordResponse": {
+            "type": "object",
+            "properties": {
+                "csrf_token": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "revoked_other_sessions": {
+                    "type": "integer"
+                }
+            }
+        },
         "backend_internal_auth_transport_http.LoginRequest": {
             "type": "object",
             "properties": {
@@ -530,6 +666,35 @@
             "properties": {
                 "revoked": {
                     "type": "integer"
+                }
+            }
+        },
+        "backend_internal_auth_transport_http.SecurityEventView": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "event_type": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "string"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "user_agent": {
+                    "type": "string"
                 }
             }
         },
@@ -638,11 +803,36 @@
                 }
             }
         },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_auth_transport_http_SecurityEventView": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/backend_internal_auth_transport_http.SecurityEventView"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
         "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_auth_transport_http_CSRFResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "$ref": "#/definitions/backend_internal_auth_transport_http.CSRFResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_auth_transport_http_ChangePasswordResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_auth_transport_http.ChangePasswordResponse"
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
