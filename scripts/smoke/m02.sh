@@ -4,13 +4,13 @@
 # POST echo butuh sesi: skrip membuat Super Admin smoke lewat bootstrap-admin, login, lalu memakai
 # cookie + X-CSRF-Token (scripts/smoke/auth-lib.sh; M03 menghapus X-Dev-Actor).
 # Idempoten (kunci idempotensi unik per eksekusi) dan gagal keras bila ada langkah gagal.
-#   BASE   alamat API (default http://localhost:8080; harus localhost karena skrip membuat Super Admin)
+#   BASE   alamat API (default http://localhost:${API_HOST_PORT:-8080}; harus localhost karena skrip membuat Super Admin)
 # Catatan: echo dibatasi 30 permintaan/menit per IP; skrip memakai 12-13. Bila sisa jatah di awal
 # kurang dari kebutuhan (atau sudah 429), skrip menunggu jendela berganti (maks 65 dtk) lalu lanjut,
 # jadi aman dijalankan berulang.
 set -euo pipefail
 
-BASE=${BASE:-http://localhost:8080}
+BASE=${BASE:-http://localhost:${API_HOST_PORT:-8080}}
 ECHO="$BASE/api/v1/_kernel/echo"
 RUN="$(date +%s)-$$"
 
