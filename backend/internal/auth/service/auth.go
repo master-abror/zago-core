@@ -45,16 +45,22 @@ type AuthService struct {
 	tx       *kernel.TxManager
 	sessions *SessionService
 	hasher   security.PasswordHasher
+	policy   security.PasswordPolicy
+	bus      modulesdk.EventBus
 	audit    modulesdk.AuditRecorder
 	log      *slog.Logger
 }
 
-// AuthDeps adalah dependensi AuthService. Audit dan Log opsional.
+// AuthDeps adalah dependensi AuthService. Policy (nol = panjang minimum bawaan), Bus, Audit, dan Log
+// opsional. Bus nil = ganti password tidak menulis event outbox (composition root selalu memasangnya,
+// ADR-0020 butir 43).
 type AuthDeps struct {
 	Store    *repository.Store
 	Tx       *kernel.TxManager
 	Sessions *SessionService
 	Hasher   security.PasswordHasher
+	Policy   security.PasswordPolicy
+	Bus      modulesdk.EventBus
 	Audit    modulesdk.AuditRecorder
 	Log      *slog.Logger
 }
@@ -75,7 +81,9 @@ func NewAuthService(d AuthDeps) (*AuthService, error) {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &AuthService{store: d.Store, tx: d.Tx, sessions: d.Sessions, hasher: d.Hasher, audit: d.Audit, log: log}, nil
+	return &AuthService{
+		store: d.Store, tx: d.Tx, sessions: d.Sessions, hasher: d.Hasher, policy: d.Policy, bus: d.Bus, audit: d.Audit, log: log,
+	}, nil
 }
 
 // NormalizeEmail menyeragamkan email untuk pencarian (skema mewajibkan huruf kecil).
@@ -403,8 +411,13 @@ func (s *AuthService) recordFailure(ctx context.Context, userID uuid.UUID, reaso
 	}
 }
 
-// record merekam activity atas nama pengguna (di transaksi yang sama bila ctx membawanya).
+// record merekam activity atas sebuah sesi (di transaksi yang sama bila ctx membawanya).
 func (s *AuthService) record(ctx context.Context, userID uuid.UUID, org *uuid.UUID, action string, sessionID uuid.UUID) {
+	s.recordResource(ctx, userID, org, action, "session", sessionID)
+}
+
+// recordResource merekam activity atas nama pengguna untuk resource tertentu.
+func (s *AuthService) recordResource(ctx context.Context, userID uuid.UUID, org *uuid.UUID, action, resourceType string, resourceID uuid.UUID) {
 	if s.audit == nil {
 		return
 	}
@@ -413,7 +426,7 @@ func (s *AuthService) record(ctx context.Context, userID uuid.UUID, org *uuid.UU
 		actor.OrganizationID = *org
 	}
 	s.audit.Record(kernel.WithActor(ctx, actor), modulesdk.ActivityEntry{
-		Action: action, ResourceType: "session", ResourceID: sessionID,
+		Action: action, ResourceType: resourceType, ResourceID: resourceID,
 	})
 }
 

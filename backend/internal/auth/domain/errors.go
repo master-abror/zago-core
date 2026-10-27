@@ -26,4 +26,7 @@ var (
 	// ErrNotOrganizationMember: user bukan anggota aktif organisasi tujuan (atau organisasinya
 	// tidak ada / tidak aktif). Satu kesalahan untuk semuanya: tidak ada oracle keberadaan organisasi.
 	ErrNotOrganizationMember = errors.New("auth: bukan anggota aktif organisasi")
+
+	// ErrSamePassword: password baru sama dengan password saat ini (ganti password, ADR-0020 butir 44).
+	ErrSamePassword = errors.New("auth: password baru sama dengan password saat ini")
 )
