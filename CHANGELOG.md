@@ -13,6 +13,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
   `SessionService` (Redis + PostgreSQL otoritatif, fallback saat Redis mati, rotasi, pencabutan, event `session.revoked`); `CSRF` terikat sesi;
   cookie sesi `__Host-`, `OriginPolicy`, middleware `Authenticate`/`CSRF`/`RequireAuth`; kode error `csrf_failed`.
 - ADR-0020 (bagian 1–3).
+- ADR-0021: port host compose dapat disetel lewat `.env` (`POSTGRES_HOST_PORT`, `REDIS_HOST_PORT`, `API_HOST_PORT`, `WEB_HOST_PORT`, `MAILPIT_SMTP_HOST_PORT`, `MAILPIT_UI_HOST_PORT`; bawaan = port lama), `scripts/env-ports.sh` untuk membuat `.env` konsisten, runbook `deploy/vps/README.md`. `api`/`worker` meng-override `SMTP_PORT=1025`; `verify-smoke.sh` dan smoke m00/m02 membaca port dari environment/`.env`.
 - Endpoint autentikasi (T4): `POST /api/v1/auth/login` (anonim, rate limit 10/menit/IP, cek Origin), `POST /auth/logout`, `GET /auth/me`, `GET /auth/csrf`, `POST /auth/refresh`,
   `POST /auth/switch-organization`, `GET /api/v1/security/sessions`, `DELETE /security/sessions/{id}`, `POST /security/sessions/revoke-others`. Semua beranotasi swagger (`docs/api/swagger.json`).
   Login tanpa oracle enumerasi akun (verifikasi Argon2id selalu berjalan; status akun baru terlihat setelah password benar); sesi + event keamanan + activity ditulis dalam satu transaksi.
