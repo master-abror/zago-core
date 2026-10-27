@@ -1,5 +1,8 @@
 # docker-compose.yml — konveniensi PENGEMBANGAN (docs/15 §2). Bukan artefak deployment produksi.
 # postgres/redis/mailpit selalu jalan; layanan aplikasi ada di profile "full".
+# Port HOST dapat disetel lewat .env (POSTGRES_HOST_PORT, REDIS_HOST_PORT, API_HOST_PORT, WEB_HOST_PORT,
+# MAILPIT_SMTP_HOST_PORT, MAILPIT_UI_HOST_PORT); bawaan = port lama. Buat .env konsisten dengan
+# `bash scripts/env-ports.sh` (ADR-0021). Port di dalam jaringan compose tidak berubah.
 #   make infra-up  -> hanya datastore (pengembangan native)
 #   make docker-up -> semua layanan (--profile full)
 services:
@@ -15,7 +18,7 @@ services:
       - postgres_data:/var/lib/postgresql
       - ./deploy/db/init:/docker-entrypoint-initdb.d:ro
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d platform"]
       interval: 5s
@@ -25,7 +28,7 @@ services:
   redis:
     image: redis:8
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -35,8 +38,8 @@ services:
   mailpit:
     image: axllent/mailpit
     ports:
-      - "127.0.0.1:1025:1025" # SMTP
-      - "127.0.0.1:8025:8025" # UI web
+      - "127.0.0.1:${MAILPIT_SMTP_HOST_PORT:-1025}:1025" # SMTP
+      - "127.0.0.1:${MAILPIT_UI_HOST_PORT:-8025}:8025" # UI web
 
   migrate:
     profiles: ["full"]
@@ -64,12 +67,13 @@ services:
       - go_mod_cache:/go/pkg/mod
       - go_build_cache:/root/.cache/go-build
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${API_HOST_PORT:-8080}:8080"
     env_file: .env
     environment:
       DATABASE_URL: postgres://app_user:app_dev_pw@postgres:5432/platform
       REDIS_URL: redis://redis:6379
       SMTP_HOST: mailpit
+      SMTP_PORT: "1025" # port di dalam jaringan compose, bukan MAILPIT_SMTP_HOST_PORT
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health/ready >/dev/null || exit 1"]
       interval: 5s
@@ -95,6 +99,7 @@ services:
       MAINTENANCE_DATABASE_URL: postgres://app_maintenance:maintenance_dev_pw@postgres:5432/platform
       REDIS_URL: redis://redis:6379
       SMTP_HOST: mailpit
+      SMTP_PORT: "1025" # port di dalam jaringan compose, bukan MAILPIT_SMTP_HOST_PORT
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
@@ -108,7 +113,7 @@ services:
       - /app/node_modules
       - /app/apps/web/node_modules   # cache .vite tetap di volume, bukan di working tree (milik root)
     ports:
-      - "127.0.0.1:5173:5173"
+      - "127.0.0.1:${WEB_HOST_PORT:-5173}:5173"
     environment:
       VITE_API_PROXY_TARGET: http://api:8080
     healthcheck:
