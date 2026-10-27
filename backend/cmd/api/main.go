@@ -18,7 +18,12 @@ import (
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	code := app.RunAPI(ctx, app.EnvMap(os.Environ()), infra.Deps{}, os.Stderr, nil)
+	var code int
+	if len(os.Args) > 1 && os.Args[1] == "bootstrap-admin" {
+		code = app.BootstrapAdmin(ctx, os.Args[2:], app.EnvMap(os.Environ()), os.Stdin, os.Stdout, os.Stderr)
+	} else {
+		code = app.RunAPI(ctx, app.EnvMap(os.Environ()), infra.Deps{}, os.Stderr, nil)
+	}
 	stop()
 	os.Exit(code)
 }

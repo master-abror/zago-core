@@ -131,9 +131,9 @@ migrate-roundtrip: ## up -> down(semua) -> up pada database SEMENTARA di Postgre
 db-test:         ## Tes constraint/trigger/cascade/grant skema + seeder (docs/04 §17; butuh Docker)
 	REQUIRE_DOCKER=1 go test ./backend/migrations/... -race -count=1
 
-bootstrap-admin: ## Buat Super Admin pertama: make bootstrap-admin EMAIL=you@example.org (mulai M03)
-	@test -n "$(EMAIL)" || (echo "usage: make bootstrap-admin EMAIL=<email>" && exit 1)
-	@echo "bootstrap-admin belum diimplementasikan (milestone M03, docs/21)" && exit 1
+bootstrap-admin: ## Buat Super Admin pertama: make bootstrap-admin EMAIL=you@example.org [NAME=..] [PASSWORD_STDIN=1]
+	@test -n "$(EMAIL)" || (echo "usage: make bootstrap-admin EMAIL=<email> [NAME=<nama>] [PASSWORD_STDIN=1]" && exit 1)
+	go run ./backend/cmd/api bootstrap-admin --email "$(EMAIL)" $(if $(NAME),--name "$(NAME)") $(if $(PASSWORD_STDIN),--password-stdin)
 
 # ---------- 2.5 Build ----------
 build:           ## Kompilasi binary produksi dan bundle frontend
@@ -154,8 +154,9 @@ docker-build:    ## Build image produksi (build context = root repo)
 	docker build -f deploy/docker/web.Dockerfile --target production -t platform-web:local .
 
 # ---------- 2.7 Smoke & verifikasi ----------
-smoke:           ## Jalankan semua smoke script milestone terhadap stack yang berjalan
-	@for f in scripts/smoke/m*.sh; do echo "== $$f"; bash $$f || exit 1; done
+smoke:           ## Jalankan semua smoke script milestone terhadap stack yang berjalan (satu direktori state sementara untuk semua skrip)
+	@dir=$$(mktemp -d); trap 'rm -rf "$$dir"' EXIT; export SMOKE_STATE_DIR="$$dir"; \
+	for f in scripts/smoke/m*.sh; do echo "== $$f"; bash $$f || exit 1; done
 
 verify:          ## Gerbang tunggal: lint + generate-check + test + migrate-roundtrip + build + smoke
 	@test -f .env || { cp .env.example .env && echo "verify: .env dibuat dari .env.example (nilai pengembangan)"; }

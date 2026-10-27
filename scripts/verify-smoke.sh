@@ -8,8 +8,18 @@ cd "$(dirname "$0")/.."
 export COMPOSE_PROJECT_NAME=${VERIFY_PROJECT:-platform-verify}
 COMPOSE=(docker compose --profile full)
 
-# Port host yang dipublikasikan compose; bentrok dengan stack dev = gagal dengan pesan jelas.
-for port in 5432 6379 8080 5173 1025 8025; do
+# Port host yang dipublikasikan compose (bawaan atau dari .env, ADR-0021); bentrok dengan stack
+# dev/proses lain = gagal dengan pesan jelas. Nilai: environment, lalu .env, lalu bawaan.
+env_port() { # env_port NAMA BAWAAN
+  local v=${!1:-}
+  if [ -z "$v" ] && [ -f .env ]; then
+    v=$(sed -n "s/^$1=//p" .env | tail -n1 | tr -d '\r"')
+  fi
+  echo "${v:-$2}"
+}
+for port in "$(env_port POSTGRES_HOST_PORT 5432)" "$(env_port REDIS_HOST_PORT 6379)" \
+  "$(env_port API_HOST_PORT 8080)" "$(env_port WEB_HOST_PORT 5173)" \
+  "$(env_port MAILPIT_SMTP_HOST_PORT 1025)" "$(env_port MAILPIT_UI_HOST_PORT 8025)"; do
   if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
     echo "✗ port $port sudah dipakai. Hentikan stack/proses dev dulu (make docker-down, atau hentikan make dev), lalu ulangi make verify." >&2
     exit 1

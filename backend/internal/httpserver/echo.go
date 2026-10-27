@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	authhttp "github.com/master-abror/zago-core/backend/internal/auth/transport/http"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
 	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
 	"github.com/master-abror/zago-core/backend/pkg/logger"
@@ -28,7 +29,6 @@ const (
 	echoMaxMessageRunes = 200
 	echoDefaultLimit    = 10
 	echoMaxLimit        = 20
-	devActorHeader      = "X-Dev-Actor"
 )
 
 // EchoRule adalah batas laju endpoint echo, per IP klien.
@@ -73,37 +73,25 @@ func after(a, b echoItem) bool {
 type echoHandlers struct{ k *KernelServices }
 
 // mountEcho memasang rute echo. Middleware dipasang per-endpoint (r.With) agar pola chi sudah
-// final saat idempotency membentuk kunci Redis.
-func mountEcho(r chi.Router, k *KernelServices) {
+// final saat idempotency membentuk kunci Redis. POST butuh sesi (Auth.RequireAuth); identitas
+// aktor datang dari Authenticate di grup API, bukan dari header apa pun. Tanpa Auth, POST
+// menolak semua request dengan 401 (fail closed).
+func mountEcho(r chi.Router, k *KernelServices, auth *authhttp.Middleware) {
 	h := &echoHandlers{k: k}
-	limit := k.RateLimiter.Middleware(EchoRule, func(req *http.Request) string {
-		ip := ClientIP(req.Context())
-		if ip == "" {
-			return ""
-		}
-		return "ip:" + ip
-	})
+	limit := k.RateLimiter.Middleware(EchoRule, ipRateKey)
 	r.With(limit).Get(EchoPath+"/items", h.items)
-	r.With(limit, devActor(k.Responder), k.Idempotency.Require()).Post(EchoPath, h.create)
+	r.With(limit, requireAuth(k.Responder, auth), k.Idempotency.Require()).Post(EchoPath, h.create)
 }
 
-// devActor membaca X-Dev-Actor (UUID) dan menaruhnya sebagai aktor pada context, menggantikan
-// autentikasi yang baru datang di M03. Hanya terpasang pada rute echo, jadi ikut tergerbang
-// DevEndpoints (tidak pernah ada di staging/production).
-func devActor(rs *httpx.Responder) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
+// requireAuth mengembalikan Auth.RequireAuth, atau — bila autentikasi tidak dirakit — middleware
+// yang menolak setiap request dengan 401 authentication_required.
+func requireAuth(rs *httpx.Responder, auth *authhttp.Middleware) func(http.Handler) http.Handler {
+	if auth != nil {
+		return auth.RequireAuth
+	}
+	return func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if raw := r.Header.Get(devActorHeader); raw != "" {
-				uid, err := uuid.Parse(raw)
-				if err != nil || uid == uuid.Nil {
-					rs.Error(w, r, httpx.Validation(httpx.FieldError{
-						Field: devActorHeader, Code: "invalid_uuid", Message: devActorHeader + " must be a UUID",
-					}))
-					return
-				}
-				r = r.WithContext(kernel.WithActor(r.Context(), kernel.Actor{UserID: uid, Type: kernel.ActorUser}))
-			}
-			next.ServeHTTP(w, r)
+			rs.Error(w, r, httpx.AuthenticationRequired.New())
 		})
 	}
 }
@@ -121,15 +109,17 @@ type echoResponse struct {
 // create godoc
 //
 //	@Summary		Echo (dev/test)
-//	@Description	Hanya development/test (ADR-0016): memperagakan envelope, idempotency, rate limit, dan audit. Bukan API produk.
+//	@Description	Hanya development/test (ADR-0016): memperagakan envelope, idempotency, rate limit, dan audit. Butuh sesi (cookie) dan X-CSRF-Token. Bukan API produk.
 //	@Tags			kernel-dev
 //	@Accept			json
 //	@Produce		json
 //	@Param			Idempotency-Key	header		string		true	"Kunci idempotensi unik per aksi"
-//	@Param			X-Dev-Actor		header		string		true	"UUID aktor (pengganti autentikasi sampai M03)"
+//	@Param			X-CSRF-Token	header		string		true	"Token CSRF sesi (GET /api/v1/auth/csrf)"
 //	@Param			body			body		echoRequest	true	"Pesan"
 //	@Success		201				{object}	httpx.Envelope[httpserver.echoResponse]
 //	@Failure		400				{object}	httpx.ErrorEnvelope	"validation_failed"
+//	@Failure		401				{object}	httpx.ErrorEnvelope	"authentication_required"
+//	@Failure		403				{object}	httpx.ErrorEnvelope	"csrf_failed"
 //	@Failure		409				{object}	httpx.ErrorEnvelope	"idempotency_in_progress"
 //	@Failure		422				{object}	httpx.ErrorEnvelope	"idempotency_key_conflict"
 //	@Failure		429				{object}	httpx.ErrorEnvelope	"rate_limit_exceeded"

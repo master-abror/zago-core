@@ -15,6 +15,7 @@ import (
 	"github.com/caarlos0/env/v11"
 
 	"github.com/master-abror/zago-core/backend/pkg/logger"
+	"github.com/master-abror/zago-core/backend/pkg/security"
 )
 
 // Role menentukan variabel mana yang wajib. Satu struct Config dipakai tiga binary, tetapi
@@ -48,6 +49,20 @@ type Config struct {
 	AllowedOrigins   []string `env:"ALLOWED_ORIGINS"`
 	TrustedProxies   []string `env:"TRUSTED_PROXIES"` // CIDR yang X-Forwarded-*-nya dipercaya
 	MFAEncryptionKey string   `env:"MFA_ENCRYPTION_KEY"`
+
+	// hash password Argon2id (docs/05 §4.1, I-04). Setel ulang dengan benchmark di perangkat keras
+	// deploy (target 50–150 ms per hash). Hash lama tetap sah; rehash terjadi saat login berikutnya.
+	PasswordArgon2MemoryKiB   int `env:"PASSWORD_ARGON2_MEMORY_KIB" envDefault:"65536"`
+	PasswordArgon2Time        int `env:"PASSWORD_ARGON2_TIME" envDefault:"3"`
+	PasswordArgon2Parallelism int `env:"PASSWORD_ARGON2_PARALLELISM" envDefault:"2"`
+	PasswordHashConcurrency   int `env:"PASSWORD_HASH_CONCURRENCY" envDefault:"0"` // 0 = jumlah CPU
+	PasswordMinLength         int `env:"PASSWORD_MIN_LENGTH" envDefault:"12"`
+
+	// sesi (docs/05 §12.1): dua jam independen. Idle = sejak aktivitas terakhir; absolut = sejak
+	// sesi dibuat, tidak bisa diperpanjang. Nilai ini bawaan; deployment yang lebih ketat dapat
+	// menggantinya lewat sumber timeout (settings platform) tanpa mengubah kode sesi.
+	SessionIdleTimeout     time.Duration `env:"SESSION_IDLE_TIMEOUT" envDefault:"30m"`
+	SessionAbsoluteTimeout time.Duration `env:"SESSION_ABSOLUTE_TIMEOUT" envDefault:"12h"`
 
 	// server
 	Port          int    `env:"PORT" envDefault:"8080"`
@@ -192,6 +207,10 @@ func (c *Config) validateRuntime(role Role) []string {
 		}
 	}
 
+	if role == RoleAPI {
+		p = append(p, c.validateAuth()...)
+	}
+
 	for _, cidr := range c.TrustedProxies {
 		if _, err := parseProxy(cidr); err != nil {
 			p = append(p, "TRUSTED_PROXIES harus berisi daftar CIDR atau alamat IP yang valid")
@@ -234,6 +253,45 @@ func (c *Config) validateRuntime(role Role) []string {
 		if u, err := url.Parse(c.PublicBaseURL); err == nil && c.PublicBaseURL != "" && u.Scheme != "https" {
 			p = append(p, "PUBLIC_BASE_URL harus https saat ENVIRONMENT=production")
 		}
+	}
+	return p
+}
+
+// Argon2Params mengembalikan parameter hash password. Hanya bermakna setelah Validate berhasil
+// (role API); nilai tak valid menghasilkan parameter nol yang ditolak konstruktor hasher.
+func (c *Config) Argon2Params() security.Argon2Params {
+	p, err := security.Argon2ParamsFromInts(c.PasswordArgon2MemoryKiB, c.PasswordArgon2Time, c.PasswordArgon2Parallelism)
+	if err != nil {
+		return security.Argon2Params{}
+	}
+	return p
+}
+
+// PasswordPolicy mengembalikan kebijakan password (panjang minimum, docs/05 §4.1).
+func (c *Config) PasswordPolicy() security.PasswordPolicy {
+	return security.PasswordPolicy{MinLength: c.PasswordMinLength}
+}
+
+func (c *Config) validateAuth() []string {
+	var p []string
+	if c.SessionIdleTimeout < time.Minute || c.SessionIdleTimeout > 24*time.Hour {
+		p = append(p, "SESSION_IDLE_TIMEOUT harus antara 1m dan 24h")
+	}
+	if c.SessionAbsoluteTimeout < 5*time.Minute || c.SessionAbsoluteTimeout > 30*24*time.Hour {
+		p = append(p, "SESSION_ABSOLUTE_TIMEOUT harus antara 5m dan 720h")
+	}
+	if c.SessionIdleTimeout > c.SessionAbsoluteTimeout {
+		p = append(p, "SESSION_IDLE_TIMEOUT tidak boleh melebihi SESSION_ABSOLUTE_TIMEOUT")
+	}
+	if _, err := security.Argon2ParamsFromInts(c.PasswordArgon2MemoryKiB, c.PasswordArgon2Time, c.PasswordArgon2Parallelism); err != nil {
+		p = append(p, "PASSWORD_ARGON2_MEMORY_KIB (8–1048576, minimal 8 x paralelisme), PASSWORD_ARGON2_TIME (1–16), "+
+			"dan PASSWORD_ARGON2_PARALLELISM (1–64) harus dalam rentang aman")
+	}
+	if c.PasswordHashConcurrency < 0 || c.PasswordHashConcurrency > 256 {
+		p = append(p, "PASSWORD_HASH_CONCURRENCY harus 0–256 (0 = jumlah CPU)")
+	}
+	if c.PasswordMinLength < 8 || c.PasswordMinLength > 128 {
+		p = append(p, "PASSWORD_MIN_LENGTH harus 8–128")
 	}
 	return p
 }

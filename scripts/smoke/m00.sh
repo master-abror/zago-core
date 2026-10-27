@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # scripts/smoke/m00.sh — fondasi: server hidup, readiness mencerminkan dependensi, header
 # keamanan, request id, proxy dev Vite. Hanya-baca dan idempoten. Gagal keras bila ada langkah gagal.
-#   BASE     alamat API  (default http://localhost:8080)
-#   WEB      alamat Vite (default http://localhost:5173)
+#   BASE     alamat API  (default http://localhost:${API_HOST_PORT:-8080})
+#   WEB      alamat Vite (default http://localhost:${WEB_HOST_PORT:-5173})
+#   (API_HOST_PORT/WEB_HOST_PORT diekspor dari .env oleh make; ADR-0021)
 #   SKIP_WEB=1 melewati langkah frontend/proxy
 set -euo pipefail
 
-BASE=${BASE:-http://localhost:8080}
-WEB=${WEB:-http://localhost:5173}
+BASE=${BASE:-http://localhost:${API_HOST_PORT:-8080}}
+WEB=${WEB:-http://localhost:${WEB_HOST_PORT:-5173}}
 SKIP_WEB=${SKIP_WEB:-0}
 
 step() { echo "▶ $*"; }

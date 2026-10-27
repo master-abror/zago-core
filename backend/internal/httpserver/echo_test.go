@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,8 +19,12 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
+	"github.com/master-abror/zago-core/backend/internal/auth/domain"
+	"github.com/master-abror/zago-core/backend/internal/auth/service"
+	authhttp "github.com/master-abror/zago-core/backend/internal/auth/transport/http"
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
+	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
 	"github.com/master-abror/zago-core/backend/internal/testkit"
 	"github.com/master-abror/zago-core/backend/pkg/logger"
 	modulesdk "github.com/master-abror/zago-core/packages/module-sdk"
@@ -29,6 +34,11 @@ const (
 	echoPath   = "/api/v1/_kernel/echo"
 	itemsPath  = "/api/v1/_kernel/echo/items"
 	testSecret = "0123456789abcdef0123456789abcdef-test-secret"
+
+	testCookieName = "platform_session" // COOKIE_SECURE=false: tanpa prefiks __Host-
+	testOrigin     = "https://app.example.com"
+	tokenA         = "token-sesi-a-0123456789abcdef0123456789ab"
+	tokenB         = "token-sesi-b-0123456789abcdef0123456789ab"
 )
 
 // fakeAudit mencatat setiap activity beserta context pemanggilnya (bukan database: perekam nyata
@@ -53,13 +63,70 @@ func (f *fakeAudit) count() int {
 }
 
 type echoEnv struct {
-	h     http.Handler
-	audit *fakeAudit
-	log   *bytes.Buffer
+	h        http.Handler
+	audit    *fakeAudit
+	log      *bytes.Buffer
+	sessions *fakeSessions
+	authSvc  *fakeAuthSvc
 }
 
-// newEcho merakit handler lengkap lewat httpserver.NewHandler dengan Redis sungguhan.
+// fakeSessions menggantikan SessionService di tes handler (SessionService diuji terhadap
+// PostgreSQL+Redis nyata di paket auth/service dan lewat e2e di paket infra): token -> Identity.
+type fakeSessions struct {
+	calls   atomic.Int64
+	fail    error // bila diisi, semua panggilan gagal dengan galat ini (gangguan infrastruktur)
+	byToken map[string]domain.Identity
+}
+
+func newFakeSessions() *fakeSessions {
+	return &fakeSessions{byToken: map[string]domain.Identity{
+		tokenA: {UserID: actorA, SessionID: sessionA, AuthLevel: domain.AuthLevelPassword},
+		tokenB: {UserID: actorB, SessionID: sessionB, AuthLevel: domain.AuthLevelPassword},
+	}}
+}
+
+func (f *fakeSessions) Authenticate(_ context.Context, token string) (*domain.Identity, error) {
+	f.calls.Add(1)
+	if f.fail != nil {
+		return nil, f.fail
+	}
+	if id, ok := f.byToken[token]; ok {
+		return &id, nil
+	}
+	return nil, domain.ErrUnauthenticated
+}
+
+// testCSRF memakai rahasia yang sama dengan toolkit kernel di tes ini.
+var testCSRF = func() *service.CSRF {
+	c, err := service.NewCSRF(testSecret)
+	if err != nil {
+		panic(err)
+	}
+	return c
+}()
+
+func newAuthMW(t *testing.T, log *slog.Logger, sessions authhttp.Authenticator) *authhttp.Middleware {
+	t.Helper()
+	cookie, err := authhttp.NewCookie("platform_session", false)
+	require.NoError(t, err)
+	require.Equal(t, testCookieName, cookie.Name())
+	mw, err := authhttp.New(authhttp.Deps{
+		Auth: sessions, Cookie: cookie, CSRF: testCSRF,
+		Origins: authhttp.NewOriginPolicy([]string{testOrigin}), Responder: httpx.NewResponder(log), Log: log,
+	})
+	require.NoError(t, err)
+	return mw
+}
+
+// newEcho merakit handler lengkap lewat httpserver.NewHandler dengan Redis sungguhan dan rantai
+// autentikasi nyata (Authenticate -> CSRF -> RequireAuth) di atas sesi palsu.
 func newEcho(t *testing.T, rdb redis.UniversalClient, devEndpoints bool) echoEnv {
+	t.Helper()
+	return buildEcho(t, rdb, devEndpoints, true)
+}
+
+// buildEcho seperti newEcho; withAuth=false meninggalkan Options.Auth nil.
+func buildEcho(t *testing.T, rdb redis.UniversalClient, devEndpoints, withAuth bool) echoEnv {
 	t.Helper()
 	var buf bytes.Buffer
 	log := logger.New(&buf, slog.LevelDebug)
@@ -68,8 +135,14 @@ func newEcho(t *testing.T, rdb redis.UniversalClient, devEndpoints bool) echoEnv
 		Redis: rdb, Log: log, SessionSecret: testSecret, Audit: aud,
 	})
 	require.NoError(t, err)
-	h := httpserver.NewHandler(httpserver.Options{Logger: log, Kernel: kern, DevEndpoints: devEndpoints})
-	return echoEnv{h: h, audit: aud, log: &buf}
+	sessions := newFakeSessions()
+	authSvc := newFakeAuthSvc()
+	opts := httpserver.Options{Logger: log, Kernel: kern, DevEndpoints: devEndpoints}
+	if withAuth {
+		opts.Auth = newAuthMW(t, log, sessions)
+		opts.AuthAPI = newAuthHandlers(t, log, authSvc)
+	}
+	return echoEnv{h: httpserver.NewHandler(opts), audit: aud, log: &buf, sessions: sessions, authSvc: authSvc}
 }
 
 func liveEcho(t *testing.T) echoEnv {
@@ -146,10 +219,21 @@ func page(t *testing.T, rec *httptest.ResponseRecorder) (items []item, next any,
 	return items, pg["next_cursor"], pg["has_more"].(bool)
 }
 
-var actorA = uuid.MustParse("0198a000-0000-7000-8000-00000000000a")
+var (
+	actorA   = uuid.MustParse("0198a000-0000-7000-8000-00000000000a")
+	actorB   = uuid.MustParse("0198a000-0000-7000-8000-00000000000b")
+	sessionA = uuid.MustParse("0198a000-0000-7000-8000-0000000000a1")
+	sessionB = uuid.MustParse("0198a000-0000-7000-8000-0000000000b1")
+)
 
+// sessionHeaders adalah cookie sesi plus token CSRF yang sah untuk sesi itu.
+func sessionHeaders(token string, sessionID uuid.UUID) []reqOpt {
+	return []reqOpt{hdr("Cookie", testCookieName+"="+token), hdr(authhttp.HeaderCSRF, testCSRF.Token(sessionID))}
+}
+
+// okHeaders: request sah milik pengguna A (sesi + CSRF) dengan kunci idempotensi key.
 func okHeaders(key string) []reqOpt {
-	return []reqOpt{hdr("Idempotency-Key", key), hdr("X-Dev-Actor", actorA.String())}
+	return append(sessionHeaders(tokenA, sessionA), hdr("Idempotency-Key", key))
 }
 
 func TestEchoIsNotMountedUnlessDevEndpointsEnabledWithKernel(t *testing.T) {
@@ -204,22 +288,37 @@ func TestEchoCreateReturnsEnvelopeAndPropagatesRequestIDActorAndClient(t *testin
 	require.Equal(t, "echo-test/1.0", client.UserAgent)
 }
 
-func TestEchoCreateRejectsMissingActorMissingKeyAndBadActor(t *testing.T) {
+func TestEchoCreateRejectsMissingSessionMissingKeyAndIgnoresDevActorHeader(t *testing.T) {
 	e := liveEcho(t)
+	body := `{"message":"hi"}`
 
-	rec := e.post(`{"message":"hi"}`, hdr("Idempotency-Key", "key-noactor-01"))
+	rec := e.post(body, hdr("Idempotency-Key", "key-nosess-01"))
 	env := requireError(t, rec, http.StatusUnauthorized, "authentication_required")
 	require.Equal(t, rec.Header().Get("X-Request-ID"), env.Error.RequestID, "envelope error membawa request_id")
 
-	rec = e.post(`{"message":"hi"}`, hdr("X-Dev-Actor", actorA.String()))
-	env = requireError(t, rec, http.StatusBadRequest, "validation_failed")
+	// X-Dev-Actor (pengganti autentikasi M02) tidak lagi memberi identitas.
+	rec = e.post(body, hdr("Idempotency-Key", "key-devactor-1"), hdr("X-Dev-Actor", actorA.String()))
+	requireError(t, rec, http.StatusUnauthorized, "authentication_required")
+
+	// Sesi dan CSRF sah, tetapi tanpa Idempotency-Key.
+	rec = e.post(body, sessionHeaders(tokenA, sessionA)...)
+	requireError(t, rec, http.StatusBadRequest, "validation_failed")
 	require.Contains(t, rec.Body.String(), "Idempotency-Key")
 
-	rec = e.post(`{"message":"hi"}`, hdr("Idempotency-Key", "key-badactor-1"), hdr("X-Dev-Actor", "bukan-uuid"))
-	requireError(t, rec, http.StatusBadRequest, "validation_failed")
-	require.Contains(t, rec.Body.String(), "X-Dev-Actor")
-
 	require.Zero(t, e.audit.count(), "handler tidak boleh jalan untuk request yang ditolak")
+
+	// Dengan sesi sah, X-Dev-Actor diabaikan: aktor adalah pemilik sesi, bukan isi header.
+	rec = e.post(body, append(okHeaders("key-devactor-2"), hdr("X-Dev-Actor", actorB.String()))...)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	var data struct {
+		ActorID string `json:"actor_id"`
+	}
+	require.NoError(t, json.Unmarshal(decode(t, rec).Data, &data))
+	require.Equal(t, actorA.String(), data.ActorID)
+	require.Equal(t, 1, e.audit.count())
+	actor, ok := kernel.ActorFromContext(e.audit.ctxs[0])
+	require.True(t, ok)
+	require.Equal(t, actorA, actor.UserID)
 }
 
 func TestEchoCreateValidatesBody(t *testing.T) {
@@ -261,9 +360,9 @@ func TestEchoIdempotencyReplaysAndRecordsOnce(t *testing.T) {
 	requireError(t, conflict, http.StatusUnprocessableEntity, "idempotency_key_conflict")
 	require.Equal(t, 1, e.audit.count())
 
-	otherActor := e.post(body, hdr("Idempotency-Key", "key-replay-0001"),
-		hdr("X-Dev-Actor", uuid.MustParse("0198a000-0000-7000-8000-00000000000b").String()))
-	require.Equal(t, http.StatusCreated, otherActor.Code, "kunci terikat ke aktor: aktor lain tidak memutar ulang respons orang lain")
+	otherActor := e.post(body, append(sessionHeaders(tokenB, sessionB), hdr("Idempotency-Key", "key-replay-0001"))...)
+	require.Equal(t, http.StatusCreated, otherActor.Code, "kunci terikat ke pemilik sesi: pengguna lain tidak memutar ulang respons orang lain")
+	require.Empty(t, otherActor.Header().Get("Idempotent-Replayed"))
 	require.Equal(t, 2, e.audit.count())
 }
 
