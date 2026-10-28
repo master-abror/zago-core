@@ -351,7 +351,11 @@ func (h *Handlers) SwitchOrganization(w http.ResponseWriter, r *http.Request) {
 // fail memetakan kesalahan layanan ke kode error API. Kesalahan tak dikenal diteruskan apa
 // adanya: Responder menjadikannya 500 internal_error tanpa membocorkan teksnya.
 func (h *Handlers) fail(w http.ResponseWriter, r *http.Request, err error) {
+	var throttled *domain.ThrottledError
 	switch {
+	case errors.As(err, &throttled):
+		// Gerbang IP penjaga login (ADR-0020 butir 50): 429 dengan Retry-After, tanpa membocorkan akun.
+		err = httpx.RateLimitExceeded.New().WithRetryAfter(max(throttled.RetryAfter, time.Second))
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		err = InvalidCredentials.New()
 	case errors.Is(err, domain.ErrAccountSuspended):

@@ -64,6 +64,14 @@ type Config struct {
 	SessionIdleTimeout     time.Duration `env:"SESSION_IDLE_TIMEOUT" envDefault:"30m"`
 	SessionAbsoluteTimeout time.Duration `env:"SESSION_ABSOLUTE_TIMEOUT" envDefault:"12h"`
 
+	// penjaga login (docs/05 §12.3, ADR-0020 butir 49–50, 55): kunci akun sementara dengan durasi berlipat
+	// (LoginLockDuration, 2x, ... sampai LoginLockMax) dan gerbang kegagalan per IP.
+	LoginMaxFailures   int           `env:"LOGIN_MAX_FAILURES" envDefault:"5"`
+	LoginFailureWindow time.Duration `env:"LOGIN_FAILURE_WINDOW" envDefault:"15m"`
+	LoginLockDuration  time.Duration `env:"LOGIN_LOCK_DURATION" envDefault:"15m"`
+	LoginLockMax       time.Duration `env:"LOGIN_LOCK_MAX" envDefault:"60m"`
+	LoginIPMaxFailures int           `env:"LOGIN_IP_MAX_FAILURES" envDefault:"30"`
+
 	// server
 	Port          int    `env:"PORT" envDefault:"8080"`
 	Environment   string `env:"ENVIRONMENT" envDefault:"development"`
@@ -292,6 +300,23 @@ func (c *Config) validateAuth() []string {
 	}
 	if c.PasswordMinLength < 8 || c.PasswordMinLength > 128 {
 		p = append(p, "PASSWORD_MIN_LENGTH harus 8–128")
+	}
+	if c.LoginMaxFailures < 3 || c.LoginMaxFailures > 100 {
+		p = append(p, "LOGIN_MAX_FAILURES harus 3–100")
+	}
+	if c.LoginIPMaxFailures < 1 || c.LoginIPMaxFailures > 10000 {
+		p = append(p, "LOGIN_IP_MAX_FAILURES harus 1–10000")
+	}
+	if c.LoginFailureWindow < time.Minute || c.LoginFailureWindow > 24*time.Hour {
+		p = append(p, "LOGIN_FAILURE_WINDOW harus antara 1m dan 24h")
+	}
+	if c.LoginLockDuration < time.Minute || c.LoginLockDuration > 24*time.Hour {
+		p = append(p, "LOGIN_LOCK_DURATION harus antara 1m dan 24h")
+	}
+	if c.LoginLockMax > 24*time.Hour {
+		p = append(p, "LOGIN_LOCK_MAX tidak boleh melebihi 24h")
+	} else if c.LoginLockMax < c.LoginLockDuration {
+		p = append(p, "LOGIN_LOCK_MAX tidak boleh kurang dari LOGIN_LOCK_DURATION")
 	}
 	return p
 }

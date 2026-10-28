@@ -47,9 +47,20 @@ func newAuthStack(cfg *config.Config, pool kernel.Pool, rdb redis.UniversalClien
 		service.StaticTimeouts{Idle: cfg.SessionIdleTimeout, Absolute: cfg.SessionAbsoluteTimeout},
 		log,
 	)
+	// Penjaga login (ADR-0020 butir 47–53): kebijakan tak sah = start ditolak (bukan dikoreksi diam-diam).
+	guard, err := service.NewGuard(rdb, service.GuardPolicy{
+		MaxFailures:   cfg.LoginMaxFailures,
+		FailureWindow: cfg.LoginFailureWindow,
+		LockDuration:  cfg.LoginLockDuration,
+		LockMax:       cfg.LoginLockMax,
+		IPMaxFailures: cfg.LoginIPMaxFailures,
+	}, log)
+	if err != nil {
+		return authStack{}, fmt.Errorf("penjaga login: %w", err)
+	}
 	authSvc, err := service.NewAuthService(service.AuthDeps{
 		Store: store, Tx: kernel.NewTxManager(pool, log), Sessions: sessions, Hasher: hasher,
-		Policy: cfg.PasswordPolicy(), Bus: kernel.NewBus(pool, log), Audit: audit, Log: log,
+		Policy: cfg.PasswordPolicy(), Bus: kernel.NewBus(pool, log), Audit: audit, Guard: guard, Log: log,
 	})
 	if err != nil {
 		return authStack{}, fmt.Errorf("layanan auth: %w", err)
