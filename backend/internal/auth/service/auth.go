@@ -26,6 +26,9 @@ const (
 	EventLoginFailed  = "auth.login.failed"
 	EventLogout       = "auth.logout"
 
+	// EventAccountLocked ditulis sekali per kunci sementara yang dipasang penjaga login (ADR-0020 butir 48).
+	EventAccountLocked = "auth.account.locked"
+
 	EventSessionRefreshed     = "auth.session.refreshed"
 	EventOrganizationSwitched = "auth.organization.switched"
 
@@ -48,12 +51,14 @@ type AuthService struct {
 	policy   security.PasswordPolicy
 	bus      modulesdk.EventBus
 	audit    modulesdk.AuditRecorder
+	guard    LoginGuard
 	log      *slog.Logger
 }
 
 // AuthDeps adalah dependensi AuthService. Policy (nol = panjang minimum bawaan), Bus, Audit, dan Log
 // opsional. Bus nil = ganti password tidak menulis event outbox (composition root selalu memasangnya,
-// ADR-0020 butir 43).
+// ADR-0020 butir 43). Guard nil = tanpa kunci akun/penghitung (hanya tes; composition root selalu
+// memasangnya, ADR-0020 butir 47–53).
 type AuthDeps struct {
 	Store    *repository.Store
 	Tx       *kernel.TxManager
@@ -62,6 +67,7 @@ type AuthDeps struct {
 	Policy   security.PasswordPolicy
 	Bus      modulesdk.EventBus
 	Audit    modulesdk.AuditRecorder
+	Guard    LoginGuard
 	Log      *slog.Logger
 }
 
@@ -82,7 +88,8 @@ func NewAuthService(d AuthDeps) (*AuthService, error) {
 		log = slog.Default()
 	}
 	return &AuthService{
-		store: d.Store, tx: d.Tx, sessions: d.Sessions, hasher: d.Hasher, policy: d.Policy, bus: d.Bus, audit: d.Audit, log: log,
+		store: d.Store, tx: d.Tx, sessions: d.Sessions, hasher: d.Hasher, policy: d.Policy, bus: d.Bus, audit: d.Audit,
+		guard: d.Guard, log: log,
 	}, nil
 }
 
@@ -112,6 +119,15 @@ type LoginResult struct {
 // Login memverifikasi kredensial dan menerbitkan sesi baru. Kesalahan domain: ErrInvalidCredentials,
 // ErrAccountSuspended, ErrAccountLocked; selain itu adalah kegagalan infrastruktur.
 func (s *AuthService) Login(ctx context.Context, in LoginInput) (LoginResult, error) {
+	// Gerbang IP (ADR-0020 butir 50, 53): sebelum pencarian user dan sebelum Argon2, jadi tidak
+	// membocorkan keberadaan akun dan tidak memakan CPU.
+	gip := guardIP(ctx)
+	if s.guard != nil {
+		if retry, blocked := s.guard.IPBlocked(ctx, gip); blocked {
+			return LoginResult{}, &domain.ThrottledError{RetryAfter: retry}
+		}
+	}
+
 	q := s.store.Q(ctx)
 
 	user, err := q.GetUserForLoginByEmail(ctx, NormalizeEmail(in.Email))
@@ -130,9 +146,19 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (LoginResult, er
 
 	if !known {
 		// Email tak dikenal atau tanpa credential: tetap jalankan verifikasi penuh (waktu setara).
-		if err := s.hasher.CompareDummy(ctx, in.Password); err != nil &&
-			!errors.Is(err, security.ErrMismatch) && !errors.Is(err, security.ErrPasswordTooLong) {
-			return LoginResult{}, fmt.Errorf("auth: verifikasi dummy: %w", err)
+		// Hanya penghitung IP yang naik (tak ada akun yang dikunci).
+		if err := s.dummyCompare(ctx, in.Password); err != nil {
+			return LoginResult{}, err
+		}
+		s.guardFailure(ctx, nil, gip)
+		return LoginResult{}, domain.ErrInvalidCredentials
+	}
+
+	// Kunci sementara aktif (ADR-0020 butir 47): selalu invalid_credentials, biaya Argon2 setara, password
+	// yang benar pun tak menghasilkan sesi; tidak dicatat dan tidak dihitung (kunci tak diperpanjang).
+	if s.guard != nil && s.guard.AccountLocked(ctx, user.ID) {
+		if err := s.dummyCompare(ctx, in.Password); err != nil {
+			return LoginResult{}, err
 		}
 		return LoginResult{}, domain.ErrInvalidCredentials
 	}
@@ -140,12 +166,12 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (LoginResult, er
 	switch err := s.hasher.Compare(ctx, cred.SecretHash, in.Password); {
 	case err == nil:
 	case errors.Is(err, security.ErrMismatch), errors.Is(err, security.ErrPasswordTooLong):
-		s.recordFailure(ctx, user.ID, "bad_password")
+		s.passwordFailed(ctx, user.ID, gip)
 		return LoginResult{}, domain.ErrInvalidCredentials
 	case errors.Is(err, security.ErrInvalidHash):
 		// Data rusak, bukan password salah: terlihat di log, tetapi klien tetap melihat 401 biasa.
 		s.log.ErrorContext(ctx, "hash password tersimpan tidak valid", "user_id", user.ID)
-		s.recordFailure(ctx, user.ID, "bad_password")
+		s.passwordFailed(ctx, user.ID, gip)
 		return LoginResult{}, domain.ErrInvalidCredentials
 	default:
 		return LoginResult{}, fmt.Errorf("auth: verifikasi password: %w", err)
@@ -213,6 +239,12 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (LoginResult, er
 	})
 	if err != nil {
 		return LoginResult{}, err
+	}
+	if s.guard != nil {
+		// Setelah commit, best-effort: login sukses mereset penghitung dan strike akun (butir 49).
+		gctx, cancel := guardCtx(ctx)
+		defer cancel()
+		s.guard.RecordSuccess(gctx, user.ID)
 	}
 	return out, nil
 }
@@ -408,6 +440,72 @@ func (s *AuthService) recordFailure(ctx context.Context, userID uuid.UUID, reaso
 		Type: EventLoginFailed, Result: eventResultFailure, UserID: userID, Metadata: map[string]any{"reason": reason},
 	}); err != nil {
 		s.log.WarnContext(ctx, "gagal mencatat event login gagal", "error", err)
+	}
+}
+
+// guardCtx adalah konteks tulis penjaga: tidak ikut dibatalkan klien (kegagalan tetap terhitung bila
+// klien memutus koneksi setelah vonis) tetapi berbatas waktu.
+func guardCtx(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+}
+
+// guardIP mengubah IP klien menjadi kunci penjaga: IPv4 apa adanya, IPv6 dipotong ke /64 (satu pelanggan
+// lazimnya memegang seluruh /64; per alamat membuat penghitung mudah dilewati). "" = tak dilacak.
+func guardIP(ctx context.Context) string {
+	ip, _ := clientInfo(ctx)
+	if ip == nil {
+		return ""
+	}
+	a := ip.Unmap()
+	if a.Is6() {
+		p, err := a.Prefix(64)
+		if err != nil {
+			return ""
+		}
+		return p.String()
+	}
+	return a.String()
+}
+
+// dummyCompare menjalankan verifikasi Argon2id terhadap hash dummy; hanya galat tak terduga yang dikembalikan.
+func (s *AuthService) dummyCompare(ctx context.Context, password string) error {
+	if err := s.hasher.CompareDummy(ctx, password); err != nil &&
+		!errors.Is(err, security.ErrMismatch) && !errors.Is(err, security.ErrPasswordTooLong) {
+		return fmt.Errorf("auth: verifikasi dummy: %w", err)
+	}
+	return nil
+}
+
+// guardFailure mencatat satu kegagalan password di penjaga (userID nil = email tak dikenal).
+func (s *AuthService) guardFailure(ctx context.Context, userID *uuid.UUID, ip string) FailureResult {
+	if s.guard == nil {
+		return FailureResult{}
+	}
+	gctx, cancel := guardCtx(ctx)
+	defer cancel()
+	return s.guard.RecordFailure(gctx, userID, ip)
+}
+
+// passwordFailed menangani password salah pada akun yang dikenal: penghitung penjaga lebih dulu (kritis
+// keamanan), lalu event login gagal, lalu event kunci bila kegagalan ini yang memasang kunci (butir 48).
+func (s *AuthService) passwordFailed(ctx context.Context, userID uuid.UUID, ip string) {
+	res := s.guardFailure(ctx, &userID, ip)
+	s.recordFailure(ctx, userID, "bad_password")
+	if res.Locked {
+		s.recordLocked(ctx, userID, res)
+	}
+}
+
+func (s *AuthService) recordLocked(ctx context.Context, userID uuid.UUID, res FailureResult) {
+	wctx, cancel := guardCtx(ctx)
+	defer cancel()
+	if err := s.insertEvent(wctx, securityEvent{
+		Type:     EventAccountLocked,
+		Result:   eventResultFailure,
+		UserID:   userID,
+		Metadata: map[string]any{"failures": res.Failures, "lock_seconds": int(res.LockFor / time.Second)},
+	}); err != nil {
+		s.log.WarnContext(ctx, "gagal mencatat event kunci akun", "error", err)
 	}
 }
 
