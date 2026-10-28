@@ -12,6 +12,7 @@ import (
 	"github.com/master-abror/zago-core/backend/internal/auth/domain"
 	"github.com/master-abror/zago-core/backend/internal/auth/service"
 	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
+	"github.com/master-abror/zago-core/backend/pkg/security"
 )
 
 const (
@@ -30,6 +31,8 @@ type Service interface {
 	ListSessions(ctx context.Context, id domain.Identity) ([]service.SessionInfo, error)
 	RevokeSession(ctx context.Context, id domain.Identity, target uuid.UUID) error
 	RevokeOtherSessions(ctx context.Context, id domain.Identity) (int, error)
+	ChangePassword(ctx context.Context, id domain.Identity, in service.ChangePasswordInput) (service.ChangePasswordResult, error)
+	ListSecurityEvents(ctx context.Context, id domain.Identity, limit int, before *service.EventPosition) ([]service.SecurityEventInfo, error)
 }
 
 // HandlerDeps adalah dependensi Handlers. Now opsional (bawaan time.Now).
@@ -37,6 +40,7 @@ type HandlerDeps struct {
 	Service   Service
 	Cookie    Cookie
 	CSRF      *service.CSRF
+	Cursors   *httpx.CursorCodec // kursor GET /security/events (ADR-0013)
 	Responder *httpx.Responder
 	Now       func() time.Time
 }
@@ -45,11 +49,12 @@ type HandlerDeps struct {
 // pernah membaca cookie: identitas datang dari Middleware (domain.IdentityFromContext), dan satu-
 // satunya yang menulis cookie sesi adalah Login/Logout.
 type Handlers struct {
-	svc  Service
-	ck   Cookie
-	csrf *service.CSRF
-	rs   *httpx.Responder
-	now  func() time.Time
+	svc     Service
+	ck      Cookie
+	csrf    *service.CSRF
+	cursors *httpx.CursorCodec
+	rs      *httpx.Responder
+	now     func() time.Time
 }
 
 // NewHandlers membuat Handlers; semua dependensi kecuali Now wajib.
@@ -59,6 +64,8 @@ func NewHandlers(d HandlerDeps) (*Handlers, error) {
 		return nil, errors.New("authhttp: HandlerDeps.Service wajib")
 	case d.CSRF == nil:
 		return nil, errors.New("authhttp: HandlerDeps.CSRF wajib")
+	case d.Cursors == nil:
+		return nil, errors.New("authhttp: HandlerDeps.Cursors wajib")
 	case d.Responder == nil:
 		return nil, errors.New("authhttp: HandlerDeps.Responder wajib")
 	case d.Cookie.Name() == "":
@@ -68,7 +75,7 @@ func NewHandlers(d HandlerDeps) (*Handlers, error) {
 	if now == nil {
 		now = time.Now
 	}
-	return &Handlers{svc: d.Service, ck: d.Cookie, csrf: d.CSRF, rs: d.Responder, now: now}, nil
+	return &Handlers{svc: d.Service, ck: d.Cookie, csrf: d.CSRF, cursors: d.Cursors, rs: d.Responder, now: now}, nil
 }
 
 // LoginRequest adalah body POST /auth/login.
@@ -344,7 +351,11 @@ func (h *Handlers) SwitchOrganization(w http.ResponseWriter, r *http.Request) {
 // fail memetakan kesalahan layanan ke kode error API. Kesalahan tak dikenal diteruskan apa
 // adanya: Responder menjadikannya 500 internal_error tanpa membocorkan teksnya.
 func (h *Handlers) fail(w http.ResponseWriter, r *http.Request, err error) {
+	var throttled *domain.ThrottledError
 	switch {
+	case errors.As(err, &throttled):
+		// Gerbang IP penjaga login (ADR-0020 butir 50): 429 dengan Retry-After, tanpa membocorkan akun.
+		err = httpx.RateLimitExceeded.New().WithRetryAfter(max(throttled.RetryAfter, time.Second))
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		err = InvalidCredentials.New()
 	case errors.Is(err, domain.ErrAccountSuspended):
@@ -357,6 +368,12 @@ func (h *Handlers) fail(w http.ResponseWriter, r *http.Request, err error) {
 		err = httpx.PermissionDenied.New()
 	case errors.Is(err, domain.ErrUnauthenticated):
 		err = httpx.AuthenticationRequired.New()
+	case errors.Is(err, security.ErrPasswordTooShort):
+		err = httpx.Validation(httpx.FieldError{Field: "new_password", Code: "too_short", Message: "New password is too short."})
+	case errors.Is(err, security.ErrPasswordTooLong):
+		err = httpx.Validation(httpx.FieldError{Field: "new_password", Code: "too_long", Message: "New password is too long."})
+	case errors.Is(err, domain.ErrSamePassword):
+		err = httpx.Validation(httpx.FieldError{Field: "new_password", Code: "same_as_current", Message: "New password must differ from the current password."})
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		err = httpx.ServiceUnavailable.Wrap(err)
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/master-abror/zago-core/backend/internal/auth/domain"
 	authhttp "github.com/master-abror/zago-core/backend/internal/auth/transport/http"
 	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
 )
@@ -17,9 +18,32 @@ const (
 )
 
 // LoginRule membatasi percobaan login per IP klien. Sensitive: bila Redis mati, pembatasan jatuh
-// ke memori proses (bukan fail open), karena login adalah target tebakan password. Pembatasan per
-// akun, jeda progresif, dan kunci akun menyusul di T5.
+// ke memori proses (bukan fail open), karena login adalah target tebakan password. Kunci akun,
+// penghitung kegagalan per akun/IP, dan jeda progresif ada di penjaga login (service.Guard, ADR-0020
+// bagian 5), bukan di limiter ini.
 var LoginRule = httpx.Rule{Name: "auth.login", Limit: 10, Window: time.Minute, Sensitive: true}
+
+// PasswordRule membatasi ganti password per pengguna (ADR-0020 butir 45): endpoint terautentikasi ini
+// memverifikasi password saat ini, jadi pencuri sesi bisa memakainya untuk menebak. Sensitive: bila
+// Redis mati, pembatasan jatuh ke memori proses. Tidak mengunci akun (itu urusan login, T5).
+var PasswordRule = httpx.Rule{Name: "security.password", Limit: 5, Window: time.Minute, Sensitive: true}
+
+// RefreshRule dan SwitchOrganizationRule membatasi rotasi sesi per pengguna (ADR-0020 butir 54). Bukan
+// Sensitive: sesi sah sudah dipersyaratkan, jadi bila Redis mati pembatasan boleh longgar (fail open).
+var (
+	RefreshRule            = httpx.Rule{Name: "auth.refresh", Limit: 30, Window: time.Minute}
+	SwitchOrganizationRule = httpx.Rule{Name: "auth.switch_organization", Limit: 30, Window: time.Minute}
+)
+
+// userRateKey mengidentifikasi pengguna terautentikasi untuk rate limit; kosong (tidak dibatasi)
+// bila tak ada identitas (RequireAuth sudah menolaknya lebih dulu).
+func userRateKey(r *http.Request) string {
+	id, ok := domain.IdentityFromContext(r.Context())
+	if !ok {
+		return ""
+	}
+	return "user:" + id.UserID.String()
+}
 
 // ipRateKey mengidentifikasi klien untuk rate limit; kosong (tidak dibatasi) bila IP tak diketahui.
 func ipRateKey(r *http.Request) string {
@@ -38,10 +62,14 @@ func mountAuth(r chi.Router, k *KernelServices, mw *authhttp.Middleware, h *auth
 	r.With(mw.RequireAuth).Post(AuthPath+"/logout", h.Logout)
 	r.With(mw.RequireAuth).Get(AuthPath+"/me", h.Me)
 	r.With(mw.RequireAuth).Get(AuthPath+"/csrf", h.CSRF)
-	r.With(mw.RequireAuth).Post(AuthPath+"/refresh", h.Refresh)
-	r.With(mw.RequireAuth).Post(AuthPath+"/switch-organization", h.SwitchOrganization)
+	r.With(mw.RequireAuth, k.RateLimiter.Middleware(RefreshRule, userRateKey)).Post(AuthPath+"/refresh", h.Refresh)
+	r.With(mw.RequireAuth, k.RateLimiter.Middleware(SwitchOrganizationRule, userRateKey)).Post(AuthPath+"/switch-organization", h.SwitchOrganization)
 
 	r.With(mw.RequireAuth).Get(SecurityPath+"/sessions", h.ListSessions)
 	r.With(mw.RequireAuth).Delete(SecurityPath+"/sessions/{id}", h.RevokeSession)
 	r.With(mw.RequireAuth).Post(SecurityPath+"/sessions/revoke-others", h.RevokeOtherSessions)
+
+	// Tanpa Idempotency-Key (ADR-0020 butir 42). RequireAuth lebih dulu: kunci rate limit memakai identitas.
+	r.With(mw.RequireAuth, k.RateLimiter.Middleware(PasswordRule, userRateKey)).Post(SecurityPath+"/password", h.ChangePassword)
+	r.With(mw.RequireAuth).Get(SecurityPath+"/events", h.ListSecurityEvents)
 }

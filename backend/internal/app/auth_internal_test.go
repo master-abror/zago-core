@@ -28,6 +28,12 @@ func TestNewAuthStackAssemblesFromConfigAndRejectsBadInputs(t *testing.T) {
 		PasswordArgon2MemoryKiB: 64, PasswordArgon2Time: 1, PasswordArgon2Parallelism: 1, PasswordHashConcurrency: 1,
 	}
 
+	good.LoginMaxFailures = 5
+	good.LoginFailureWindow = 15 * time.Minute
+	good.LoginLockDuration = 15 * time.Minute
+	good.LoginLockMax = time.Hour
+	good.LoginIPMaxFailures = 30
+
 	stack, err := newAuthStack(&good, nil, rdb, nil, rs, log)
 	require.NoError(t, err)
 	require.NotNil(t, stack.mw)
@@ -47,4 +53,9 @@ func TestNewAuthStackAssemblesFromConfigAndRejectsBadInputs(t *testing.T) {
 	badParams.PasswordArgon2MemoryKiB = 0
 	_, err = newAuthStack(&badParams, nil, rdb, nil, rs, log)
 	require.ErrorContains(t, err, "hasher password")
+
+	badGuard := good
+	badGuard.LoginLockMax = badGuard.LoginLockDuration - time.Second
+	_, err = newAuthStack(&badGuard, nil, rdb, nil, rs, log)
+	require.ErrorContains(t, err, "penjaga login", "kebijakan penjaga tak sah (atau tak diisi) menggagalkan perakitan")
 }
