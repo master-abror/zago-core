@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M03 — Authentication (SEDANG BERJALAN; parsial 5, sampai ◆CP5)
+### M03 — Authentication (SEDANG BERJALAN; parsial 6, sampai ◆CP6)
 
 #### Added
 - `pkg/security`: hasher Argon2id (PHC, rehash-on-login, hash dummy, batas 256 byte, semaphore konkurensi berbasis context) dan `PasswordPolicy`.
@@ -12,7 +12,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `internal/auth`: repositori sqlc (credentials, sessions, security events, lookup user/keanggotaan minimal) dengan `Store` yang mengikuti transaksi;
   `SessionService` (Redis + PostgreSQL otoritatif, fallback saat Redis mati, rotasi, pencabutan, event `session.revoked`); `CSRF` terikat sesi;
   cookie sesi `__Host-`, `OriginPolicy`, middleware `Authenticate`/`CSRF`/`RequireAuth`; kode error `csrf_failed`.
-- ADR-0020 (bagian 1–4).
+- ADR-0020 (bagian 1–5).
 - ADR-0021: port host compose dapat disetel lewat `.env` (`POSTGRES_HOST_PORT`, `REDIS_HOST_PORT`, `API_HOST_PORT`, `WEB_HOST_PORT`, `MAILPIT_SMTP_HOST_PORT`, `MAILPIT_UI_HOST_PORT`; bawaan = port lama), `scripts/env-ports.sh` untuk membuat `.env` konsisten, runbook `deploy/vps/README.md`. `api`/`worker` meng-override `SMTP_PORT=1025`; `verify-smoke.sh` dan smoke m00/m02 membaca port dari environment/`.env`.
 - Endpoint autentikasi (T4): `POST /api/v1/auth/login` (anonim, rate limit 10/menit/IP, cek Origin), `POST /auth/logout`, `GET /auth/me`, `GET /auth/csrf`, `POST /auth/refresh`,
   `POST /auth/switch-organization`, `GET /api/v1/security/sessions`, `DELETE /security/sessions/{id}`, `POST /security/sessions/revoke-others`. Semua beranotasi swagger (`docs/api/swagger.json`).
@@ -27,6 +27,11 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `GET /api/v1/security/events` (T4d-2): riwayat event keamanan milik sesi pemanggil, keyset dengan kursor ber-HMAC (`limit` bawaan 50, maks 100); `metadata` dan `request_id` tidak dipublikasikan.
 - Kode error: `invalid_credentials` (401), `account_suspended` (403), `account_locked` (423).
 - Event keamanan: `auth.login.success|failed`, `auth.logout`, `auth.session.refreshed`, `auth.organization.switched`, `auth.session.revoked`, `auth.sessions.revoked_others`.
+- Penjaga login (T5, ADR-0020 bagian 5): kunci akun sementara di Redis (`auth:lock:{user_id}`) yang tidak pernah terlihat oleh klien (selama kunci aktif login selalu 401 `invalid_credentials` dengan biaya Argon2 setara; password benar pun tak menghasilkan sesi),
+  penghitung kegagalan per akun (5 dalam 15 menit → kunci 15 menit) dan jeda progresif (durasi kunci berlipat sampai 60 menit), gerbang kegagalan per IP (30 per 15 menit, IPv6 per /64) yang menolak 429 `rate_limit_exceeded` + `Retry-After` sebelum pencarian user,
+  fallback memori per proses bila Redis mati (bukan fail open), event keamanan `auth.account.locked` (sekali per kunci). Kegagalan ganti password dan kegagalan status setelah password benar tidak menaikkan penghitung; login sukses mereset penghitung akun.
+- Config: `LOGIN_MAX_FAILURES`, `LOGIN_FAILURE_WINDOW`, `LOGIN_LOCK_DURATION`, `LOGIN_LOCK_MAX`, `LOGIN_IP_MAX_FAILURES` (divalidasi saat start; kebijakan tak sah menggagalkan perakitan auth).
+- Rate limit per pengguna 30/menit untuk `POST /auth/refresh` dan `POST /auth/switch-organization`.
 
 #### Changed
 - `httpserver.Options` punya `Auth` dan `AuthAPI`; grup rute API memakai `Authenticate → CSRF`, `/health*` di luarnya. `SessionService` menerima `redis.UniversalClient`.
@@ -34,7 +39,8 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `scripts/smoke/m02.sh` memakai sesi nyata (login + cookie + `X-CSRF-Token`): langkah "X-Dev-Actor non-UUID" diganti "tanpa sesi → 401" dan "CSRF hilang → 403"; `make smoke` menyediakan direktori state sementara bersama.
 
 #### Known issues
-- Belum ada: kunci akun + rate limit per akun (T5) dan smoke M03 (lihat docs/handover/HANDOVER-M03-partial-5.md §10). Alur ganti password belum dibuktikan di stack asli (hanya tes Go).
+- Belum ada: smoke M03 (lihat docs/handover/HANDOVER-M03-partial-6.md §10). Alur ganti password, riwayat event, dan kunci akun belum dibuktikan di stack asli (hanya tes Go dengan PostgreSQL + Redis sungguhan).
+- Tidak ada pembuka kunci administratif (sementara `redis-cli DEL auth:lock:<user_id>`) dan tidak ada notifikasi ke pemilik saat kunci dipasang (M05/M08); password spraying lintas IP belum tertangani (M15).
 
 ### M02 — Kernel (2026-10-18; tag `m02-done`)
 
