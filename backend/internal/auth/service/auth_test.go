@@ -89,7 +89,7 @@ func newAuthHarness(t *testing.T) *authHarness {
 	spy := &spyHasher{PasswordHasher: base}
 	aud := &authAudit{}
 	as, err := service.NewAuthService(service.AuthDeps{
-		Store: h.store, Tx: h.tm, Sessions: h.svc, Hasher: spy, Audit: aud,
+		Store: h.store, Tx: h.tm, Sessions: h.svc, Hasher: spy, Audit: aud, Bus: kernel.NewBus(h.db.App, nil),
 		Log: slog.New(slog.NewTextHandler(h.logs, &slog.HandlerOptions{Level: slog.LevelDebug})),
 	})
 	require.NoError(t, err)

@@ -47,8 +47,20 @@ func newAuthStack(cfg *config.Config, pool kernel.Pool, rdb redis.UniversalClien
 		service.StaticTimeouts{Idle: cfg.SessionIdleTimeout, Absolute: cfg.SessionAbsoluteTimeout},
 		log,
 	)
+	// Penjaga login (ADR-0020 butir 47–53): kebijakan tak sah = start ditolak (bukan dikoreksi diam-diam).
+	guard, err := service.NewGuard(rdb, service.GuardPolicy{
+		MaxFailures:   cfg.LoginMaxFailures,
+		FailureWindow: cfg.LoginFailureWindow,
+		LockDuration:  cfg.LoginLockDuration,
+		LockMax:       cfg.LoginLockMax,
+		IPMaxFailures: cfg.LoginIPMaxFailures,
+	}, log)
+	if err != nil {
+		return authStack{}, fmt.Errorf("penjaga login: %w", err)
+	}
 	authSvc, err := service.NewAuthService(service.AuthDeps{
-		Store: store, Tx: kernel.NewTxManager(pool, log), Sessions: sessions, Hasher: hasher, Audit: audit, Log: log,
+		Store: store, Tx: kernel.NewTxManager(pool, log), Sessions: sessions, Hasher: hasher,
+		Policy: cfg.PasswordPolicy(), Bus: kernel.NewBus(pool, log), Audit: audit, Guard: guard, Log: log,
 	})
 	if err != nil {
 		return authStack{}, fmt.Errorf("layanan auth: %w", err)
@@ -65,7 +77,11 @@ func newAuthStack(cfg *config.Config, pool kernel.Pool, rdb redis.UniversalClien
 	if err != nil {
 		return authStack{}, fmt.Errorf("middleware auth: %w", err)
 	}
-	api, err := authhttp.NewHandlers(authhttp.HandlerDeps{Service: authSvc, Cookie: cookie, CSRF: csrf, Responder: rs})
+	cursors, err := httpx.NewCursorCodec(cfg.SessionSecret)
+	if err != nil {
+		return authStack{}, fmt.Errorf("cursor: %w", err)
+	}
+	api, err := authhttp.NewHandlers(authhttp.HandlerDeps{Service: authSvc, Cookie: cookie, CSRF: csrf, Cursors: cursors, Responder: rs})
 	if err != nil {
 		return authStack{}, fmt.Errorf("handler auth: %w", err)
 	}
