@@ -168,9 +168,11 @@ Menjawab pertanyaan terbuka #10 dan #11 (HANDOVER-M03-partial-5 §9) serta peril
 54. **Laju `refresh` dan `switch-organization`:** aturan per pengguna 30/menit, non-Sensitive (fail open bila Redis mati, seperti aturan umum). Hanya melengkapi pembatasan; sesi sah sudah dipersyaratkan.
 55. **Konfigurasi baru (semua dengan bawaan aman; nilai tak sah = konfigurasi ditolak saat start, bukan diam-diam dikoreksi):** `LOGIN_MAX_FAILURES` (5), `LOGIN_FAILURE_WINDOW` (15m), `LOGIN_LOCK_DURATION` (15m), `LOGIN_LOCK_MAX` (60m, ≥ durasi dasar),
     `LOGIN_IP_MAX_FAILURES` (30). Wajib dicatat di `.env.example` (dijaga `env_example_test.go`) dan docs/10 §8.
+56. **Kunci IP penjaga dikanonikalkan (tambahan parsial 6).** IPv4 apa adanya (IPv4-mapped sudah di-unmap oleh RealIP); IPv6 dipotong ke prefiks /64 (`2001:db8:1:2::/64`), karena satu pelanggan lazimnya memegang seluruh /64 dan penghitung per alamat
+    mudah dilewati dengan berganti alamat. Berlaku untuk penghitung/gerbang IP penjaga (butir 50). `LoginRule` (limiter 10/menit) masih per alamat (ADR-0014); menyamakannya adalah utang kecil (M15).
 
 ## Konsekuensi (bagian 5)
 - Tidak ada migrasi dan tidak ada query sqlc baru. Respons login 429 dari gerbang IP bisa menambah anotasi swagger (`make generate` bila berubah).
 - Smoke (T5/C): `scripts/smoke/m03.sh` memakai SATU password salah per run lalu login sukses (membuktikan reset akun); penghitung IP tidak direset, jadi >30 run dalam 15 menit dari satu IP menembus gerbang IP. Jumlah login m02+m03 harus tetap < 10/menit.
-- Utang: pembuka kunci administratif (sementara: `redis-cli DEL auth:lock:<uuid>`; M04/M05); notifikasi pemilik saat kunci (M05/M08); password spraying lintas IP, CAPTCHA/MFA (M15/Fase 2); kebijakan retensi `security_events` (M06/M15).
+- Utang: kanonikalisasi /64 untuk `LoginRule` limiter; pembuka kunci administratif (sementara: `redis-cli DEL auth:lock:<uuid>`; M04/M05); notifikasi pemilik saat kunci (M05/M08); password spraying lintas IP, CAPTCHA/MFA (M15/Fase 2); kebijakan retensi `security_events` (M06/M15).
 - Doc-sync tertunda (akhir M03): docs/05 §12.3 (kunci tak terlihat, jeda progresif = durasi berlipat, kunci per IP, fallback memori) dan §18 (423 hanya administratif) dan §14 (`auth.account.locked`), docs/08 §7 (gerbang IP login) dan §11, docs/10 §8 (5 env baru).
