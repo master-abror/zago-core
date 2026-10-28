@@ -492,3 +492,60 @@ func TestSecurityEventsRequireASessionButNoCSRFTokenAndUseTheCallersIdentity(t *
 	require.Equal(t, actorA, e.authSvc.gotEventsID.UserID, "identitas dari sesi, bukan dari query")
 	require.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 }
+
+func TestAuthLoginMapsTheIPGateTo429WithRetryAfterAndNoCookie(t *testing.T) {
+	e := liveEcho(t)
+	e.authSvc.loginErr = &domain.ThrottledError{RetryAfter: 90 * time.Second}
+
+	rec := e.login()
+
+	requireError(t, rec, http.StatusTooManyRequests, "rate_limit_exceeded")
+	require.Equal(t, "90", rec.Header().Get("Retry-After"))
+	require.Empty(t, sessionSetCookies(rec), "gerbang IP tidak menyentuh cookie")
+}
+
+func TestAuthLoginIPGateRetryAfterIsAtLeastOneSecond(t *testing.T) {
+	e := liveEcho(t)
+	e.authSvc.loginErr = &domain.ThrottledError{RetryAfter: 200 * time.Millisecond}
+
+	rec := e.login()
+
+	requireError(t, rec, http.StatusTooManyRequests, "rate_limit_exceeded")
+	require.Equal(t, "1", rec.Header().Get("Retry-After"))
+}
+
+func TestAuthRefreshIsRateLimitedPerUser(t *testing.T) {
+	e := liveEcho(t)
+	path := httpserver.AuthPath + "/refresh"
+
+	for i := 0; i < httpserver.RefreshRule.Limit; i++ {
+		rec := e.do(http.MethodPost, path, "", sessionHeaders(tokenA, sessionA)...)
+		require.Equal(t, http.StatusOK, rec.Code, "refresh ke-"+strconv.Itoa(i+1))
+	}
+	rec := e.do(http.MethodPost, path, "", sessionHeaders(tokenA, sessionA)...)
+
+	requireError(t, rec, http.StatusTooManyRequests, "rate_limit_exceeded")
+	require.Equal(t, httpserver.RefreshRule.Limit, e.authSvc.rotations(), "permintaan yang dibatasi tidak sampai ke layanan")
+	require.Empty(t, sessionSetCookies(rec))
+
+	other := e.do(http.MethodPost, path, "", sessionHeaders(tokenB, sessionB)...)
+	require.Equal(t, http.StatusOK, other.Code, "pengguna lain tidak ikut dibatasi: kuncinya per pengguna")
+}
+
+func TestAuthSwitchOrganizationIsRateLimitedPerUser(t *testing.T) {
+	e := liveEcho(t)
+	path := httpserver.AuthPath + "/switch-organization"
+	org := uuid.MustParse("0198a000-0000-7000-8000-0000000000d2")
+	body := `{"organization_id":"` + org.String() + `"}`
+	opts := append(sessionHeaders(tokenA, sessionA), hdr("Content-Type", "application/json"))
+
+	for i := 0; i < httpserver.SwitchOrganizationRule.Limit; i++ {
+		rec := e.do(http.MethodPost, path, body, opts...)
+		require.Equal(t, http.StatusOK, rec.Code, "switch ke-"+strconv.Itoa(i+1))
+	}
+	rec := e.do(http.MethodPost, path, body, opts...)
+
+	requireError(t, rec, http.StatusTooManyRequests, "rate_limit_exceeded")
+	require.Equal(t, httpserver.SwitchOrganizationRule.Limit, e.authSvc.rotations(), "permintaan yang dibatasi tidak sampai ke layanan")
+	require.Empty(t, sessionSetCookies(rec))
+}
