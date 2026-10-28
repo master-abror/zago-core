@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 var (
 	// ErrUnauthenticated: kredensial/sesi tidak ada, tidak dikenal, kedaluwarsa, atau dicabut.
@@ -30,3 +33,14 @@ var (
 	// ErrSamePassword: password baru sama dengan password saat ini (ganti password, ADR-0020 butir 44).
 	ErrSamePassword = errors.New("auth: password baru sama dengan password saat ini")
 )
+
+// ThrottledError: login ditolak oleh gerbang IP penjaga login (ADR-0020 butir 50) karena terlalu banyak
+// kegagalan password dari alamat ini. Dipetakan ke 429 rate_limit_exceeded dengan Retry-After. Diperiksa
+// SEBELUM pencarian user, jadi tidak membocorkan keberadaan akun. Dipakai dengan errors.As.
+type ThrottledError struct {
+	RetryAfter time.Duration
+}
+
+func (e *ThrottledError) Error() string {
+	return "auth: terlalu banyak percobaan login gagal dari alamat ini"
+}
