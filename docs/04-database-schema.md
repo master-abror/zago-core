@@ -1079,7 +1079,9 @@ ON CONFLICT (installation_key) DO NOTHING;
 
 3. **System roles** — Super Admin, Organization Admin, Group Admin, Member (06 §5.5), upserted by `slug` with their default permission sets. Super Admin receives every `is_system` permission on each sync.
 
-4. **First Super Admin** — `make bootstrap-admin EMAIL=you@example.org`: creates the user, the password credential, and a platform-scoped `role_assignment` for Super Admin, idempotently, in one transaction. The password is read interactively (or from stdin) or generated and printed once — never from a committed file.
+4. **First Super Admin** — `make bootstrap-admin EMAIL=you@example.org`: creates the user, the password credential, and a platform-scoped `role_assignment` for Super Admin, idempotently, in one transaction. The password is read from stdin or generated and printed once — never from a committed file.
+
+> **As built (M03 T6, ADR-0020 #33–#41):** a subcommand of the `api` binary — `go run ./backend/cmd/api bootstrap-admin --email … [--name …] [--password-stdin]` (make variables `EMAIL`, `NAME`, `PASSWORD_STDIN=1`). Prerequisite: the `platforms` row exists (`make db-seed`, step 1), otherwise `ErrNoPlatform`. One transaction serialised by an advisory lock creates the *minimal* Super Admin role (`role_type='system'`, slug `super-admin`, no organization/group, **no permissions** — M04 adopts this row by upserting on slug `super-admin` instead of inserting a second one), the user, the password credential and the platform assignment, then writes the activity and security event `auth.bootstrap_admin` (boolean flags only). It is idempotent and **never overwrites an existing password**; a user with that e-mail who is not `active` is left untouched (`ErrUserUnavailable`). The password is one line from stdin (CR/LF stripped, checked against the password policy) or generated (≥ 24 characters, printed once); it never passes through argv, the environment or logs. There is **no interactive no-echo prompt** (it would need `golang.org/x/term`; deferred). The `app_user` role is sufficient — no DDL, no migrator role.
 
 ---
 

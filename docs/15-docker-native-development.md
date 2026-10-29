@@ -164,6 +164,8 @@ volumes:
   go_build_cache:
 ```
 
+> **As built (ADR-0021):** every *host* port above is `${NAME_HOST_PORT:-default}` — `POSTGRES_HOST_PORT` (5432), `REDIS_HOST_PORT` (6379), `API_HOST_PORT` (8080), `WEB_HOST_PORT` (5173), `MAILPIT_SMTP_HOST_PORT` (1025), `MAILPIT_UI_HOST_PORT` (8025) — still bound to `127.0.0.1` only. Ports *inside* the compose network never change, and `PORT` in `.env` is the port inside the api container, so do not change it to dodge a clash. When a host port is taken (for example by another project's containers), do not edit `.env` by hand: `bash scripts/env-ports.sh --force POSTGRES=25000 REDIS=25001 API=25002 WEB=25003 SMTP=25004 MAILUI=25005` writes a consistent `.env` (the three database URLs, `REDIS_URL`, `ALLOWED_ORIGINS`, `PUBLIC_BASE_URL`, `SMTP_PORT` and the `*_HOST_PORT` variables). The browser must then use `http://localhost:<WEB_HOST_PORT>`, because `Origin` is checked exactly (ADR-0020 #12). `make dev` (native processes) still uses `PORT`, 5173, 9090 and 9091 on the host.
+
 `condition: service_healthy` and `service_completed_successfully` make the start order deterministic: the API never starts before PostgreSQL accepts connections **and** the migrations have been applied, instead of crash-looping for ten seconds.
 
 The development passwords above exist only for local use. The init script (`deploy/db/init/00-roles.sql`) creates `app_migrator`, `app_user` and `app_maintenance` with those development passwords; production roles are provisioned by the operator from the secret manager (04 §13). Datastore ports are bound to `127.0.0.1` so a development machine does not expose PostgreSQL or Redis to its network.
@@ -240,7 +242,8 @@ COPY deploy/nginx/web.conf /etc/nginx/conf.d/default.conf
 ```text
 make infra-up       # postgres + redis + mailpit only
 make migrate-up     # applies migrations (needs MIGRATION_DATABASE_URL)
-make bootstrap-admin EMAIL=you@example.org     # first Super Admin (04 §16)
+make db-seed        # the platform row; REQUIRED before bootstrap-admin (setup/dev/compose `migrate` only run `up`)
+make bootstrap-admin EMAIL=you@example.org     # first Super Admin (04 §16); add PASSWORD_STDIN=1 to read the password from stdin
 make run-api        # air-reloaded API, natively
 make run-worker     # air-reloaded worker, natively
 make frontend       # Vite dev server, natively

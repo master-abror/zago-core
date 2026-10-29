@@ -136,12 +136,12 @@ migrate-roundtrip: ## up → down(all) → up on a throwaway database in a throw
 db-test:         ## Schema constraint/trigger/cascade/grant + seeder tests (04 §17); needs Docker, fails (not skips) without it
 	REQUIRE_DOCKER=1 go test ./backend/migrations/... -race -count=1
 
-bootstrap-admin: ## Create the first Super Admin: make bootstrap-admin EMAIL=you@example.org
-	@test -n "$(EMAIL)" || (echo "usage: make bootstrap-admin EMAIL=<email>" && exit 1)
-	go run ./backend/cmd/api bootstrap-admin --email "$(EMAIL)"
+bootstrap-admin: ## Create the first Super Admin: make bootstrap-admin EMAIL=you@example.org [NAME=..] [PASSWORD_STDIN=1]
+	@test -n "$(EMAIL)" || (echo "usage: make bootstrap-admin EMAIL=<email> [NAME=<name>] [PASSWORD_STDIN=1]" && exit 1)
+	go run ./backend/cmd/api bootstrap-admin --email "$(EMAIL)" $(if $(NAME),--name "$(NAME)") $(if $(PASSWORD_STDIN),--password-stdin)
 ```
 
-`cmd/migrate` embeds golang-migrate as a library (04 §15) and reads `MIGRATION_DATABASE_URL` (role `app_migrator`, `pgx5://` scheme) — there is no separate CLI to install. `bootstrap-admin` reads the password from a prompt/stdin or prints a generated one once; never from a file.
+`cmd/migrate` embeds golang-migrate as a library (04 §15) and reads `MIGRATION_DATABASE_URL` (role `app_migrator`, `pgx5://` scheme) — there is no separate CLI to install. `bootstrap-admin` reads the password from stdin (`PASSWORD_STDIN=1`) or prints a generated one once; never from a file and never from argv (04 §16 as-built note, ADR-0020 #33–#41). There is no interactive prompt yet.
 
 ## 2.5 Build
 
@@ -172,8 +172,9 @@ docker-build:    ## Build production images (build context = repository root)
 ## 2.7 Smoke tests and verification
 
 ```makefile
-smoke:           ## Run every milestone smoke script against a running stack
-	@for f in scripts/smoke/m*.sh; do echo "== $$f"; bash $$f || exit 1; done
+smoke:           ## Run every milestone smoke script against a running stack (one temporary state dir for all scripts)
+	@dir=$$(mktemp -d); trap 'rm -rf "$$dir"' EXIT; export SMOKE_STATE_DIR="$$dir"; \
+	for f in scripts/smoke/m*.sh; do echo "== $$f"; bash $$f || exit 1; done
 
 verify:          ## The single gate: lint + generate-check + test + migrate-roundtrip + build + smoke
 	$(MAKE) lint
@@ -185,6 +186,11 @@ verify:          ## The single gate: lint + generate-check + test + migrate-roun
 ```
 
 `make verify` is **the one command** used by CI (19), by a contributor before opening a pull request, and by a new chat/session at the start of a milestone to prove the previous milestone's work is actually green (22 §4). `scripts/verify-smoke.sh` brings up a throwaway stack (infra, migrate, api, worker), runs `make smoke`, and tears it down.
+
+**Implementation note (M03, ADR-0020 #40, ADR-0021):**
+- `make smoke` creates one temporary directory (`SMOKE_STATE_DIR`, mode 0700) shared by all scripts and removes it at the end. `scripts/smoke/auth-lib.sh` (sourced, not run) bootstraps the smoke Super Admin through `make db-seed` + `make bootstrap-admin` and logs in; its password is random per run and kept 0600 in that directory, never in the repo. Smoke refuses any `BASE` other than localhost because it **creates Super Admin users** (`smoke-admin@example.org`, and for M03 `smoke-lock@example.org`). `make bootstrap-admin` makes smoke need Go and a database reachable from the host (the same `.env` as `make dev`); the M03 smoke also needs `docker compose exec -T redis redis-cli` (override: `SMOKE_REDIS_CLI`) to open an account lock.
+- `scripts/verify-smoke.sh` reads the published host ports from the environment, then `.env`, then the defaults (ADR-0021); a busy port fails with a clear message. When it runs as a non-root user it also fails if the containers left root-owned files in the repository.
+- `GO_TEST_PARALLEL` — see the next note.
 
 **Implementation note (ADR-0017, ADR-0018):**
 - `GO_TEST_PARALLEL` (default 3) caps how many packages `go test` runs at once. Every integration package starts its own PostgreSQL and Redis containers, and on a small Docker Desktop VM the uncapped default (one package per CPU) starved the daemon until tests with tight timeouts failed at random. CI can raise it: `make test-backend GO_TEST_PARALLEL=6`.

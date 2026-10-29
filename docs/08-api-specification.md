@@ -142,7 +142,6 @@ A leading `-` reverses sort direction. Filterable/sortable fields are an explici
 Required, via `Idempotency-Key`, on mutating endpoints where a retried network request must not double-apply:
 
 ```text
-POST /api/v1/security/password
 POST /api/v1/modules/{code}/install
 POST /api/v1/role-assignments
 POST /api/v1/organizations/{org_id}/modules/{code}/enable
@@ -151,6 +150,8 @@ POST /api/v1/organizations/{org_id}/invitations
 POST /api/v1/conversations
 (and any module route declared with `Idempotent()`, 07 §5.1)
 ```
+
+> **Amendment (M03, ADR-0020 #42):** `POST /api/v1/security/password` is **not** on this list. Its success response rotates the session and therefore carries a new `Set-Cookie` and `csrf_token`, which an idempotency record must never store (ADR-0014 never stores `Set-Cookie`, and a CSRF token must not linger for 24 h in Redis); a replay with the old cookie is already a `401`; and double execution is prevented inside the transaction (compare-and-swap of the hash). The other session endpoints (logout, refresh, switch-organization, revoke-others) do not use `Idempotency-Key` either.
 
 The server stores the result in **Redis for 24 hours** under a key scoped to the caller: `idem:{user_id}:{method}:{route}:{key}` → `{request_hash, status, headers, body}`. A retried request with the same key and the same body returns the original response without re-executing; a same key with a **different** body is `422 idempotency_key_conflict`; a duplicate that arrives while the first is still running is `409 idempotency_in_progress`. Because the key includes the user, one user can never replay another user's stored response. If Redis is unavailable, requests that *require* a key fail closed (`503 service_unavailable`) rather than executing without protection.
 
@@ -167,6 +168,17 @@ Every response carries the standard trio of headers (§2.2); a `429` uses the sa
 ```
 
 Sensitive endpoints (login, forgot/reset password, accept-invitation, MFA verify — 05 §12.3) have tighter, dedicated limits on top of the general per-user/per-IP limits everything else shares. Client IP is taken from `X-Forwarded-For` only when the immediate peer is in `TRUSTED_PROXIES` (10 §8); otherwise from the socket address. If Redis is unavailable, the limiter falls back to a conservative per-instance in-memory limit for sensitive endpoints rather than disabling limiting.
+
+**Rules as built for authentication (M03, ADR-0020 #24, #45, #50, #54):**
+
+| Rule | Limit | Key | When Redis is down |
+|---|---|---|---|
+| `auth.login` | 10 / min | client IP | `Sensitive`: in-memory fallback |
+| login guard IP gate | 30 password failures / 15 min (`LOGIN_IP_MAX_FAILURES`) | IP (IPv6 per /64) | per-process memory (05 §12.3) |
+| `security.password` | 5 / min | user | `Sensitive`: in-memory fallback |
+| `auth.refresh`, `auth.switch_organization` | 30 / min each | user | fail open |
+
+The login guard answers `429 rate_limit_exceeded` with a `Retry-After` header (whole seconds, minimum 1) even when the submitted password is correct, and does so before the user lookup. The temporary per-account lock is **not** a 429 or a 423: it is an ordinary `401 invalid_credentials` (05 §12.3, §18).
 
 **Implementation note (ADR-0014):** counters are fixed windows in Redis (Lua, one round trip). `X-RateLimit-Reset` is the window end in Unix epoch seconds, rounded **up**. After a Redis error the limiter uses the fallback straight away for one second before trying Redis again. The in-memory fallback for `Sensitive` rules allows `Limit/2` per window and tracks at most 10,000 identities: expired windows are purged first, and only if the table is still full of **active** windows is an identity not yet tracked rejected (fail closed) — an active window is never evicted. Non-sensitive rules fail **open** when Redis is down. Each Redis check has a 250 ms deadline (`httpx.WithRedisTimeout` overrides it in tests only), and that deadline is enforced **only because the shared client sets `ContextTimeoutEnabled`** (10 §8, ADR-0019): by default go-redis ignores context deadlines on socket I/O, so a Redis that accepts connections but stops answering (a network partition, a stalled failover) would hold every limited request for about 5 seconds instead of failing open within 250 ms.
 
@@ -222,6 +234,8 @@ GET  /api/v1/security/sessions, /security/events
 DELETE /api/v1/security/sessions/{id}
 POST /api/v1/security/sessions/revoke-others
 ```
+
+> **As built (M03):** `forgot-password`, `reset-password`, `accept-invitation` and the MFA endpoints are not built yet (reset/invitation: M05; MFA: Phase 2). Shapes: `POST /security/password` takes `{current_password, new_password}` and answers `{csrf_token, expires_at, revoked_other_sessions}` plus a new session cookie; `POST /security/sessions/revoke-others` answers `{revoked}`; `GET /security/events` is the caller's own history, newest first, keyset-paginated with the standard cursor (`limit` default 50, max 100) and each row `{id, event_type, result, created_at, ip_address, user_agent, organization_id, session_id}`. The generated contract is `docs/api/swagger.json`.
 
 ## 10.2 Authorization — see 06 §11
 
@@ -347,6 +361,8 @@ General (this doc)    validation_failed, resource_not_found, method_not_allowed,
                        idempotency_key_conflict, idempotency_in_progress,
                        unsupported_api_version, service_unavailable
 ```
+
+> **As built (M03, ADR-0020 #14, #20, #30, #47):** HTTP status of the auth codes: `invalid_credentials` 401, `account_suspended` 403, `csrf_failed` 403, `account_locked` **423 (only for `users.status = 'locked'`; the temporary Redis lock is `invalid_credentials`)**, `rate_limit_exceeded` 429. `session_expired` and `session_revoked` are reserved but not emitted: every session failure is `authentication_required`. No new error code was added after ADR-0020 #30. `rate_limit_exceeded` is now also produced by the login guard (05 §12.3).
 
 HTTP mapping: `validation_failed` 400 (422 for `idempotency_key_conflict`), `authentication_required` 401, `permission_denied` 403, `resource_not_found`/`module_not_enabled` 404, `method_not_allowed` 405, `version_conflict`/`idempotency_in_progress` 409, `payload_too_large` 413, `unsupported_media_type` 415, `rate_limit_exceeded` 429, `internal_error` 500, `service_unavailable` 503.
 
