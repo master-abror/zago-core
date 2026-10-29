@@ -44,3 +44,6 @@ algoritma jendela, dan ukuran "konservatif" fallback.
 - Pemasangan ke composition root (klien Redis, `Subject` dari `kernel.ActorFromContext`, `Route` dari pola chi, aturan login M03)
   dilakukan di T5 (`/api/v1/_kernel/echo`) dan milestone pemilik endpoint.
 - Tes memakai Redis 8 asli (`testkit.Redis`); skenario Redis mati memakai klien ke port tertutup.
+
+## Catatan (M03, ADR-0020 butir 42)
+`POST /api/v1/security/password` **tidak** memakai `Idempotency-Key` (docs/08 §6 tidak lagi mendaftarkannya): respons suksesnya merotasi sesi dan membawa `Set-Cookie` serta `csrf_token` baru, yang tidak boleh disimpan (butir 7); pemutaran ulang dengan cookie lama sudah 401; eksekusi ganda dicegah di dalam transaksi. Aturan rate limit M03 (`auth.login`, `security.password`, `auth.refresh`, `auth.switch_organization`) memakai mekanisme butir 9–12 tanpa perubahan.
