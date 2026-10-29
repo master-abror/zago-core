@@ -100,18 +100,21 @@ A mismatch returns `401` without revealing whether the email exists:
 
 ```go
 type PasswordHasher interface {
-    Hash(password string) (string, error)           // returns a PHC string
-    Compare(hash string, password string) error
-    NeedsRehash(hash string) bool
+    Hash(ctx context.Context, password string) (string, error)  // returns a PHC string
+    Compare(ctx context.Context, hash, password string) error    // nil | ErrMismatch | ErrInvalidHash
+    CompareDummy(ctx context.Context, password string) error    // one full derivation, always ErrMismatch
+    NeedsRehash(hash string) bool                                // true for unreadable hashes too
 }
 ```
+
+> **As built (M03, ADR-0020 #1–#4):** every method that waits on the concurrency semaphore takes a `context.Context`, so a login flood cannot pile up uncancellable goroutines; input longer than 256 bytes is rejected *before* waiting for the semaphore. Rehash-on-login is compare-and-swap (`WHERE secret_hash = <old hash>`) so a concurrent password change is never overwritten.
 
 - **Starting parameters:** memory 64 MiB, time 3, parallelism 2, 16-byte salt, 32-byte key. Tune by benchmarking on the deployment hardware (target roughly 50–150 ms per hash); they live in one security package (`pkg/security`) and in config, never scattered across services.
 - **PHC string format** (`$argon2id$v=19$m=65536,t=3,p=2$…`) stores the parameters with the hash, so old hashes stay verifiable after a parameter change. On a successful login, if `NeedsRehash` is true, the password is re-hashed with the current parameters and stored (**rehash-on-login**).
 - **Maximum password length** (256 bytes): longer input is rejected before hashing — an unbounded password is a cheap CPU/memory DoS against Argon2.
-- **Dummy verification:** for an unknown email the service verifies the submitted password against a fixed dummy hash with the same parameters, so the response time of "no such user" and "wrong password" is indistinguishable.
+- **Dummy verification:** for an unknown email the service verifies the submitted password against a dummy hash with the same parameters (`CompareDummy`), so the response time of "no such user" and "wrong password" is indistinguishable. The dummy hash is generated randomly per hasher instance at construction — there is no constant in the code (ADR-0020 #2).
 - **Concurrency limiter:** hashing is guarded by a semaphore (size from config, default about the number of CPU cores) so a login flood cannot exhaust memory (64 MiB × concurrent requests).
-- Password policy: minimum length 12 (configurable); no composition rules; optional breached-password check is roadmap work (20 §4).
+- Password policy: minimum length 12 runes (`PASSWORD_MIN_LENGTH`, 8–128); no composition rules; optional breached-password check is roadmap work (20 §4).
 
 ---
 
@@ -157,8 +160,10 @@ Two stores, two jobs:
 
 | | Stores | Purpose |
 |---|---|---|
-| **Redis** | `session:{sha256(token)}` → `{session_id, user_id, organization_id, auth_level, created_at, expires_at}`; `user_sessions:{user_id}` → set of token hashes | Fast lookup on every request; O(1) "revoke all of this user's sessions" |
+| **Redis** | `session:{sha256(token)}` → `{session_id, user_id, organization_id, auth_level, created_at, expires_at, last_activity_at}`; `user_sessions:{user_id}` → set of token hashes | Fast lookup on every request; O(1) "revoke all of this user's sessions" |
 | **PostgreSQL** (`sessions`, 04 §10) | `id, token_hash, user_id, organization_id, created_at, last_activity_at, expires_at, ip_address, user_agent, auth_level, revoked_at` | Durable record: history, the "Active Sessions" UI, revoke-all-others — **and the fallback lookup when Redis is unavailable** |
+
+> **As built (M03, ADR-0020 #6–#8):** `last_activity_at` lives in the Redis value so the idle timeout is checked without a PostgreSQL read per request; it is refreshed at most once per minute per session. A Redis miss always continues to PostgreSQL and refills Redis, so an empty or lost Redis logs nobody out. If a Redis delete fails after a revocation, the stale entry can live for at most one activity interval (1 minute): the next activity update checks PostgreSQL and rejects it.
 
 ## 7.1 Session token
 
@@ -172,7 +177,7 @@ token_hash = SHA-256(token)                                    (the ONLY thing s
 
 ## 7.2 Redis unavailable
 
-PostgreSQL is authoritative. If Redis is unreachable, lookups fall back to `sessions` by `token_hash` (checking `revoked_at`, `expires_at`, idle timeout), a warning is written to the system log, and `last_activity_at` updates are batched. This is *degraded*, not *failed*: Redis loss must not log everyone out (domain invariant 14). Rate limiting and idempotency that depend on Redis fail according to 10 §15.
+PostgreSQL is authoritative. If Redis is unreachable, lookups fall back to `sessions` by `token_hash` (checking `revoked_at`, `expires_at`, idle timeout), a warning is written to the system log, and `last_activity_at` updates are rate-limited per session instead of batched (ADR-0020 #6). This is *degraded*, not *failed*: Redis loss must not log everyone out (domain invariant 14). Rate limiting and idempotency that depend on Redis fail according to 10 §15. The login guard (§12.3) does not fail open or closed: it falls back to a per-process in-memory table with the same semantics (ADR-0020 #51).
 
 ## 7.3 Revocation reaches WebSockets
 
@@ -186,7 +191,7 @@ Whenever a session is revoked, or a user/organization is suspended, the service 
 Set-Cookie: __Host-platform_session=<token>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=...
 ```
 
-`HttpOnly` keeps JavaScript from ever reading the session cookie, which limits what a successful XSS can do with it.
+`HttpOnly` keeps JavaScript from ever reading the session cookie, which limits what a successful XSS can do with it. The effective name is `__Host-` + `COOKIE_NAME` only when `COOKIE_SECURE=true`; browsers reject the `__Host-` prefix without `Secure`, so development over plain HTTP uses the bare name (ADR-0020 #13). The cookie has no `Domain`, and `Max-Age` is the session's remaining absolute lifetime.
 
 State-changing requests (`POST`/`PUT`/`PATCH`/`DELETE`) also need an anti-CSRF token independent of the cookie:
 
@@ -195,6 +200,8 @@ GET /api/v1/auth/csrf  →  { "data": { "csrf_token": "..." } }
 ```
 
 The token is `HMAC-SHA256(key = SESSION_SECRET-derived, message = session id)`, so it is bound to the session and needs no extra storage. The client sends it back as `X-CSRF-Token`; it is validated server-side before the request reaches a handler. For login (no session yet), the pre-auth endpoints are protected by `SameSite=Lax` + `Origin` header verification.
+
+> **As built (M03, ADR-0020 #12):** the CSRF token is `HMAC-SHA256(key derived from SESSION_SECRET with the domain label "platform/auth/csrf/v1", session id)` and is therefore invalidated by every rotation. When an `Origin` header is sent it must equal one of `ALLOWED_ORIGINS` exactly — for authenticated requests too (defence in depth); an anonymous request without `Origin` (non-browser client) passes that check.
 
 **WebSocket handshake:** the upgrade is a `GET`, which CSRF tokens do not cover. It is protected by verifying the `Origin` header against `ALLOWED_ORIGINS` (09 §2).
 
@@ -215,10 +222,13 @@ Security Headers
 Rate Limit
      │
      ▼
+Authentication  ──►  Identity
+     │
+     ▼
 CSRF
      │
      ▼
-Authentication  ──►  Identity
+RequireAuth
      │
      ▼
 Authorization  (06-authorization-engine.md)
@@ -237,6 +247,8 @@ type Identity struct {
 ```
 
 Handlers receive `Identity` from the middleware; they never read the cookie themselves.
+
+> **As built (M03, ADR-0020 #11, #14, #17):** the order is **Authenticate → CSRF → RequireAuth**, not CSRF first: the token is bound to the session id, so the session must be recognised before it can be checked. The core guarantee is unchanged — no state-changing request reaches a handler without passing CSRF. Authenticate does not reject an invalid cookie (the request continues anonymously and the cookie is cleared); `RequireAuth` produces the 401. Infrastructure failure while resolving a session is a 503, never a 401. Every session failure (unknown, revoked, expired, idle) is the single `authentication_required` — there is no oracle. `/health*` sits outside the chain, and without the chain wired every identity-requiring route fails closed with 401.
 
 ---
 
@@ -309,7 +321,7 @@ Two independent clocks, both enforced:
 - **Absolute**: `expires_at` — a session cannot live past this regardless of activity.
 - **Idle**: revoked if `last_activity_at` is older than the deployment's idle timeout, even if `expires_at` hasn't arrived yet.
 
-A security-sensitive deployment tightens the idle timeout via `settings` (platform scope); this is not a hardcoded constant. `last_activity_at` is refreshed at most once per minute per session to avoid a write per request.
+A security-sensitive deployment tightens the idle timeout via `settings` (platform scope); this is not a hardcoded constant. *As built (M03, ADR-0020 #5):* the timeouts come from configuration first — `SESSION_IDLE_TIMEOUT` (30m) and `SESSION_ABSOLUTE_TIMEOUT` (12h) — behind a `TimeoutSource` interface, so a `settings`-backed source can be plugged in later without touching the session service. `last_activity_at` is refreshed at most once per minute per session to avoid a write per request.
 
 ## 12.2 Rotation
 
@@ -330,13 +342,24 @@ switch-organization
 
 This is what prevents session fixation: an attacker who fixed a pre-login token gets nothing once the real login issues a fresh one.
 
+> **As built (M03, ADR-0020 #9, #15, #27, #28):** `POST /auth/refresh` is a rotation too: new token and CSRF token, the idle clock restarts, the absolute limit does **not** grow, and the old token and CSRF token die. Rotation writes a security event carrying `previous_session_id` (`auth.session.refreshed`, `auth.organization.switched`, `auth.password.changed`) and publishes `session.revoked` with `reason=rotated` so the WebSocket Hub may keep the connection. `switch-organization` checks the active membership and rotates in one transaction, and records the event in the destination organization.
+
 ## 12.3 Account locking
 
 ```text
-5 failed login attempts → temporary lock → security event
+5 failed password attempts in 15 minutes → temporary lock (15 min) → security event
 ```
 
-The temporary lock lives in **Redis with a TTL** (`auth:lock:{user_id}`), together with per-account and per-IP failure counters and a progressive delay. It is deliberately **not** `users.status`: `status = 'locked'` has no expiry and is reserved for a manual administrative lock. Never a hard lock alone — a hard lock keyed only on the account is itself a way to lock someone else out by repeatedly failing their login; per-IP throttling and the progressive delay limit that.
+The temporary lock lives in **Redis with a TTL**, never in `users.status`: `status = 'locked'` has no expiry and is reserved for a manual administrative lock. A hard lock keyed only on the account is itself a way to lock someone else out, so the design below bounds that.
+
+> **As built (M03 T5, ADR-0020 #47–#56):**
+> - **The lock is invisible to the client.** While it is active every login for that account answers `401 invalid_credentials` — even with the correct password — at the cost of one Argon2id derivation (dummy) and without a session, so the lock is not an account-existence oracle. `423 account_locked` is returned only for `users.status = 'locked'` (administrative), after the password verified (§18).
+> - **Counters and keys** (all with a TTL; no e-mail in any key or value): `auth:lock:{user_id}`, `auth:fail:{user_id}`, `auth:strike:{user_id}` (24 h), `auth:ipfail:{ip}` (IPv6 collapsed to its /64). Time comes from the application clock (the Lua scripts receive `now`); the Redis TTL is only cleanup. Failures counted: wrong password for a *known* account. Not counted: unknown e-mail (IP counter only), status checks after a correct password, password-change failures, attempts while locked.
+> - **Progressive delay = the lock duration doubles** on each repetition (15 → 30 → 60 min, capped at `LOGIN_LOCK_MAX`; the strike counter expires after 24 h). It is not a server-side sleep (a held goroutine is a DoS vector) and not a rejection between attempts before the lock (that would be an existence oracle). Attempts during a lock neither count nor extend it. A successful login resets the account's counter and strike.
+> - **IP gate:** every password failure (known or unknown e-mail) raises the IP counter; after `LOGIN_IP_MAX_FAILURES` (30) per 15 min the IP gets `429 rate_limit_exceeded` + `Retry-After`, checked **before** the user lookup and not reset by a successful login. This is in addition to the `auth.login` rate rule (10/min/IP, 08 §7).
+> - **Redis down:** per-process in-memory fallback with the same semantics (10,000 identities; a full table of *active* windows rejects new identities with 429; 250 ms per Redis operation, then 1 s on the fallback). Guard errors never fail a legitimate login. Accepted price: the effective threshold is multiplied by the instance count while degraded.
+> - **Event:** `auth.account.locked` once per lock (`result=failure`, metadata `{failures, lock_seconds}`, known accounts only). `auth.account.unlocked` is not written — the TTL has no trigger. The lock does not revoke existing sessions; it only closes new logins.
+> - **Emergency opener** (until an administrative endpoint exists, M04/M05): `redis-cli DEL auth:lock:<user_id>`. Targeted lock-out of a victim who is known by e-mail remains possible (5 requests per lock period, bounded by the 60-minute cap and the IP gate); password spraying across many IPs, CAPTCHA and MFA are M15/Phase 2.
 
 ---
 
@@ -352,6 +375,8 @@ revoke other sessions → rotate this session
 ```
 
 A security-sensitive deployment can additionally require MFA re-verification (Phase 2).
+
+> **As built (M03 T4d, ADR-0020 #42–#45):** request `{current_password, new_password}`; response `{csrf_token, expires_at, revoked_other_sessions}` plus a new session cookie. Order: shape validation → verify the current password (wrong = `401 invalid_credentials`, nothing changes, and an `auth.password.change_failed` event is written — it does not feed the login guard) → password policy for the new one (`400 validation_failed` on `new_password`: `too_short` | `too_long` | `same_as_current`) → hash outside the transaction → one transaction: compare-and-swap of the hash, rotation of this session (reason `password_changed`), revocation of all other sessions, security event `auth.password.changed`, activity `auth.password.change`, and an outbox event `auth.password.changed` (payload `{user_id, revoked_other_sessions}`; no consumer until M05/M08; publish failure rolls everything back). The endpoint does **not** use `Idempotency-Key` (the response carries a new `Set-Cookie`, and a replay with the old cookie is already a 401), and is rate-limited at 5/min per user.
 
 ## 13.2 Reset (forgot password)
 
@@ -402,6 +427,8 @@ auth.invitation.accepted   auth.password.reset        auth.passkey.removed
 auth.password.reset_requested
 ```
 
+> **As built (M03, ADR-0020 #22, #23, #39, #48):** names written by M03: `auth.login.success`, `auth.login.failed` (known accounts only; metadata `reason` = `bad_password` | `status_<status>`), `auth.logout`, `auth.session.refreshed`, `auth.organization.switched`, `auth.session.revoked`, `auth.sessions.revoked_others` (none when zero were revoked), `auth.password.changed`, `auth.password.change_failed`, `auth.account.locked` and `auth.bootstrap_admin` (CLI). `result` follows the schema CHECK: `success` | `failure` (not `failed`). Metadata never contains an e-mail, password or token. `auth.account.unlocked` is reserved and not written. `GET /security/events` returns only the caller's own events, newest first (keyset on `(created_at, id)`, default `limit` 50, max 100).
+
 A security event (the auth-specific fact: *"a login failed"*) is distinct from an activity (the business-facing fact: *"Budi changed his password"*) — both can be written for the same operation; they serve different audiences and different tables.
 
 ---
@@ -451,7 +478,7 @@ Future flow: `User → Passkey → WebAuthn → Identity verified → Session cr
 ```text
 POST   /api/v1/auth/login
 POST   /api/v1/auth/logout
-POST   /api/v1/auth/refresh                 (extends the session within its absolute limit; rotates the token)
+POST   /api/v1/auth/refresh                 (rotates the token and restarts the idle clock; the absolute limit does NOT grow — ADR-0020 #9)
 POST   /api/v1/auth/forgot-password
 POST   /api/v1/auth/reset-password
 POST   /api/v1/auth/accept-invitation
@@ -469,6 +496,8 @@ POST   /api/v1/security/mfa                 (Phase 2)
 DELETE /api/v1/security/mfa                 (Phase 2)
 POST   /api/v1/security/mfa/verify          (Phase 2)
 ```
+
+> **As built (M03):** `forgot-password`, `reset-password`, `accept-invitation` and MFA are not built in M03 (reset/invitation: M05). `revoke-others` is a `POST` answering `{revoked: <count>}`. `DELETE /security/sessions/{id}` answers a uniform 404 for a malformed, unknown, foreign or already-revoked id, and revoking the current session is a logout (cookie cleared). `refresh` and `switch-organization` are limited to 30/min per user; `security/password` to 5/min per user; `login` to 10/min per IP plus the guard (§12.3). Final contract: `docs/api/swagger.json`.
 
 Self-service `security/*` and `auth/me` endpoints require authentication only — they act on the caller's own records, which is an "own" scope by construction (06 §5.6).
 
@@ -501,6 +530,8 @@ invalid_reset_token
 invalid_invitation
 ```
 
+> **As built (M03, ADR-0020 #14, #20, #28, #30, #47):** `invalid_credentials` 401; `account_suspended` 403 (also for `deactivated`); `account_locked` **423 — only for `users.status = 'locked'`**, never for the temporary Redis lock (that is `invalid_credentials`, §12.3); `pending` and `deleted` users stay `invalid_credentials` after a correct password; `permission_denied` 403 for every `switch-organization` denial (no oracle); `rate_limit_exceeded` 429 + `Retry-After` (seconds, minimum 1) from the login IP gate and the rate rules; `csrf_failed` 403; `session_expired` and `session_revoked` stay reserved but are not emitted — every session failure is `authentication_required` 401.
+
 `account_locked` and `account_suspended` are only returned **after** the password has verified successfully — before that, every failure is `invalid_credentials`, so the status of an account is not an enumeration oracle.
 
 ---
@@ -508,35 +539,23 @@ invalid_invitation
 # 19. Package Structure
 
 ```text
-internal/auth/
+internal/auth/                          (as built in M03; the planned `application/` layer was not created)
 ├── domain/
-│   ├── identity.go
-│   ├── session.go
-│   ├── credential.go
-│   └── errors.go
-├── application/
-│   ├── login.go
-│   ├── logout.go
-│   ├── password.go
-│   ├── session.go
-│   ├── mfa.go                  # Phase 2
-│   ├── reset_password.go
-│   └── accept_invitation.go    # uses internal/invitation
-├── repository/
-│   ├── credentials.go
-│   ├── sessions.go
-│   ├── reset_tokens.go
-│   └── security_events.go
+│   ├── identity.go                     # Identity, AuthLevel, context helpers
+│   └── errors.go                       # sentinel errors, ThrottledError
+├── repository/                         # sqlc (second block in sqlc.yaml) + store.go
+│   ├── credentials.sql.go  sessions.sql.go  security_events.sql.go  users.sql.go
 ├── service/
-│   ├── password.go
-│   ├── session.go              # Redis + PostgreSQL fallback
-│   ├── mfa.go                  # Phase 2
-│   ├── lock.go
-│   └── rate_limit.go
-└── transport/http/
-    ├── handler.go
-    └── middleware.go
+│   ├── auth.go                         # Login/Logout/Refresh/SwitchOrganization/Profile
+│   ├── session.go  sessions_mgmt.go    # Redis + PostgreSQL fallback; list/revoke
+│   ├── password.go  security_events.go # change password; event history
+│   ├── csrf.go                         # HMAC token bound to the session id
+│   └── guard.go  guard_memory.go       # login guard: Redis Lua + in-memory fallback
+└── transport/http/                     # package authhttp
+    ├── handlers.go  handlers_sessions.go  handlers_security.go
+    ├── middleware.go  cookie.go  origin.go  errors.go
 ```
+(The Argon2id hasher and password policy live in `pkg/security`; wiring in `internal/app/auth.go`; routes and rate rules in `internal/httpserver/auth_routes.go`; the `bootstrap-admin` logic in `internal/bootstrap`.)
 
 ---
 
