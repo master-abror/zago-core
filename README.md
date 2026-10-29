@@ -34,6 +34,18 @@ Lalu: `curl localhost:8080/health/ready` → `200` dengan `postgres` dan `redis`
 
 Semua stack di Docker: `make docker-up` / `make docker-down`.
 
+Admin pertama (setelah stack jalan): `make db-seed && make bootstrap-admin EMAIL=kamu@example.org`, lalu `POST /api/v1/auth/login`
+(cookie sesi `HttpOnly` + `csrf_token` di body; kirim `X-CSRF-Token` pada setiap request pengubah-state).
+
+**Keamanan login (M03, ADR-0020):** Argon2id; token sesi 256-bit yang hanya disimpan sebagai hash (Redis + PostgreSQL, tetap berjalan bila Redis mati);
+rotasi sesi saat login, ganti password, refresh, dan pindah organisasi; CSRF terikat sesi; 5 password salah/15 menit mengunci akun secara **tak terlihat**
+(login tetap "email atau password salah", durasi berlipat 15→30→60 menit) dan 30 kegagalan/15 menit per IP ditolak 429 + `Retry-After`.
+Pembuka kunci darurat: `redis-cli DEL auth:lock:<user_id>`. Batas yang diketahui (kunci akun bisa dipakai mengunci korban yang emailnya diketahui,
+password spraying lintas IP, tanpa MFA/CAPTCHA) ada di `docs/handover/HANDOVER-M03.md`. Tidak ada jaminan keamanan absolut.
+
+Port host bentrok dengan proyek lain? Jangan edit `.env` manual: `bash scripts/env-ports.sh --force POSTGRES=25000 REDIS=25001 API=25002 WEB=25003 SMTP=25004 MAILUI=25005`
+(ADR-0021; port di dalam jaringan compose tidak berubah).
+
 ## Perintah utama (`make help` untuk daftar lengkap)
 
 | Perintah | Fungsi |
@@ -41,9 +53,10 @@ Semua stack di Docker: `make docker-up` / `make docker-down`.
 | `make verify` | **Gerbang tunggal**: lint + `generate-check` + tes + migrate-roundtrip + build + smoke pada stack Docker sementara. Harus hijau sebelum merge. |
 | `make lint` / `make test` | lint Go + frontend + pemeriksaan struktural / tes backend (`-race`, testcontainers) + frontend |
 | `make generate` / `make generate-check` | regenerasi OpenAPI (`docs/api/swagger.json`), kode sqlc, SDK TS dan registri modul (bertahap per milestone) / gagal bila keluaran generator di disk basi |
-| `make smoke` | semua `scripts/smoke/m*.sh` terhadap stack yang berjalan (`M00`: fondasi; `M02`: kernel lewat endpoint echo) |
+| `make smoke` | semua `scripts/smoke/m*.sh` terhadap stack yang berjalan (`M00`: fondasi; `M02`: kernel lewat endpoint echo; `M03`: login/logout, ganti password, kunci akun). Membuat user Super Admin smoke, jadi hanya terhadap localhost; butuh Go, DB terjangkau dari host, dan `docker compose exec redis` |
 | `make migrate-up` / `migrate-down` / `migrate-version` | terapkan / mundurkan satu / tampilkan versi migrasi inti (`MIGRATION_DATABASE_URL`) |
-| `make db-seed` | pastikan baris platform ada (idempoten) |
+| `make db-seed` | pastikan baris platform ada (idempoten); WAJIB sebelum `make bootstrap-admin` (`make setup`/`make dev` hanya menjalankan migrasi) |
+| `make bootstrap-admin EMAIL=…` | buat Super Admin pertama (idempoten, tidak pernah menimpa password): `NAME=…`, `PASSWORD_STDIN=1` (baca password dari stdin; tanpa itu password acak dicetak SEKALI) |
 | `make migrate-roundtrip` / `make db-test` | up→down→up pada PostgreSQL sementara / tes constraint, trigger, cascade, grant skema (butuh Docker). Skema: [docs/erd.md](docs/erd.md) |
 | `make infra-up` | hanya datastore, untuk pengembangan native |
 | `make clean` | hapus artefak **dan volume data** (destruktif) |
@@ -55,7 +68,8 @@ Metrik Prometheus disajikan di **port terpisah** (bukan port API) bila `METRICS_
 membatasi jumlah paket tes yang menyalakan container bersamaan (bawaan 3).
 
 `make verify` memakai compose project terpisah (`platform-verify`) sehingga tidak menghapus data pengembanganmu, tetapi
-port 5432/6379/8080/5173/1025/8025 harus bebas (hentikan `make dev`/`make docker-up` dulu).
+port host yang dipublikasikan compose (bawaan 5432/6379/8080/5173/1025/8025, atau yang kamu setel di `.env`) harus bebas (hentikan `make dev`/`make docker-up` dulu).
+Di Docker Desktop bermemori kecil, tes integrasi bisa flake (`Reaper handshake failed`, `connection refused`): jalankan paket itu sendirian dan ulangi, jangan ubah kode.
 Build pertama dengan cache dingin butuh beberapa menit; jangan hentikan saat tampak diam di `menunggu: api`.
 
 ## Struktur

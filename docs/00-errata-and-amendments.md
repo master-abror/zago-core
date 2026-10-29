@@ -90,6 +90,8 @@ Seed membuat role Super Admin tapi tidak ada user pemegangnya; kriteria sukses 0
 - Role sistem (Super Admin, Org Admin, Group Admin, Member) di-seed dari kode beserta set permission default.
 - Perintah `make bootstrap-admin EMAIL=…` membuat user + `role_assignment` scope platform. Password diinput interaktif/stdin atau dibuat acak sekali-tampil — **tidak pernah** dari file yang di-commit.
 
+**Pembaruan (M03, ADR-0020 butir 33–41):** `bootstrap-admin` adalah subcommand `api` yang membuat role Super Admin **minimal** (`role_type='system'`, slug `super-admin`, tanpa permission) bila belum ada; **M04 mengadopsinya lewat upsert by slug `super-admin`** saat menyinkronkan role sistem, bukan membuat baris kedua. Password dibaca dari stdin atau dibuat acak sekali-tampil; prompt interaktif tanpa-echo ditunda (butuh `golang.org/x/term`).
+
 Berlaku: M03 (bootstrap), M04 (katalog + role sistem).
 
 ## B-05 — Bug Docker/Makefile/CI (Doc 15, 16, 19)

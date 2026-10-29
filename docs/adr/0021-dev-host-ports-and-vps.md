@@ -36,3 +36,10 @@ sedangkan `docker-compose.yml` mematok port host itu.
   (setiap port host harus berbentuk variabel dengan bawaan = port lama).
 - **Doc-sync TERTUNDA (akhir M03):** docs/15 §2 (port host dapat disetel; `env-ports.sh`), docs/16 §2.7 (`verify-smoke` membaca port),
   docs/19 (CI tidak terpengaruh; catat bila CI memakai port non-bawaan), README (alur pengembangan di VPS).
+
+## Bagian 2 — pengembangan kembali ke laptop (2026-10-29)
+Akses ke VPS hilang; pengembangan M03 dilanjutkan di laptop (WSL2 Ubuntu, `~/projects/zago-core-m03`). Butir 1–5 (port host dapat disetel lewat `.env`) tetap berlaku dan dipakai di laptop:
+`bash scripts/env-ports.sh --force POSTGRES=25000 REDIS=25001 API=25002 WEB=25003 SMTP=25004 MAILUI=25005`, karena port 5432/6379 dipegang container proyek lain yang tidak boleh dimatikan.
+- **Butir 6 (tunnel SSH) dan butir 7 (commit hanya di VPS) tidak berlaku lagi.** Commit dibuat di satu tempat saja (laptop) dan `git push` WAJIB setelah setiap patch diterapkan dan diverifikasi: lima commit T5 nyaris hilang karena belum di-push saat akses VPS putus.
+- `deploy/vps/README.md` adalah catatan historis. Semua rujukan "di VPS" di handover parsial 3–6 menggambarkan keadaan sebelumnya.
+- Docker Desktop laptop (≈3,5 GB memori) kadang flake (`Reaper handshake failed`, `wait for reaper … context deadline exceeded`, `RWLayer … is unexpectedly nil`, `connection refused` padahal container ready, `failed to authorize: DeadlineExceeded` saat build). Itu masalah lingkungan, bukan kode: jalankan paket itu sendirian (`REQUIRE_DOCKER=1 go test <paket> -race -count=1 -p 1`), pulihkan Docker, ulangi. Di laptop non-root, `verify-smoke.sh` juga memeriksa berkas milik root di repo (`sudo chown -R "$USER":"$USER" .` bila perlu; muncul lagi setelah run bersih = celah di `docker-compose.yml`, perbaiki lewat commit tersendiri).

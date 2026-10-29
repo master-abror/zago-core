@@ -1,3 +1,5 @@
+> **Catatan historis (ADR-0021 bagian 2, 2026-10-29):** akses ke VPS hilang dan pengembangan kembali ke laptop (WSL2). Panduan di bawah tidak lagi menggambarkan alur kerja yang berlaku; ia dipertahankan sebagai rujukan bila pengembangan dipindahkan ke mesin jarak jauh lagi.
+
 # Pengembangan di VPS (ADR-0021)
 
 Panduan memindahkan pengembangan dari laptop ke VPS. Semua perintah dijalankan di VPS kecuali disebut "di laptop".
