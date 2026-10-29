@@ -80,7 +80,7 @@ Dari `~/projects/zago-core-m03` (WSL2):
 gofmt -l backend; make verify GO_TEST_PARALLEL=1 > ~/verify.log 2>&1; echo "exit=$?"; grep -nE '^(--- FAIL|FAIL|✗)|smoke|•' ~/verify.log | tail -50
 ```
 Demo manual setelah `make docker-up`: `make db-seed && make bootstrap-admin EMAIL=kamu@example.org`, lalu `POST /api/v1/auth/login` (cookie jar + `X-CSRF-Token`).
-Penutupan milestone (pengguna): `git push`, lalu merge `milestone/m03-authentication` ke `main` (PR atau merge lokal, mengikuti cara M01/M02), `git tag m03-done <sha merge>` dan `git push origin m03-done`.
+Penutupan milestone (pengguna): `git push`, lalu buka PR `milestone/m03-authentication` → `main` di GitHub (PR #4 sudah me-merge M03 secara parsial; PR akhir hanya membawa commit sesudahnya) dan merge dengan merge commit seperti M00/M02; lalu `git switch main && git pull`, `git tag m03-done <sha merge commit>` dan `git push origin m03-done`.
 Flake Docker laptop (kelas galat di ADR-0021 bagian 2) bukan kode: jalankan paket sendirian, pulihkan Docker, ulangi.
 
 ## 8. Masalah diketahui / utang teknis
