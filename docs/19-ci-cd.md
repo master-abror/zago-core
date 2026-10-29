@@ -126,6 +126,8 @@ jobs:
         # differs from what's committed — the drift check from 08 §9 and 07 §5.2
 ```
 
+> **As built (M03, ADR-0020 #40, ADR-0021):** the `docker-smoke` job uses the default host ports (`.env` copied from `.env.example`), so the configurable ports (ADR-0021) do not affect CI. The M02 and M03 smoke scripts create Super Admin users with `go run … bootstrap-admin` and the M03 smoke opens a lock with `docker compose exec -T redis redis-cli`, so the runner needs Go and a database reachable on `localhost` — **open debt (M15): the job does not yet set up Go explicitly (it relies on the runner's Go and toolchain download), and this has not been proven in CI**; the proof so far is `make verify` locally.
+
 `make verify` (16 §2.7) runs the same lint/test/roundtrip/build/smoke stages locally. Contributors run it before opening a PR; a new development session runs it first to prove the baseline is green.
 
 ---

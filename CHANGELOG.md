@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M03 — Authentication (SEDANG BERJALAN; parsial 6, sampai ◆CP6)
+### M03 — Authentication (2026-10-29; tag `m03-done`)
 
 #### Added
 - `pkg/security`: hasher Argon2id (PHC, rehash-on-login, hash dummy, batas 256 byte, semaphore konkurensi berbasis context) dan `PasswordPolicy`.
@@ -32,15 +32,20 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
   fallback memori per proses bila Redis mati (bukan fail open), event keamanan `auth.account.locked` (sekali per kunci). Kegagalan ganti password dan kegagalan status setelah password benar tidak menaikkan penghitung; login sukses mereset penghitung akun.
 - Config: `LOGIN_MAX_FAILURES`, `LOGIN_FAILURE_WINDOW`, `LOGIN_LOCK_DURATION`, `LOGIN_LOCK_MAX`, `LOGIN_IP_MAX_FAILURES` (divalidasi saat start; kebijakan tak sah menggagalkan perakitan auth).
 - Rate limit per pengguna 30/menit untuk `POST /auth/refresh` dan `POST /auth/switch-organization`.
+- `scripts/smoke/m03.sh`: smoke autentikasi di stack asli — login/me/csrf/logout (cookie yang sama 401 setelah logout), ganti password A→B→A (sesi lama 401, sesi baru berlaku, riwayat event), dan kunci akun pada akun terpisah `smoke-lock@example.org`
+  (5 salah = `invalid_credentials`, benar saat terkunci tetap `invalid_credentials` tanpa cookie, kunci Redis ber-TTL, pembuka `DEL`, satu `auth.account.locked`). Menunggu jatah `LoginRule` lewat header `X-RateLimit-*` (ADR-0020 butir 58–60).
 
 #### Changed
 - `httpserver.Options` punya `Auth` dan `AuthAPI`; grup rute API memakai `Authenticate → CSRF`, `/health*` di luarnya. `SessionService` menerima `redis.UniversalClient`.
 - **Breaking (dev/test):** endpoint echo `POST` kini butuh sesi + `X-CSRF-Token`; header `X-Dev-Actor` dihapus.
 - `scripts/smoke/m02.sh` memakai sesi nyata (login + cookie + `X-CSRF-Token`): langkah "X-Dev-Actor non-UUID" diganti "tanpa sesi → 401" dan "CSRF hilang → 403"; `make smoke` menyediakan direktori state sementara bersama.
 
+#### Docs
+- Doc-sync M03: docs/05 (§4.1, §7, §8, §9, §12, §13.1, §14, §17–§19), docs/08 (§6, §7, §10.1, §11), docs/10 (§3, §8), docs/04 §16, docs/00 B-04, docs/15, docs/16, docs/19, ADR-0014 (catatan), ADR-0020 bagian 6, ADR-0021 bagian 2, README, `deploy/vps/README.md` (catatan historis).
+
 #### Known issues
-- Belum ada: smoke M03 (lihat docs/handover/HANDOVER-M03-partial-6.md §10). Alur ganti password, riwayat event, dan kunci akun belum dibuktikan di stack asli (hanya tes Go dengan PostgreSQL + Redis sungguhan).
-- Tidak ada pembuka kunci administratif (sementara `redis-cli DEL auth:lock:<user_id>`) dan tidak ada notifikasi ke pemilik saat kunci dipasang (M05/M08); password spraying lintas IP belum tertangani (M15).
+- Kunci akun bisa dipakai mengunci korban yang emailnya diketahui (≤ 60 menit per kunci, dibatasi gerbang IP); tidak ada pembuka kunci administratif (sementara `redis-cli DEL auth:lock:<user_id>`) dan tidak ada notifikasi ke pemilik saat kunci dipasang (M05/M08); password spraying lintas IP, CAPTCHA/MFA belum tertangani (M15/Fase 2).
+- Smoke M03 membuat dua Super Admin smoke (hanya localhost), butuh `docker compose exec redis` dari host; job CI `docker-smoke` belum terbukti menjalankan smoke M02/M03 (tanpa setup Go eksplisit; M15). Lihat docs/handover/HANDOVER-M03.md §8.
 
 ### M02 — Kernel (2026-10-18; tag `m02-done`)
 
