@@ -117,8 +117,9 @@ func (r *resources) checkers() []health.Checker {
 }
 
 // RunAPI menjalankan cmd/api. ln opsional (untuk tes); bila nil, mendengarkan di :PORT.
-// Urutan: validasi konfigurasi -> buka dependensi -> bind port. Konfigurasi buruk selalu
-// keluar dengan ExitConfig sebelum port di-bind.
+// Urutan: validasi konfigurasi -> buka dependensi -> sinkron katalog otorisasi (bila ada pool)
+// -> bind port. Konfigurasi buruk selalu keluar dengan ExitConfig sebelum port di-bind; galat
+// sinkron keluar dengan ExitFailed sebelum port di-bind.
 func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stderr io.Writer, ln net.Listener) int {
 	cfg, err := config.LoadFrom(config.RoleAPI, env)
 	if err != nil {
@@ -161,6 +162,17 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 			return ExitFailed
 		}
 		res.add(r)
+	}
+
+	// Katalog permission core dan role sistem disinkronkan dari kode ke database SEKALI saat start,
+	// sebelum autentikasi dirakit (ADR-0022 butir 7). Hanya bila pool nyata ada: di tes dengan fake
+	// tanpa pool, langkah ini dilewati. Galat = ExitFailed: API yang berjalan dengan katalog atau
+	// role yang tidak sinkron akan menolak (atau lebih buruk, menerima) request secara keliru.
+	if appPool != nil {
+		if err = syncAuthorization(ctx, appPool, log); err != nil {
+			log.Error("gagal menyinkronkan katalog otorisasi", "error", err)
+			return ExitFailed
+		}
 	}
 
 	// Dideklarasikan SETELAH res.closeAll, jadi dijalankan SEBELUM pool ditutup (defer LIFO).
