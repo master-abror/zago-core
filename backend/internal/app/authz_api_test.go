@@ -28,7 +28,7 @@ func (p failingPool) Exec(context.Context, string, ...any) (pgconn.CommandTag, e
 
 func (p failingPool) Query(context.Context, string, ...any) (pgx.Rows, error) { return nil, p.err }
 
-func (p failingPool) QueryRow(context.Context, string, ...any) pgx.Row { return errRow{err: p.err} }
+func (p failingPool) QueryRow(context.Context, string, ...any) pgx.Row { return errRow(p) }
 
 type errRow struct{ err error }
 
