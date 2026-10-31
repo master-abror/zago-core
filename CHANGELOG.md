@@ -4,6 +4,21 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2)
+
+#### Added
+- `internal/permission`: katalog permission core (41 kode, docs/06 §5.4), validasi kode, sinkron tanpa hapus (orphan dilaporkan).
+- `internal/role`: role sistem `super-admin`, `organization-admin`, `group-admin`, `member` dan konvergensi set permission core (permission modul dibiarkan).
+- `internal/authorization/application.Syncer`: sinkron katalog dan role sistem dalam satu transaksi (advisory lock, hanya hak `app_user`) + activity `authz.catalog_synced` hanya bila ada perubahan.
+- `RunAPI` menjalankan Syncer saat start (setelah dependensi dibuka, sebelum rakitan auth); log ringkasan, orphan = warn.
+- `authorization/domain.ScopeContext` (organisasi dari Identity, grup aktif hanya setelah terverifikasi), `ScopeResolver`, `authorization/repository.Groups.IsActiveGroupMember`, middleware `authzhttp.Scope`
+  (`X-Active-Group-ID` diverifikasi ke database pada setiap request; header tidak sah dibuang; galat infrastruktur 503).
+- `testkit`: `AddOrganizationMember`, `NewGroup`, `AddGroupMember`.
+- ADR-0022 (bagian 1–2).
+
+#### Changed
+- API tidak lagi start bila database tidak terjangkau saat startup (galat sinkron otorisasi = `ExitFailed`); sebelumnya hanya `/health/ready` yang 503.
+
 ### M03 — Authentication (2026-10-29; tag `m03-done`)
 
 #### Added
