@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b)
 
 #### Added
 - `internal/permission`: katalog permission core (41 kode, docs/06 §5.4), validasi kode, sinkron tanpa hapus (orphan dilaporkan).
@@ -14,7 +14,12 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `authorization/domain.ScopeContext` (organisasi dari Identity, grup aktif hanya setelah terverifikasi), `ScopeResolver`, `authorization/repository.Groups.IsActiveGroupMember`, middleware `authzhttp.Scope`
   (`X-Active-Group-ID` diverifikasi ke database pada setiap request; header tidak sah dibuang; galat infrastruktur 503).
 - `testkit`: `AddOrganizationMember`, `NewGroup`, `AddGroupMember`.
-- ADR-0022 (bagian 1–2).
+- `authorization/domain`: `Check`, `ResourceRef`, `Decision`, `DecisionLevel`, `EffectivePermissions` (level terluas per kode; hanya platform/organization/group).
+- `authorization/repository.Effective`: effective permissions dari PostgreSQL dalam satu kueri (scope platform hanya subjek user; cabang tenant mensyaratkan organisasi aktif, anggota aktif, role global atau se-organisasi, grup scope eksak dan aktif).
+- `authorization/cache`: cache effective permissions berversi di Redis (versi organisasi + versi platform, versi dari jam, TTL 2 menit, fallback ke PostgreSQL saat Redis gagal, `InvalidateInTx` sebelum dan sesudah commit).
+- `authorization/application.Authorizer.Can(ctx, Check)`: pemeriksaan tenant (`scope_mismatch`), cache atau PostgreSQL, izin level group pada sumber daya; `Syncer.WithInvalidator` menaikkan versi platform bila katalog berubah.
+- `testkit`: `NewRole`, `EnsurePermission`, `GrantPermission`, `RoleWith`, `AssignRole`.
+- ADR-0022 (bagian 1–3).
 
 #### Changed
 - API tidak lagi start bila database tidak terjangkau saat startup (galat sinkron otorisasi = `ExitFailed`); sebelumnya hanya `/health/ready` yang 503.
