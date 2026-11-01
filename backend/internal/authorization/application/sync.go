@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 
@@ -36,10 +37,41 @@ type SyncResult struct {
 // Changed melaporkan apakah ada baris yang dibuat, diubah, atau dicabut.
 func (r SyncResult) Changed() bool { return r.Permissions.Changed() || r.Roles.Changed() }
 
+// Invalidator menaikkan penghitung versi platform pada cache effective permissions (paket cache).
+type Invalidator interface {
+	BumpPlatform(ctx context.Context) error
+}
+
 // Syncer menyinkronkan katalog permission dan role sistem dari kode ke database.
 type Syncer struct {
 	defs  []permission.Def
 	roles []role.SystemRole
+	inv   Invalidator
+	log   *slog.Logger
+}
+
+// WithInvalidator mengembalikan salinan Syncer yang menaikkan versi platform bila sinkron mengubah
+// sesuatu: sekali sebelum commit dan sekali sesudahnya (ADR-0022 butir 3; role sistem berlaku di
+// semua organisasi). Kegagalan bump hanya dicatat di log, tidak menggagalkan sinkron: start API
+// tidak boleh mati karena Redis (docs/10 §11, §15), dan entri basi dibatasi TTL cache.
+func (s *Syncer) WithInvalidator(inv Invalidator, log *slog.Logger) *Syncer {
+	cp := *s
+	cp.inv, cp.log = inv, log
+	return &cp
+}
+
+func (s *Syncer) bump(ctx context.Context, when string) {
+	if s.inv == nil {
+		return
+	}
+	if err := s.inv.BumpPlatform(ctx); err != nil {
+		log := s.log
+		if log == nil {
+			log = slog.Default()
+		}
+		log.Error("invalidasi cache otorisasi gagal setelah sinkron katalog; entri basi dibatasi TTL",
+			"when", when, "error", err)
+	}
 }
 
 // NewSyncer membuat Syncer dari katalog dan role yang diberikan, dan menolak definisi yang
@@ -97,8 +129,14 @@ func (s *Syncer) Run(ctx context.Context, db Beginner) (SyncResult, error) {
 		_ = tx.Rollback(context.WithoutCancel(ctx))
 		return SyncResult{}, err
 	}
+	if res.Changed() {
+		s.bump(ctx, "sebelum commit")
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return SyncResult{}, fmt.Errorf("authorization: commit sinkron: %w", err)
+	}
+	if res.Changed() {
+		s.bump(ctx, "sesudah commit")
 	}
 	return res, nil
 }

@@ -2,6 +2,7 @@ package application_test
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"sync"
 	"testing"
@@ -411,4 +412,72 @@ func TestNewSyncerRejectsInconsistentDefinitionsBeforeTouchingTheDatabase(t *tes
 
 	_, err = application.NewSyncer(good, role.SystemRoles())
 	require.NoError(t, err)
+}
+
+// recordingInvalidator mencatat panggilan BumpPlatform dan dapat dibuat gagal.
+type recordingInvalidator struct {
+	mu    sync.Mutex
+	calls int
+	err   error
+}
+
+func (r *recordingInvalidator) BumpPlatform(context.Context) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls++
+	return r.err
+}
+
+func (r *recordingInvalidator) count() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.calls
+}
+
+func TestSyncBumpsPlatformVersionBeforeAndAfterCommitOnlyWhenSomethingChanged(t *testing.T) {
+	db := testkit.NewDB(t)
+	inv := &recordingInvalidator{}
+	syncer := newSyncer(t).WithInvalidator(inv, nil)
+
+	res, err := syncer.Run(ctx, db.App)
+	require.NoError(t, err)
+	require.True(t, res.Changed())
+	require.Equal(t, 2, inv.count(), "sekali sebelum commit, sekali sesudahnya")
+
+	res, err = syncer.Run(ctx, db.App)
+	require.NoError(t, err)
+	require.False(t, res.Changed())
+	require.Equal(t, 2, inv.count(), "sinkron tanpa perubahan tidak menaikkan versi")
+}
+
+func TestSyncRollbackNeverBumpsTheVersion(t *testing.T) {
+	db := testkit.NewDB(t)
+	insertModulePermission(t, db, "billing", "role", "read")
+	inv := &recordingInvalidator{}
+
+	_, err := newSyncer(t).WithInvalidator(inv, nil).Run(ctx, db.App)
+
+	require.ErrorIs(t, err, permission.ErrCodeConflict)
+	require.Equal(t, 0, inv.count())
+}
+
+func TestSyncSucceedsEvenWhenTheInvalidatorFails(t *testing.T) {
+	db := testkit.NewDB(t)
+	inv := &recordingInvalidator{err: errors.New("redis mati")}
+
+	res, err := newSyncer(t).WithInvalidator(inv, nil).Run(ctx, db.App)
+
+	require.NoError(t, err, "start API tidak boleh mati karena Redis")
+	require.True(t, res.Changed())
+	require.Equal(t, 2, inv.count(), "kedua bump tetap dicoba")
+	require.Positive(t, count(t, db, `SELECT count(*) FROM permissions`), "sinkron tetap ter-commit")
+}
+
+func TestSyncWithoutInvalidatorStillWorks(t *testing.T) {
+	db := testkit.NewDB(t)
+
+	res, err := newSyncer(t).Run(ctx, db.App)
+
+	require.NoError(t, err)
+	require.True(t, res.Changed())
 }
