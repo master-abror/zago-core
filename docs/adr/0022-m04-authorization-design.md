@@ -1,4 +1,4 @@
-# ADR-0022 — M04: keputusan desain Authorization Engine (bagian 1: keputusan awal; bagian 2: T1b dan T2)
+# ADR-0022 — M04: keputusan desain Authorization Engine (bagian 1: keputusan awal; bagian 2: T1b dan T2; bagian 3: T3a dan T3b)
 
 **Status:** Diterima · **Tanggal:** 2026-10-30 · **Konteks:** awal M04 (docs/06, docs/00 B-04 dan I-01 sampai I-03). Bagian berikutnya
 (bagian 2, 3, ...) ditambahkan per ◆CP/task; butir diberi nomor lanjut.
@@ -80,3 +80,43 @@ skema dan kode M03: identitas platform tidak punya jalur masuk organisasi (ADR-0
 - **Doc-sync tertunda (tambahan, kumulatif dengan bagian 1):** docs/06 §4.2 (header dibuang, bentuk kanonik, pengetatan butir 13) dan §13 (struktur paket nyata); docs/10 §3, §11, §15 (urutan start API: sinkron katalog
   sebelum melayani request, API gagal start tanpa DB; risiko dan mitigasi retry); docs/18 §7 (fixture grup); koreksi "migrasi 021" → 034 di docs/03, docs/04, `docs/erd.md` (dikerjakan bersama T4).
 - Konsekuensi bagian 1 yang menyebut "wiring sinkron ke RunAPI dikerjakan sebagai commit terpisah" SELESAI di T1b (butir 11).
+
+## Bagian 3 — keputusan T3a dan T3b (2026-11-01)
+
+16. **Scope `platform` hanya berlaku untuk subjek `user`** (`authorization/repository.Effective`). Assignment platform dengan subjek `group`, `organization`, atau `service` DIABAIKAN.
+    Rumus docs/06 §5.2 yang literal membuat keanggotaan grup atau organisasi bisa menjadi jalur menuju otoritas platform; ini ditutup. Penegakan saat penulisan (T5, butir 9) tetap berlaku,
+    tetapi engine tidak boleh bergantung padanya (pertahanan berlapis).
+17. **Cabang tenant effective permissions lebih ketat dari docs/06 §5.2.** Assignment ber-scope `organization`/`group` berlaku hanya bila SEMUA terpenuhi: belum dicabut, belum kedaluwarsa,
+    role `active`; `role_assignments.organization_id` = organisasi scope; organisasi `active` dan `deleted_at IS NULL`; user anggota organisasi `active`; role global (sistem) atau milik
+    organisasi yang sama; scope `organization` dengan `scope_id` kosong atau organisasi itu sendiri; scope `group` dengan `scope_id` = grup aktif scope DAN grup itu `active` di organisasi scope;
+    subjek = user itu sendiri, organisasi scope, atau grup yang user-nya anggota `active` (grup `active`, tidak terhapus, di organisasi scope). Subjek `service` tidak pernah berlaku untuk user.
+    Identitas platform tanpa keanggotaan hanya mendapat grant platform (bukan grant organisasi) walau masuk ke organisasi lewat `switch-organization`.
+18. **Himpunan effective permissions hanya memuat level `platform`, `organization`, `group`; level terluas menang per kode** (`platform` > `organization` > `group`; `domain.EffectivePermissions`,
+    `EffectiveBuilder`, `ErrInvalidGrant`). `Decision.Level` = level terluas yang memberi kode (konsisten dengan butir 1). Assignment ber-scope `resource` dan `own` TIDAK masuk himpunan
+    (docs/06 §5.2: tidak di-cache) dan **belum dievaluasi saat pengecekan: ditolak, gagal tertutup**. Pekerjaan tersisa: T3b2 (kueri terpisah di `Can`) atau milestone pertama yang punya
+    sumber daya ber-pemilik. Filter "permission modul nonaktif tidak dapat diberikan" (docs/06 §14, Cache) juga belum ada (butuh tabel enablement modul, M07).
+19. **Cache (`authorization/cache`).** Kunci versi `authz:ver:{organization_id}` dan `authz:ver:platform` (tanpa TTL); kunci efektif
+    `authz:eff:{org|-}:{verOrg}:{verPlatform}:{user}:{grup|-}`; nilai JSON `{"v":1,"g":{kode:level}}` yang divalidasi lewat `EffectiveFromGrants` saat dibaca (nilai rusak, versi format lain,
+    atau level `resource`/`own` = miss yang ditimpa). TTL default 2 menit (jaring pengaman; docs/06 §8.1 menyebut "beberapa menit"), batas satu operasi Redis 250 ms (ADR-0019), setelah galat
+    Redis dilewati 1 detik (backoff). `Lookup` TIDAK PERNAH mengembalikan galat: galat Redis, versi rusak (bukan bilangan bulat positif), atau backoff = `Lookup{}` (Key kosong: hitung dari PostgreSQL
+    dan jangan menulis). Versi dibaca SEBELUM menghitung dan dipakai untuk `Store` (hasil yang dihitung sebelum bump tidak pernah dibaca setelahnya).
+    **Penghitung yang hilang (tergusur) dimulai dari jam (ms epoch), bukan dari 1** (pembaca: `SET NX now`; bump: skrip Lua `EXISTS→INCR else SET now+1`), supaya entri efektif lama tidak hidup kembali.
+    Batas: jam mundur lebih dari 1 ms atau dua kejadian pada milidetik yang sama (diabaikan).
+20. **Invalidasi (`Cache.InvalidateInTx`).** Dipanggil DI DALAM transaksi pengubah SESUDAH perubahan ditulis: bump sebelum commit (galat dikembalikan, transaksi dibatalkan: fail-closed) dan sekali lagi
+    lewat `kernel.AfterCommit` (galat hanya di-log level error; entri basi dibatasi TTL). Penghitung target: `Targets{Platform, Organizations}` (dedup, UUID nol diabaikan). Tanpa transaksi pada ctx
+    kedua bump berjalan langsung. **Keterbatasan terbuka:** bila Redis gagal tepat antara bump sebelum dan sesudah commit, pencabutan bisa tertunda sampai TTL (2 menit); tidak ada jaminan absolut.
+21. **`Syncer.WithInvalidator(inv, log)`**: bila `SyncResult.Changed()`, bump platform sekali sebelum dan sekali sesudah commit; kegagalan bump hanya di-log (start API tidak boleh mati karena Redis,
+    docs/10 §11/§15). **Belum terpasang di `RunAPI`** (sinkron saat start masih tanpa invalidator): pemasangannya bagian T3c, bersama perakitan `cache.Cache` di app.
+22. **`Authorizer.Can(ctx, Check) (Decision, error)` mengikuti docs/06 §9** (satu parameter `Check` yang memuat `Identity`, `Scope`, `Action`, `Resource`), bukan tanda tangan tiga parameter di prompt/handover.
+    Urutan, tiap langkah hanya dapat menolak: (1) `Check` salah bentuk (user nol, aksi bukan `resource.action` sah) = `ErrInvalidCheck`; scope melanggar invarian = `domain.ErrInvalidScope`; keduanya GALAT, bukan
+    keputusan; (2) organisasi Identity = organisasi scope = organisasi sumber daya (nil sama dengan nil), selain itu `Decision{Allowed:false, Reason:"scope_mismatch"}` SEBELUM menyentuh cache/database,
+    juga untuk level platform; (3) effective set dari cache atau PostgreSQL (galat PostgreSQL = galat, `Decision` nol, tidak pernah ALLOW); (4) kode tidak ada = `no_permission`; izin level `group` pada
+    `Resource` hanya berlaku bila `Resource.GroupID` = grup aktif. Alasan keputusan: `granted`, `no_permission`, `scope_mismatch` (`domain.Reason*`).
+23. **Pekerjaan T3c yang diwariskan:** middleware `Authorize(action)` memetakan `Decision` ke 403 `permission_denied` (audit DENY dalam transaksinya sendiri, docs/06 §9) dan `scope_mismatch` ke kode error yang
+    didaftarkan di `httpx`; galat `Can` = 503 (infrastruktur) atau 500 (`ErrInvalidCheck`/`ErrInvalidScope`, kesalahan pemrograman) , diputuskan di T3c (menyelesaikan utang partial-2 §8 tentang `ErrInvalidScope`);
+    rakit `cache.Cache` + `Authorizer` + `Syncer.WithInvalidator` di `internal/app`; `PlatformEntryChecker` (butir 1) dan `switch-organization` identitas platform.
+
+## Konsekuensi bagian 3
+- **Doc-sync tertunda (tambahan, kumulatif dengan bagian 1–2):** docs/06 §5.2 (platform hanya subjek user, pengetatan butir 17, level terluas, resource/own belum), §8.1 (kunci memuat versi platform, versi dari jam, TTL 2 menit, skrip bump, perilaku saat bump gagal),
+  §9 (galat vs keputusan, urutan `Can`), §14 (tes yang sudah/belum terpenuhi); docs/10 §11/§15 (invalidasi gagal tidak mematikan start); docs/18 §7 (fixture role/permission/assignment di `testkit`).
+- Butir 3 (bagian 1) "dikerjakan di T3" **sebagian selesai**: mekanisme dan Syncer ada (butir 19–21); pemakaian oleh endpoint pengubah (role, assignment, keanggotaan) ada di T5; pemasangan di app di T3c.
