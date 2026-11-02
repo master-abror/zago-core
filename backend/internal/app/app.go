@@ -168,8 +168,14 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 	// sebelum autentikasi dirakit (ADR-0022 butir 7). Hanya bila pool nyata ada: di tes dengan fake
 	// tanpa pool, langkah ini dilewati. Galat = ExitFailed: API yang berjalan dengan katalog atau
 	// role yang tidak sinkron akan menolak (atau lebih buruk, menerima) request secara keliru.
+	var authz authzStack
 	if appPool != nil {
-		if err = syncAuthorization(ctx, appPool, log); err != nil {
+		authz, err = newAuthzStack(appPool, rdb, log)
+		if err != nil {
+			log.Error("gagal merakit otorisasi", "error", err)
+			return ExitFailed
+		}
+		if err = syncAuthorization(ctx, appPool, authz.invalidator, log); err != nil {
 			log.Error("gagal menyinkronkan katalog otorisasi", "error", err)
 			return ExitFailed
 		}
@@ -203,7 +209,7 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 	// Tanpa salah satunya Auth tetap nil: rute yang butuh identitas menolak semua request (401).
 	var auth authStack
 	if appPool != nil && kern != nil {
-		auth, err = newAuthStack(cfg, appPool, rdb, auditor, kern.Responder, log)
+		auth, err = newAuthStack(cfg, appPool, rdb, auditor, kern.Responder, authz.entryChecker(), log)
 		if err != nil {
 			log.Error("gagal merakit autentikasi HTTP", "error", err)
 			return ExitFailed
