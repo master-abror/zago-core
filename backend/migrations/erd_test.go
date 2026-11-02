@@ -19,7 +19,7 @@ import (
 const erdHeader = `# ERD — Skema Inti (final)
 
 > **Dibangkitkan otomatis** oleh ` + "`backend/migrations/erd_test.go`" + ` dari skema PostgreSQL yang benar-benar
-> dihasilkan migrasi 001–033. **Jangan sunting manual.** Perbarui: ` + "`UPDATE_ERD=1 make db-test`" + `.
+> dihasilkan migrasi 001–034. **Jangan sunting manual.** Perbarui: ` + "`UPDATE_ERD=1 make db-test`" + `.
 > Penjelasan desain ada di [04-database-schema.md](04-database-schema.md); konsep di [03-database-erd.md](03-database-erd.md).
 >
 > Label relasi: kolom FK dan aksi ` + "`ON DELETE`" + `. Relasi polimorfik tanpa FK (mis. ` + "`role_assignments.scope_id`" + `,
@@ -144,7 +144,7 @@ func TestERDCoversEveryTable(t *testing.T) { // pelindung tes di atas dari koson
 	w := newWorld(t)
 	erd := generateERD(t, w)
 	n := scalar[int](t, w.p, `SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename <> 'schema_migrations'`)
-	require.Equal(t, 31, n, "jumlah tabel inti (002–032 = 31 tabel; 001 dan 033 tanpa tabel)")
+	require.Equal(t, 31, n, "jumlah tabel inti (002–032 = 31 tabel; 001, 033, dan 034 tanpa tabel baru)")
 	require.Equal(t, n, strings.Count(erd, " {\n"), "setiap tabel harus muncul di ERD")
 	require.Contains(t, erd, `organizations ||--o{ groups : "organization_id [RESTRICT]"`)
 	require.Contains(t, erd, `groups |o--o{ groups : "parent_group_id [RESTRICT]"`)
