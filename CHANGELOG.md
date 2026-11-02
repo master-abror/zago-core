@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c)
 
 #### Added
 - `internal/permission`: katalog permission core (41 kode, docs/06 §5.4), validasi kode, sinkron tanpa hapus (orphan dilaporkan).
@@ -19,9 +19,14 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `authorization/cache`: cache effective permissions berversi di Redis (versi organisasi + versi platform, versi dari jam, TTL 2 menit, fallback ke PostgreSQL saat Redis gagal, `InvalidateInTx` sebelum dan sesudah commit).
 - `authorization/application.Authorizer.Can(ctx, Check)`: pemeriksaan tenant (`scope_mismatch`), cache atau PostgreSQL, izin level group pada sumber daya; `Syncer.WithInvalidator` menaikkan versi platform bila katalog berubah.
 - `testkit`: `NewRole`, `EnsurePermission`, `GrantPermission`, `RoleWith`, `AssignRole`.
-- ADR-0022 (bagian 1–3).
+- `authzhttp.Authorize(action)`: middleware gagal tertutup (401 tanpa Identity, 500 tanpa Scope, galat engine 503/500 dan tidak pernah ALLOW, 403 `permission_denied`/`scope_mismatch` seragam) dengan activity `authz.access_denied` (`result=denied`).
+- Kode error `scope_mismatch` (403).
+- `auth/service.PlatformEntryChecker` dan `authorization/application.PlatformEntry`: identitas platform memasuki organisasi `active` lewat `switch-organization` bila engine memutuskan `organization.read` pada scope platform (`via=platform`; penolakan seragam).
+- `internal/app`: perakitan `authzStack` (cache Redis bila ada, `Authorizer`, `PlatformEntry`); `Syncer.WithInvalidator` terpasang di `RunAPI`.
+- ADR-0022 (bagian 1–4).
 
 #### Changed
+- `ErrInvalidScope` dari resolver di middleware `Scope` kini 500 (sebelumnya 503).
 - API tidak lagi start bila database tidak terjangkau saat startup (galat sinkron otorisasi = `ExitFailed`); sebelumnya hanya `/health/ready` yang 503.
 
 ### M03 — Authentication (2026-10-29; tag `m03-done`)
