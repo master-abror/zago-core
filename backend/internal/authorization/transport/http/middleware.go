@@ -10,6 +10,7 @@ import (
 	authdomain "github.com/master-abror/zago-core/backend/internal/auth/domain"
 	"github.com/master-abror/zago-core/backend/internal/authorization/domain"
 	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
+	modulesdk "github.com/master-abror/zago-core/packages/module-sdk"
 )
 
 // HeaderActiveGroup adalah header petunjuk grup aktif (docs/06 §4.2). Nilainya TIDAK dipercaya:
@@ -21,18 +22,24 @@ type ScopeResolver interface {
 	Resolve(ctx context.Context, id authdomain.Identity, groupHeader []string) (domain.ScopeContext, error)
 }
 
-// Deps adalah dependensi Middleware.
+// Deps adalah dependensi Middleware. Scope dan Responder wajib. Authorizer wajib hanya bila rute
+// memakai Authorize (Authorize panik saat dipasang tanpa Authorizer). Audit opsional: nil berarti
+// penolakan tidak direkam; composition root selalu memasangnya. Log nil = slog.Default.
 type Deps struct {
-	Scope     ScopeResolver
-	Responder *httpx.Responder
-	Log       *slog.Logger
+	Scope      ScopeResolver
+	Authorizer Authorizer
+	Audit      modulesdk.AuditRecorder
+	Responder  *httpx.Responder
+	Log        *slog.Logger
 }
 
 // Middleware adalah rantai HTTP Authorization Engine. Urutan pemasangan pada rute terlindungi:
 //
-//	Authenticate -> CSRF -> RequireAuth -> Scope -> [Authorize(action), T3] -> handler
+//	Authenticate -> CSRF -> RequireAuth -> Scope -> Authorize(action) -> handler
 type Middleware struct {
 	scope ScopeResolver
+	authz Authorizer
+	audit modulesdk.AuditRecorder
 	rs    *httpx.Responder
 	log   *slog.Logger
 }
@@ -49,7 +56,7 @@ func New(d Deps) (*Middleware, error) {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Middleware{scope: d.Scope, rs: d.Responder, log: log}, nil
+	return &Middleware{scope: d.Scope, authz: d.Authorizer, audit: d.Audit, rs: d.Responder, log: log}, nil
 }
 
 // Scope menyelesaikan ScopeContext request dan memasangnya pada context. Dipasang SESUDAH
