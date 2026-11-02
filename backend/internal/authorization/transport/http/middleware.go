@@ -71,6 +71,13 @@ func (m *Middleware) Scope(next http.Handler) http.Handler {
 			return
 		}
 		scope, err := m.scope.Resolve(r.Context(), id, r.Header.Values(HeaderActiveGroup))
+		if errors.Is(err, domain.ErrInvalidScope) {
+			// Identity yang melanggar invarian scope (mis. UUID organisasi nol) adalah cacat data atau
+			// kode, bukan gangguan sementara: 500, bukan 503 yang mengundang klien mencoba lagi.
+			m.log.ErrorContext(r.Context(), "scope sesi melanggar invarian", "error", err)
+			m.rs.Error(w, r, httpx.InternalError.Wrap(err))
+			return
+		}
 		if err != nil {
 			m.log.ErrorContext(r.Context(), "resolusi scope gagal", "error", err)
 			m.rs.Error(w, r, httpx.ServiceUnavailable.Wrap(err))
