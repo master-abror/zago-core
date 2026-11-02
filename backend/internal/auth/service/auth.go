@@ -39,6 +39,15 @@ const (
 	revokeReasonSwitchOrganization = "switch_organization"
 )
 
+// PlatformEntryChecker memutuskan apakah user boleh MEMASUKI organisasi mana pun tanpa menjadi
+// anggotanya: identitas platform (Super Admin tanpa keanggotaan; ADR-0022 bagian 2). Diimplementasikan
+// paket authorization lewat engine (organization.read pada scope platform); antarmukanya ada di sini
+// supaya auth tidak mengimpor authorization (tanpa impor melingkar). Galat berarti "tidak diketahui":
+// pemanggil menolak (fail-closed), tidak pernah mengizinkan.
+type PlatformEntryChecker interface {
+	CanEnterOrganizations(ctx context.Context, userID uuid.UUID) (bool, error)
+}
+
 // AuthService adalah use case autentikasi di atas SessionService: login, logout, profil.
 // Aturan keras (docs/05 §3, §4, §18): verifikasi Argon2id SELALU berjalan (terhadap hash dummy
 // bila akun tidak ada), status akun baru diperiksa setelah password benar, dan sesi + event
@@ -52,23 +61,26 @@ type AuthService struct {
 	bus      modulesdk.EventBus
 	audit    modulesdk.AuditRecorder
 	guard    LoginGuard
+	platform PlatformEntryChecker
 	log      *slog.Logger
 }
 
 // AuthDeps adalah dependensi AuthService. Policy (nol = panjang minimum bawaan), Bus, Audit, dan Log
 // opsional. Bus nil = ganti password tidak menulis event outbox (composition root selalu memasangnya,
 // ADR-0020 butir 43). Guard nil = tanpa kunci akun/penghitung (hanya tes; composition root selalu
-// memasangnya, ADR-0020 butir 47–53).
+// memasangnya, ADR-0020 butir 47–53). PlatformEntry nil = identitas platform tidak dapat memasuki
+// organisasi mana pun lewat switch-organization (fail-closed); composition root memasangnya.
 type AuthDeps struct {
-	Store    *repository.Store
-	Tx       *kernel.TxManager
-	Sessions *SessionService
-	Hasher   security.PasswordHasher
-	Policy   security.PasswordPolicy
-	Bus      modulesdk.EventBus
-	Audit    modulesdk.AuditRecorder
-	Guard    LoginGuard
-	Log      *slog.Logger
+	Store         *repository.Store
+	Tx            *kernel.TxManager
+	Sessions      *SessionService
+	Hasher        security.PasswordHasher
+	Policy        security.PasswordPolicy
+	Bus           modulesdk.EventBus
+	Audit         modulesdk.AuditRecorder
+	Guard         LoginGuard
+	PlatformEntry PlatformEntryChecker
+	Log           *slog.Logger
 }
 
 // NewAuthService membuat AuthService; Store, Tx, Sessions, dan Hasher wajib.
@@ -89,7 +101,7 @@ func NewAuthService(d AuthDeps) (*AuthService, error) {
 	}
 	return &AuthService{
 		store: d.Store, tx: d.Tx, sessions: d.Sessions, hasher: d.Hasher, policy: d.Policy, bus: d.Bus, audit: d.Audit,
-		guard: d.Guard, log: log,
+		guard: d.Guard, platform: d.PlatformEntry, log: log,
 	}, nil
 }
 
@@ -302,6 +314,12 @@ func (s *AuthService) Refresh(ctx context.Context, id domain.Identity) (Issued, 
 // (docs/05 §12.2): keanggotaan diperiksa dan token dirotasi dalam SATU transaksi, jadi sesi tidak
 // pernah menunjuk organisasi yang bukan haknya. Bukan anggota (atau organisasi tak ada/tak aktif)
 // = domain.ErrNotOrganizationMember tanpa efek samping.
+//
+// Identitas platform (bukan anggota tetapi diizinkan engine memasuki organisasi, hanya yang `active`)
+// juga lolos; event dan activity-nya membawa via=platform. Semua penolakan seragam: bukan anggota,
+// tanpa izin platform, organisasi tak ada/suspended/archived/terhapus semuanya
+// domain.ErrNotOrganizationMember. Galat engine atau database naik sebagai galat (bukan penolakan,
+// bukan izin).
 func (s *AuthService) SwitchOrganization(ctx context.Context, id domain.Identity, orgID uuid.UUID) (Issued, error) {
 	var out Issued
 	err := s.tx.WithinTx(ctx, func(ctx context.Context) error {
@@ -309,8 +327,16 @@ func (s *AuthService) SwitchOrganization(ctx context.Context, id domain.Identity
 		if err != nil {
 			return fmt.Errorf("auth: periksa keanggotaan: %w", err)
 		}
+		via := ""
 		if !member {
-			return domain.ErrNotOrganizationMember
+			entered, err := s.platformMayEnter(ctx, id.UserID, orgID)
+			if err != nil {
+				return err
+			}
+			if !entered {
+				return domain.ErrNotOrganizationMember
+			}
+			via = switchViaPlatform
 		}
 
 		ip, ua := clientInfo(ctx)
@@ -325,13 +351,18 @@ func (s *AuthService) SwitchOrganization(ctx context.Context, id domain.Identity
 		if id.OrganizationID != nil {
 			meta["from_organization_id"] = id.OrganizationID.String()
 		}
+		var auditMeta map[string]any
+		if via != "" {
+			meta["via"] = via
+			auditMeta = map[string]any{"via": via}
+		}
 		sid := iss.Session.ID
 		if err := s.insertEvent(ctx, securityEvent{
 			Type: EventOrganizationSwitched, Result: eventResultSuccess, UserID: id.UserID, OrgID: &orgID, SessionID: &sid, Metadata: meta,
 		}); err != nil {
 			return fmt.Errorf("auth: catat event pindah organisasi: %w", err)
 		}
-		s.record(ctx, id.UserID, &orgID, "auth.switch_organization", sid)
+		s.recordResourceMeta(ctx, id.UserID, &orgID, "auth.switch_organization", "session", sid, auditMeta)
 		out = iss
 		return nil
 	})
@@ -339,6 +370,27 @@ func (s *AuthService) SwitchOrganization(ctx context.Context, id domain.Identity
 		return Issued{}, err
 	}
 	return out, nil
+}
+
+// switchViaPlatform menandai masuk organisasi lewat izin platform (bukan keanggotaan).
+const switchViaPlatform = "platform"
+
+// platformMayEnter memutuskan masuk lewat jalur platform. Engine ditanya LEBIH DULU dan tidak
+// bergantung pada organisasi tujuan, sehingga pengguna biasa mengalami kerja yang sama untuk
+// organisasi yang ada maupun tidak (tidak ada selisih waktu yang membocorkan keberadaan organisasi).
+// Organisasi harus aktif dan belum terhapus.
+func (s *AuthService) platformMayEnter(ctx context.Context, userID, orgID uuid.UUID) (bool, error) {
+	if s.platform == nil {
+		return false, nil
+	}
+	allowed, err := s.platform.CanEnterOrganizations(ctx, userID)
+	if err != nil {
+		return false, fmt.Errorf("auth: periksa izin masuk platform: %w", err)
+	}
+	if !allowed {
+		return false, nil
+	}
+	return s.store.OrganizationIsActive(ctx, orgID)
 }
 
 // Profile adalah data diri pengguna untuk GET /auth/me.
@@ -516,6 +568,11 @@ func (s *AuthService) record(ctx context.Context, userID uuid.UUID, org *uuid.UU
 
 // recordResource merekam activity atas nama pengguna untuk resource tertentu.
 func (s *AuthService) recordResource(ctx context.Context, userID uuid.UUID, org *uuid.UUID, action, resourceType string, resourceID uuid.UUID) {
+	s.recordResourceMeta(ctx, userID, org, action, resourceType, resourceID, nil)
+}
+
+// recordResourceMeta seperti recordResource dengan metadata (sudah melewati redaksi perekam).
+func (s *AuthService) recordResourceMeta(ctx context.Context, userID uuid.UUID, org *uuid.UUID, action, resourceType string, resourceID uuid.UUID, meta map[string]any) {
 	if s.audit == nil {
 		return
 	}
@@ -524,7 +581,7 @@ func (s *AuthService) recordResource(ctx context.Context, userID uuid.UUID, org 
 		actor.OrganizationID = *org
 	}
 	s.audit.Record(kernel.WithActor(ctx, actor), modulesdk.ActivityEntry{
-		Action: action, ResourceType: resourceType, ResourceID: resourceID,
+		Action: action, ResourceType: resourceType, ResourceID: resourceID, Metadata: meta,
 	})
 }
 
