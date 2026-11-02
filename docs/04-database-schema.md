@@ -515,6 +515,17 @@ CREATE UNIQUE INDEX uq_policies_global_code ON policies (code) WHERE organizatio
 SELECT attach_updated_at('policies');
 ```
 
+A policy is bound to the actions it applies to by `actions` (added by migration 034, ADR-0022 items 2 and 10; 021 is already taken by `password_reset_tokens`): exact permission codes (`invoice.read`) or every action of one resource (`invoice.*`), one dimension, 1–50 distinct elements, never empty. The database enforces the shape (`policy_actions_valid`, `ck_policies_actions`); membership in the catalog (core in code, modules in `permissions`) cannot be a foreign key on an array and is validated by the application on write. 034 refuses to run when `policies` already holds rows, because there is no safe way to guess `actions` for them (a deny policy with no actions would silently stop denying).
+
+```sql
+-- 034_policies_actions.up.sql (excerpt; the full file also holds the guard and the function body)
+ALTER TABLE policies
+    ADD COLUMN actions text[] NOT NULL,
+    ADD CONSTRAINT ck_policies_actions CHECK (policy_actions_valid(actions));
+
+CREATE INDEX idx_policies_actions ON policies USING gin (actions);
+```
+
 ---
 
 # 9. Settings
@@ -1031,6 +1042,7 @@ Supersedes 03-database-erd.md's first-draft §45:
 031_system_logs
 032_outbox_events
 033_grants
+034_policies_actions
 ```
 
 Each numbered step has a paired `.up.sql` / `.down.sql`. A module's own tables (e.g. `announcements_posts`) are **never** part of core's sequence: they use the module's own migration sequence and version table (§15.2), run when that module is installed.

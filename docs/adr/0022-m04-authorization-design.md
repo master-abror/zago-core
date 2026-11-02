@@ -148,3 +148,21 @@ skema dan kode M03: identitas platform tidak punya jalur masuk organisasi (ADR-0
 - **Doc-sync tertunda (tambahan, kumulatif dengan bagian 1–3):** docs/05 (switch-organization untuk identitas platform: urutan engine-lalu-organisasi, `via=platform`, penolakan seragam); docs/06 §9 (perilaku `Authorize`, activity `authz.access_denied`), §12 (`scope_mismatch` didaftarkan di paket pemilik); docs/08 §11 (`scope_mismatch` 403); docs/10 §3 (urutan start API dengan `authzStack`).
 - Butir 3 (bagian 1) "dikerjakan di T3" kini **sebagian besar selesai**: mekanisme, Syncer, dan pemasangan Syncer di app ada; pemakaian oleh endpoint pengubah (role, assignment, keanggotaan) ada di T5.
 - Keterbatasan yang dicatat (tidak ada jaminan absolut): sesi hasil masuk-lewat-platform tetap hidup sampai habis walau assignment platform dicabut (`Authenticate` tidak memeriksa ulang hak per request; setiap request terguard tetap diputuskan ulang oleh engine); audit penolakan menulis satu baris per request tanpa rate limit per pengguna.
+
+## Bagian 5 — keputusan T4 (2026-11-02)
+
+30. **Migrasi `034_policies_actions`** menambah `policies.actions text[] NOT NULL` tanpa default, constraint `ck_policies_actions` = `policy_actions_valid(actions)`, dan indeks GIN `idx_policies_actions`.
+    Fungsi `policy_actions_valid` (SQL, `IMMUTABLE`) memaksa: satu dimensi, 1 sampai 50 elemen, tanpa NULL, tanpa duplikat, tiap elemen sepanjang paling banyak 255 karakter dan berbentuk kode permission (`permission.codePattern`)
+    atau `<resource>.*` (bintang hanya sebagai segmen terakhir). Hasil yang tak tentu dipaksa `false` (`COALESCE`), sebab CHECK meloloskan NULL. Keanggotaan terhadap katalog (core di kode, modul di tabel `permissions`)
+    tidak dapat menjadi FK pada array dan divalidasi aplikasi saat tulis. Migrasi menolak berjalan (`RAISE EXCEPTION`) bila `policies` tidak kosong: tidak ada cara aman menebak actions baris lama (policy deny tanpa action akan diam-diam berhenti menolak).
+    Belum ada kode yang menulis `policies`, jadi guard itu tidak terpicu di instalasi mana pun saat ini. Pencarian policy untuk satu action memakai `actions && ARRAY[kode, 'resource.*']`, dengan `resource` = semua segmen sebelum titik terakhir (butir 5).
+31. **Semantik efek policy: policy hanya membatasi, tidak pernah memberi izin** (docs/06 §2: tidak ada link yang memaksa ALLOW; docs/02 §16 dan docs/03 §16 tidak merinci `allow`). Hanya policy `active` yang berlaku; policy global (`organization_id IS NULL`) berlaku untuk semua organisasi, policy organisasi hanya untuk organisasinya.
+    Untuk satu check, dari semua policy yang terikat ke action itu: (a) policy `deny` yang ekspresinya true = tolak (alasan `policy_denied`, kode policy ikut audit); (b) policy `allow` adalah SYARAT TAMBAHAN: semua policy `allow` yang berlaku harus true, bila salah satu false = tolak (alasan `policy_denied`);
+    (c) galat evaluasi pada policy mana pun (deny maupun allow) = tolak (`policy_evaluation_failed`), tidak pernah dilewati. Hasilnya, policy `allow` setara dengan `deny` atas negasinya; permission tetap syarat pertama.
+32. **Atribut sumber daya dan `Authorize` di middleware.** Middleware memakai `Resource` nil (butir 25), sehingga policy yang membutuhkan atribut sumber daya tidak dapat dievaluasi di sana dan menolaknya akan menutup rute selamanya. Aturan:
+    dengan `Resource` nil, policy yang membutuhkan atribut sumber daya DITUNDA (tidak berlaku pada pengecekan kasar; dilaporkan sebagai tertunda pada `Decision`) dan wajib dievaluasi oleh pengecekan tingkat sumber daya (service/handler, docs/06 §9);
+    dengan `Resource` ada, atribut yang hilang atau galat evaluasi = tolak (fail-closed). Evaluator membedakan "atribut tidak tersedia" dari "galat" (sentinel terpisah) dan keduanya diuji negatif. Keterbatasan yang dicatat: handler yang tidak melakukan pengecekan tingkat sumber daya tidak mendapat policy berbasis atribut.
+
+## Konsekuensi bagian 5
+- **Doc-sync tertunda (tambahan, kumulatif dengan bagian 1–4):** docs/06 §6 (semantik efek butir 31, penundaan butir 32, pengikat `actions`) dan §14 (tes policy yang sudah/belum terpenuhi). docs/03 §16.1, docs/04 (§8 dan §14), dan `docs/erd.md` untuk migrasi 034 SUDAH diterapkan bersama migrasinya.
+- Butir 2 (bagian 1) selesai di sisi skema; evaluator, repositori policy, dan `FieldGuard` menyusul di T4b/T4c.
