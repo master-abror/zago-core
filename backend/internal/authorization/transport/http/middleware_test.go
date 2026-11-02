@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -163,4 +164,15 @@ func TestScopeFailsClosedWith503WhenResolutionFails(t *testing.T) {
 	require.False(t, r.reached, "request tidak boleh lanjut tanpa scope")
 	require.NotContains(t, w.Body.String(), "10.0.0.5", "detail infrastruktur tidak boleh bocor ke klien")
 	require.NotContains(t, w.Body.String(), "connection refused")
+}
+
+func TestScopeInvalidInvariantIs500NotRetryable503(t *testing.T) {
+	ident := tenantIdentity()
+	r := newRig(t, &fakeResolver{err: fmt.Errorf("resolve: %w", domain.ErrInvalidScope)})
+
+	w := r.do(nil, &ident)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+	require.Equal(t, "internal_error", errCode(t, w))
+	require.False(t, r.reached, "request tidak boleh lanjut tanpa scope")
 }
