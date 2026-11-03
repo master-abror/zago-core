@@ -163,6 +163,16 @@ skema dan kode M03: identitas platform tidak punya jalur masuk organisasi (ADR-0
     dengan `Resource` nil, policy yang membutuhkan atribut sumber daya DITUNDA (tidak berlaku pada pengecekan kasar; dilaporkan sebagai tertunda pada `Decision`) dan wajib dievaluasi oleh pengecekan tingkat sumber daya (service/handler, docs/06 §9);
     dengan `Resource` ada, atribut yang hilang atau galat evaluasi = tolak (fail-closed). Evaluator membedakan "atribut tidak tersedia" dari "galat" (sentinel terpisah) dan keduanya diuji negatif. Keterbatasan yang dicatat: handler yang tidak melakukan pengecekan tingkat sumber daya tidak mendapat policy berbasis atribut.
 
+33. **Bahasa ekspresi policy (`internal/policy`, T4b).** Tokenizer dan parser rekursif-turun tulis tangan; tanpa `eval`, reflection, atau pemanggilan metode. Tata bahasa lengkap ada di dokumentasi paket. Keputusan yang mengikat:
+    (a) nilai hanya dapat dibaca lewat `akar.atribut` dengan tepat dua segmen dan akar `resource`, `current_user`, `scope`; pengenal yang berdiri sendiri dan akar lain ditolak (contoh di docs/06 §6 seperti `amount <= approval_limit` bersifat ilustratif, bentuk kanoniknya `resource.amount <= resource.approval_limit`);
+    (b) operator `== != < <= > >= in && || !` dan tanda kurung; perbandingan tidak berantai; daftar putih fungsi murni `lower`, `len`, `startsWith`, `endsWith`, `contains` (fungsi yang butuh I/O seperti keanggotaan grup TIDAK ada di T4b; penambahannya wajib lewat ADR baru);
+    (c) pengetikan ketat: `null` hanya sama dengan `null`; int dan float dibandingkan numerik; tipe berbeda lainnya, operand non-boolean, dan hasil akhir non-boolean adalah galat `ErrEvaluation` (bukan false), sehingga salah tipe tidak diam-diam meloloskan atau melewatkan policy; `in` memeriksa tipe semua elemen tanpa keluar dini;
+    (d) `&&` dan `||` memakai hubung-singkat, sehingga operand yang tidak perlu tidak dievaluasi dan tidak membutuhkan sumber daya (dasar penundaan butir 32 lewat `ErrNoResource`; atribut yang hilang saat sumber daya ada adalah `ErrAttributeUnavailable` = tolak);
+    (e) batas keras: ekspresi 2000 byte, 400 token, kedalaman 24, 1000 langkah evaluasi, string literal 256 byte, pengenal 64 byte, daftar 64 elemen, string atribut 4096 byte; pelanggaran = `ErrTooComplex`;
+    (f) atribut dari `Env` dinormalisasi ke null/bool/int/float/string/daftar-skalar (termasuk `uuid.UUID` menjadi string); tipe lain adalah galat, tidak pernah dikonversi diam-diam;
+    (g) pesan galat memuat posisi, nama, dan tipe saja, tidak pernah nilai atribut;
+    (h) sifat yang dijaga uji fuzz dan uji acak: masukan apa pun tidak panik, tidak menggantung, galatnya hanya sentinel yang dikenal, dan `Eval` tidak pernah mengembalikan true bersama galat.
+
 ## Konsekuensi bagian 5
 - **Doc-sync tertunda (tambahan, kumulatif dengan bagian 1–4):** docs/06 §6 (semantik efek butir 31, penundaan butir 32, pengikat `actions`) dan §14 (tes policy yang sudah/belum terpenuhi). docs/03 §16.1, docs/04 (§8 dan §14), dan `docs/erd.md` untuk migrasi 034 SUDAH diterapkan bersama migrasinya.
-- Butir 2 (bagian 1) selesai di sisi skema; evaluator, repositori policy, dan `FieldGuard` menyusul di T4b/T4c.
+- Butir 2 (bagian 1) selesai di sisi skema dan bahasa ekspresi (T4a, T4b1); kombinasi efek (butir 31), repositori policy, integrasi ke `Authorizer.Can`, dan `FieldGuard` menyusul (T4b2, T4c).
