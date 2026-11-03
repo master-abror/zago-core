@@ -32,9 +32,11 @@ type Authorizer interface {
 //   - Identity ada tetapi Scope tidak ada: urutan pemasangan salah (kesalahan server) → 500.
 //   - Galat engine: ErrInvalidCheck/ErrInvalidScope → 500 (kesalahan pemrograman); selain itu
 //     (PostgreSQL gagal dsb.) → 503. Galat tidak pernah menjadi izin, walau Decision ikut terisi.
-//   - Ditolak: 403 scope_mismatch bila alasannya ReasonScopeMismatch, selain itu 403
-//     permission_denied seragam (tanpa menyebut aksi atau alasan ke klien). Penolakan direkam
-//     sebagai activity result=denied (transaksi terpisah, docs/10 §4).
+//   - Ditolak: 403 scope_mismatch bila alasannya ReasonScopeMismatch, 403
+//     policy_evaluation_failed bila ReasonPolicyEvaluationFailed, selain itu 403 permission_denied
+//     seragam (tanpa menyebut aksi, alasan, atau kode policy ke klien; penolakan policy tampil
+//     sebagai permission_denied biasa). Penolakan direkam sebagai activity result=denied
+//     (transaksi terpisah, docs/10 §4); untuk penolakan policy, kode policy ikut di metadata.
 //
 // Authorize memakai Resource nil: pemeriksaan sumber daya tertentu (organisasi, pemilik, grup
 // sumber daya) dilakukan handler lewat Authorizer.Can dengan ResourceRef. Authorize panik saat
@@ -88,24 +90,40 @@ func (m *Middleware) engineFailure(w http.ResponseWriter, r *http.Request, actio
 func (m *Middleware) deny(w http.ResponseWriter, r *http.Request, scope domain.ScopeContext, action string, dec domain.Decision) {
 	if m.audit != nil {
 		reason := "unspecified"
-		if dec.Reason == domain.ReasonNoPermission || dec.Reason == domain.ReasonScopeMismatch {
+		if auditableDenyReason(dec.Reason) {
 			reason = dec.Reason
 		}
+		meta := map[string]any{
+			"required_action": action,
+			"reason":          reason,
+			"method":          r.Method,
+		}
+		if isPolicyReason(dec.Reason) && dec.PolicyCode != "" {
+			meta["policy_code"] = dec.PolicyCode
+		}
 		m.audit.Record(auditContext(r.Context(), scope), modulesdk.ActivityEntry{
-			Action: ActivityAccessDenied,
-			Result: modulesdk.ResultDenied,
-			Metadata: map[string]any{
-				"required_action": action,
-				"reason":          reason,
-				"method":          r.Method,
-			},
+			Action:   ActivityAccessDenied,
+			Result:   modulesdk.ResultDenied,
+			Metadata: meta,
 		})
 	}
-	if dec.Reason == domain.ReasonScopeMismatch {
+	switch dec.Reason {
+	case domain.ReasonScopeMismatch:
 		m.rs.Error(w, r, ScopeMismatch.New())
-		return
+	case domain.ReasonPolicyEvaluationFailed:
+		m.rs.Error(w, r, PolicyEvaluationFailed.New())
+	default:
+		m.rs.Error(w, r, httpx.PermissionDenied.New())
 	}
-	m.rs.Error(w, r, httpx.PermissionDenied.New())
+}
+
+func isPolicyReason(reason string) bool {
+	return reason == domain.ReasonPolicyDenied || reason == domain.ReasonPolicyEvaluationFailed
+}
+
+// auditableDenyReason: hanya alasan stabil yang dikenal yang masuk audit; selain itu "unspecified".
+func auditableDenyReason(reason string) bool {
+	return reason == domain.ReasonNoPermission || reason == domain.ReasonScopeMismatch || isPolicyReason(reason)
 }
 
 // auditContext melengkapi context dengan scope request supaya activity penolakan memuat
