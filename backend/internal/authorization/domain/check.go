@@ -49,6 +49,12 @@ const (
 	ReasonGranted       = "granted"
 	ReasonNoPermission  = "no_permission"
 	ReasonScopeMismatch = "scope_mismatch"
+
+	// ReasonPolicyDenied: permission ada, tetapi sebuah policy menolak (ADR-0022 butir 31).
+	ReasonPolicyDenied = "policy_denied"
+
+	// ReasonPolicyEvaluationFailed: sebuah policy tidak dapat dievaluasi; ditolak gagal-tertutup.
+	ReasonPolicyEvaluationFailed = "policy_evaluation_failed"
 )
 
 // ResourceRef menunjuk sumber daya yang sedang diperiksa (docs/06 §3). OrganizationID milik
@@ -77,4 +83,12 @@ type Decision struct {
 	Allowed bool
 	Reason  string
 	Level   DecisionLevel
+
+	// PolicyCode adalah kode policy yang menolak; terisi hanya bila Reason adalah ReasonPolicy*.
+	// Kode ditulis admin, bukan data pengguna, sehingga aman masuk ke jejak audit.
+	PolicyCode string
+
+	// DeferredPolicies adalah kode policy yang butuh sumber daya tetapi Check.Resource nil; policy
+	// itu WAJIB dievaluasi oleh pengecekan tingkat sumber daya (ADR-0022 butir 32).
+	DeferredPolicies []string
 }

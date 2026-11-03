@@ -19,6 +19,7 @@ import (
 // invalidator nil bila tanpa Redis (tanpa cache, tidak ada yang perlu dibatalkan); platformEntry
 // nil bila tanpa PostgreSQL.
 type authzStack struct {
+	authorizer    *authzapp.Authorizer
 	invalidator   authzapp.Invalidator
 	platformEntry *authzapp.PlatformEntry
 }
@@ -39,11 +40,14 @@ func newAuthzStack(db kernel.DBTX, rdb redis.UniversalClient, log *slog.Logger) 
 	if err != nil {
 		return authzStack{}, fmt.Errorf("rakit authorizer: %w", err)
 	}
+	// Policy (ADR-0022 butir 31-32) hanya berlaku bila dirakit di sini; tanpa ini setiap policy
+	// diabaikan tanpa suara. authz_internal_test menjaganya lewat PoliciesEnabled.
+	authorizer = authorizer.WithPolicies(authzrepo.NewPolicies(db))
 	entry, err := authzapp.NewPlatformEntry(authorizer)
 	if err != nil {
 		return authzStack{}, fmt.Errorf("rakit platform entry: %w", err)
 	}
-	return authzStack{invalidator: inv, platformEntry: entry}, nil
+	return authzStack{authorizer: authorizer, invalidator: inv, platformEntry: entry}, nil
 }
 
 // entryChecker mengembalikan PlatformEntryChecker untuk AuthService, atau interface nil bila tidak
