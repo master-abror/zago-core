@@ -480,3 +480,14 @@ func TestFieldFilterIsSafeForConcurrentUse(t *testing.T) {
 		require.False(t, leaked[w])
 	}
 }
+
+func TestHasRestrictionsReflectsDeclaredCodesOnly(t *testing.T) {
+	require.True(t, fieldRules(t).HasRestrictions())
+
+	none, err := domain.NewFieldRules("invoice", []string{"invoice.read", "other.field.cost.read"})
+	require.NoError(t, err)
+	require.False(t, none.HasRestrictions(), "kode biasa dan field tipe lain tidak membatasi tipe ini")
+
+	var zero domain.FieldRules
+	require.False(t, zero.HasRestrictions())
+}
