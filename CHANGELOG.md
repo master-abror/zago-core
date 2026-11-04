@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b)
 
 #### Added
 - `internal/permission`: katalog permission core (41 kode, docs/06 §5.4), validasi kode, sinkron tanpa hapus (orphan dilaporkan).
@@ -23,7 +23,11 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - Kode error `scope_mismatch` (403).
 - `auth/service.PlatformEntryChecker` dan `authorization/application.PlatformEntry`: identitas platform memasuki organisasi `active` lewat `switch-organization` bila engine memutuskan `organization.read` pada scope platform (`via=platform`; penolakan seragam).
 - `internal/app`: perakitan `authzStack` (cache Redis bila ada, `Authorizer`, `PlatformEntry`); `Syncer.WithInvalidator` terpasang di `RunAPI`.
-- ADR-0022 (bagian 1–4).
+- Migrasi `034_policies_actions`: `policies.actions text[] NOT NULL` (kode persis atau `resource.*`; 1–50 elemen, tanpa NULL/duplikat, divalidasi fungsi `policy_actions_valid` + `ck_policies_actions`), indeks GIN `idx_policies_actions`, dan guard yang menolak migrasi bila `policies` tidak kosong.
+- `internal/policy`: bahasa ekspresi policy (tokenizer dan parser tulis tangan, tanpa `eval`; akar `resource`/`current_user`/`scope`; daftar putih fungsi; pengetikan ketat; hubung-singkat; batas panjang/token/kedalaman/langkah/ukuran) dengan uji fuzz; `Evaluate` (policy hanya membatasi: `deny` true atau `allow` false menolak, galat menolak, `Resource` nil menunda policy yang butuh sumber daya).
+- `authorization/application.Authorizer.WithPolicies` dan `PolicySource`: policy diterapkan setelah permission terbukti; atribut inti sumber daya menimpa `Attrs`; `Decision.PolicyCode` dan `Decision.DeferredPolicies`; `authorization/repository.Policies` (policy aktif global + organisasi per aksi); perakitan di `internal/app` (dijaga tes `PoliciesEnabled`).
+- Kode error `policy_evaluation_failed` (403); penolakan policy tampil ke klien sebagai `permission_denied` biasa, kode policy hanya di metadata audit `authz.access_denied`.
+- ADR-0022 (bagian 1–5).
 
 #### Changed
 - `ErrInvalidScope` dari resolver di middleware `Scope` kini 500 (sebelumnya 503).
