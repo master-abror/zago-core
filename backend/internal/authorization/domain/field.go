@@ -199,6 +199,12 @@ func (r FieldRules) ResourceType() string {
 	return r.resourceType
 }
 
+// HasRestrictions melaporkan apakah tipe ini punya field terbatas untuk aksi apa pun. Tanpa
+// pembatasan tidak ada yang perlu ditapis, sehingga himpunan izin tidak perlu dimuat.
+func (r FieldRules) HasRestrictions() bool {
+	return len(r.allRead) > 0 || len(r.allWrite) > 0
+}
+
 // Restricts melaporkan apakah kunci dibatasi untuk aksi itu.
 func (r FieldRules) Restricts(key string, action FieldAction) bool {
 	return len(r.required(action, key)) > 0
