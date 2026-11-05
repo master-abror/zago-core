@@ -18,4 +18,10 @@ var (
 	// gagal-tertutup (ADR-0022 butir 31). 403 (penolakan, bukan galat server) dengan kode sendiri
 	// supaya admin dapat membedakan policy rusak dari penolakan biasa; pesan tidak menyebut policy.
 	PolicyEvaluationFailed = httpx.Register(httpx.Code{Name: "policy_evaluation_failed", Status: http.StatusForbidden, Message: "The request could not be authorized."})
+
+	// FieldPermissionDenied: request menulis field terbatas yang tidak boleh ditulis pemanggil
+	// (ADR-0022 butir 40, 44). 403 dengan kode sendiri supaya UI dapat membedakannya dari
+	// permission_denied. Respons TIDAK memuat nama field: nama berasal dari klien dan menyebutkannya
+	// kembali menjadikan respons alat untuk menebak field terbatas; nama masuk log dan audit.
+	FieldPermissionDenied = httpx.Register(httpx.Code{Name: "field_permission_denied", Status: http.StatusForbidden, Message: "You do not have permission to change one or more fields in this request."})
 )
