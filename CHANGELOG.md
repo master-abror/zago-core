@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d)
 
 #### Added
 - `internal/permission`: katalog permission core (41 kode, docs/06 §5.4), validasi kode, sinkron tanpa hapus (orphan dilaporkan).
@@ -30,11 +30,12 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `authorization/domain`: field permission (docs/06 §7): `FieldCode`, `FieldRules` (definisi field terbatas dari kode katalog `<tipe>.field.<nama>.<read|write>`; baca dan tulis terpisah, default tolak) dan `FieldFilter` (`Apply` menjatuhkan field terbatas yang tidak boleh dibaca: absen, bukan null; `CheckWrite` menolak penulisannya dengan `FieldDeniedError`; pencocokan kunci gagal-tertutup; izin level group hanya untuk grup aktif; organisasi sumber daya harus sama dengan scope).
 - `authorization/repository.Fields` (definisi field dari katalog `permissions` dengan `starts_with`, tanpa cache) dan `authorization/application.FieldGuard` (`For`, `Filter`, `CheckWrite`; himpunan izin lewat jalur yang sama dengan `Can`; kegagalan memuat definisi atau izin = galat, tidak pernah tanpa pembatasan); dirakit di `newAuthzStack` dan dijaga tes. Belum dipakai handler mana pun (belum ada endpoint).
 - Kode error `field_permission_denied` (403) dan `authzhttp.FieldError` (respons tanpa nama field dan tanpa penyebab).
-- ADR-0022 (bagian 1–6).
+- `internal/app`: retry terbatas sinkron katalog saat start (5 percobaan, backoff 1/2/4/8 detik, batas 30 detik per percobaan; konflik kode core, kegagalan merakit syncer, dan pembatalan konteks tidak diulang).
+- ADR-0022 (bagian 1–7).
 
 #### Changed
 - `ErrInvalidScope` dari resolver di middleware `Scope` kini 500 (sebelumnya 503).
-- API tidak lagi start bila database tidak terjangkau saat startup (galat sinkron otorisasi = `ExitFailed`); sebelumnya hanya `/health/ready` yang 503.
+- API tidak lagi start bila database tidak terjangkau saat startup (galat sinkron otorisasi sesudah retry terbatas = `ExitFailed`); sebelumnya hanya `/health/ready` yang 503.
 
 ### M03 — Authentication (2026-10-29; tag `m03-done`)
 

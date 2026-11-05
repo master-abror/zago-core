@@ -1,4 +1,4 @@
-# ADR-0022 — M04: keputusan desain Authorization Engine (bagian 1: keputusan awal; bagian 2: T1b dan T2; bagian 3: T3a dan T3b)
+# ADR-0022 — M04: keputusan desain Authorization Engine (bagian 1: keputusan awal; bagian 2: T1b dan T2; bagian 3: T3a dan T3b; bagian 4: T3c; bagian 5: T4a sampai T4b; bagian 6: T4c; bagian 7: T4d)
 
 **Status:** Diterima · **Tanggal:** 2026-10-30 · **Konteks:** awal M04 (docs/06, docs/00 B-04 dan I-01 sampai I-03). Bagian berikutnya
 (bagian 2, 3, ...) ditambahkan per ◆CP/task; butir diberi nomor lanjut.
@@ -215,3 +215,17 @@ skema dan kode M03: identitas platform tidak punya jalur masuk organisasi (ADR-0
 - **Doc-sync tertunda (tambahan, kumulatif dengan bagian 1–5):** docs/06 §7 (tanda tangan, sumber definisi, per aksi, pencocokan kunci, cakupan), §13 (letak kode di `authorization/domain`), §14 (tes field: sudah/belum), docs/08 §11 (kode `field_permission_denied` sudah tercantum; tambahkan status 403 dan catatan bahwa respons tidak memuat nama field, butir 44).
 - **Keterbatasan yang dicatat (tidak ada jaminan absolut):** penapisan hanya tingkat atas (butir 39); bukti "absen dari REST/WebSocket/export" baru dapat diberikan pada level fungsi sampai ada konsumen bertipe (T5, M05, M08); kunci non-ASCII pada tipe ber-field-terbatas dijatuhkan kecuali semua kode dipegang (butir 38);
   validasi deklarasi kode field di manifest modul belum ada (butir 35, M07).
+
+## Bagian 7 — keputusan T4d: retry terbatas sinkron katalog saat start (2026-11-06)
+
+46. **Sinkron katalog saat start diulang terbatas sebelum `ExitFailed`.** (a) Kebijakan (`defaultSyncRetry`): 5 percobaan total, jeda 1, 2, 4, lalu 8 detik (15 detik tidur; tidak ada jeda sesudah percobaan terakhir), dan tiap percobaan dibatasi 30 detik supaya koneksi yang menggantung tidak menahan start tanpa batas dan retry sempat jalan. Terburuk ±165 detik (dependensi menggantung); database yang menolak koneksi ±15 detik. Tanpa jitter: advisory lock sinkron sudah menserialkan instance.
+    (b) Aman diulang: tiap percobaan adalah satu transaksi utuh yang di-rollback bila gagal dan sinkronnya idempoten (advisory lock + konvergensi); bump versi platform sebelum dan sesudah commit (butir 28) tetap benar bila percobaan sebelumnya gagal saat commit.
+    (c) Yang TIDAK diulang: `permission.ErrCodeConflict` (kode core dimiliki modul: deterministik), kegagalan merakit syncer (`errSyncSetup`: kesalahan kode), dan pembatalan konteks induk (SIGTERM saat start berhenti seketika; operasi tidak dijalankan bila konteks sudah batal). Galat yang tidak dikenal DIULANG (gagal-aman: ruginya paling banyak jeda total sebelum `ExitFailed`). Klasifikasi galat PostgreSQL permanen (mis. kelas SQLSTATE 28 dan 42) tidak dibuat; galat itu diulang sampai habis.
+    (d) Tetap gagal-tertutup: sesudah percobaan habis galat percobaan terakhir dikembalikan ("setelah 5 percobaan: ...", penyebab tetap dapat ditelusuri lewat `errors.Is`) dan `RunAPI` keluar `ExitFailed` sebelum port di-bind; API tidak pernah melayani request dengan katalog atau role sistem yang belum sinkron. Butir 11 tetap berlaku; yang berubah hanya gangguan dependensi yang bersifat sementara. Setiap kegagalan yang akan diulang dicatat level warn (nomor percobaan, jeda, galat); keberhasilan sesudah retry dicatat level info.
+    (e) Implementasi: `retryStartup` generik (`internal/app/startup_retry.go`) dan pembungkus `syncAuthorizationWithRetry`; `syncAuthorization` tetap SATU percobaan. `RunAPI` memakai `syncRetryPolicy()` (variabel fungsi; hanya `export_test.go` yang menggantinya dengan kebijakan tanpa jeda sungguhan).
+
+## Konsekuensi bagian 7
+- **KETERBATASAN TERBUKA:** selama retry berjalan port belum di-bind, jadi `/health/*` belum menjawab; ±15 detik (database menolak koneksi) sampai ±165 detik (menggantung) dapat melebihi batas startup probe sebuah orkestrator. Memisahkan "bind dan health dulu, sinkron di latar dengan readiness 503" mengubah urutan butir 7 (autentikasi dirakit sesudah sinkron) dan belum diputuskan; dicatat untuk M15 (operabilitas).
+- Retry hanya untuk sinkron katalog. Langkah start lain (pembukaan pool tidak memblokir menunggu server siap; `newAuthzStack` tanpa I/O) tidak membutuhkannya.
+- Kebijakan produksi dipin tes (`TestDefaultSyncRetryPinsTheBoundedBackoff`); alur ujung-ke-ujung dengan jeda sungguhan tidak diuji (tes `RunAPI` memakai kebijakan instan).
+- **Doc-sync tertunda (tambahan, kumulatif dengan bagian 1–6):** docs/10 §11 dan §15 (perilaku start: retry terbatas lalu keluar `ExitFailed`; catatan batas startup probe).
