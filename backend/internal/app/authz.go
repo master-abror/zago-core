@@ -17,11 +17,13 @@ import (
 // authzStack adalah hasil perakitan Authorization Engine (ADR-0022 bagian 3): Authorizer di atas
 // repositori effective permissions (PostgreSQL, otoritatif) dan cache berversi di Redis.
 // invalidator nil bila tanpa Redis (tanpa cache, tidak ada yang perlu dibatalkan); platformEntry
-// nil bila tanpa PostgreSQL.
+// nil bila tanpa PostgreSQL. fieldGuard (ADR-0022 butir 41-43) memakai Authorizer yang sama dan
+// definisi field dari katalog di PostgreSQL.
 type authzStack struct {
 	authorizer    *authzapp.Authorizer
 	invalidator   authzapp.Invalidator
 	platformEntry *authzapp.PlatformEntry
+	fieldGuard    *authzapp.FieldGuard
 }
 
 // newAuthzStack merakit engine. Hanya merakit objek: tidak ada I/O. rdb nil = tanpa cache
@@ -47,7 +49,11 @@ func newAuthzStack(db kernel.DBTX, rdb redis.UniversalClient, log *slog.Logger) 
 	if err != nil {
 		return authzStack{}, fmt.Errorf("rakit platform entry: %w", err)
 	}
-	return authzStack{authorizer: authorizer, invalidator: inv, platformEntry: entry}, nil
+	guard, err := authzapp.NewFieldGuard(authorizer, authzrepo.NewFields(db))
+	if err != nil {
+		return authzStack{}, fmt.Errorf("rakit field guard: %w", err)
+	}
+	return authzStack{authorizer: authorizer, invalidator: inv, platformEntry: entry, fieldGuard: guard}, nil
 }
 
 // entryChecker mengembalikan PlatformEntryChecker untuk AuthService, atau interface nil bila tidak
