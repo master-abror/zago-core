@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c)
 
 #### Added
 - `internal/permission`: katalog permission core (41 kode, docs/06 §5.4), validasi kode, sinkron tanpa hapus (orphan dilaporkan).
@@ -27,7 +27,10 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `internal/policy`: bahasa ekspresi policy (tokenizer dan parser tulis tangan, tanpa `eval`; akar `resource`/`current_user`/`scope`; daftar putih fungsi; pengetikan ketat; hubung-singkat; batas panjang/token/kedalaman/langkah/ukuran) dengan uji fuzz; `Evaluate` (policy hanya membatasi: `deny` true atau `allow` false menolak, galat menolak, `Resource` nil menunda policy yang butuh sumber daya).
 - `authorization/application.Authorizer.WithPolicies` dan `PolicySource`: policy diterapkan setelah permission terbukti; atribut inti sumber daya menimpa `Attrs`; `Decision.PolicyCode` dan `Decision.DeferredPolicies`; `authorization/repository.Policies` (policy aktif global + organisasi per aksi); perakitan di `internal/app` (dijaga tes `PoliciesEnabled`).
 - Kode error `policy_evaluation_failed` (403); penolakan policy tampil ke klien sebagai `permission_denied` biasa, kode policy hanya di metadata audit `authz.access_denied`.
-- ADR-0022 (bagian 1–5).
+- `authorization/domain`: field permission (docs/06 §7): `FieldCode`, `FieldRules` (definisi field terbatas dari kode katalog `<tipe>.field.<nama>.<read|write>`; baca dan tulis terpisah, default tolak) dan `FieldFilter` (`Apply` menjatuhkan field terbatas yang tidak boleh dibaca: absen, bukan null; `CheckWrite` menolak penulisannya dengan `FieldDeniedError`; pencocokan kunci gagal-tertutup; izin level group hanya untuk grup aktif; organisasi sumber daya harus sama dengan scope).
+- `authorization/repository.Fields` (definisi field dari katalog `permissions` dengan `starts_with`, tanpa cache) dan `authorization/application.FieldGuard` (`For`, `Filter`, `CheckWrite`; himpunan izin lewat jalur yang sama dengan `Can`; kegagalan memuat definisi atau izin = galat, tidak pernah tanpa pembatasan); dirakit di `newAuthzStack` dan dijaga tes. Belum dipakai handler mana pun (belum ada endpoint).
+- Kode error `field_permission_denied` (403) dan `authzhttp.FieldError` (respons tanpa nama field dan tanpa penyebab).
+- ADR-0022 (bagian 1–6).
 
 #### Changed
 - `ErrInvalidScope` dari resolver di middleware `Scope` kini 500 (sebelumnya 503).
