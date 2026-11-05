@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a)
 
 #### Added
 - `internal/permission`: katalog permission core (41 kode, docs/06 §5.4), validasi kode, sinkron tanpa hapus (orphan dilaporkan).
@@ -31,7 +31,8 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `authorization/repository.Fields` (definisi field dari katalog `permissions` dengan `starts_with`, tanpa cache) dan `authorization/application.FieldGuard` (`For`, `Filter`, `CheckWrite`; himpunan izin lewat jalur yang sama dengan `Can`; kegagalan memuat definisi atau izin = galat, tidak pernah tanpa pembatasan); dirakit di `newAuthzStack` dan dijaga tes. Belum dipakai handler mana pun (belum ada endpoint).
 - Kode error `field_permission_denied` (403) dan `authzhttp.FieldError` (respons tanpa nama field dan tanpa penyebab).
 - `internal/app`: retry terbatas sinkron katalog saat start (5 percobaan, backoff 1/2/4/8 detik, batas 30 detik per percobaan; konflik kode core, kegagalan merakit syncer, dan pembatalan konteks tidak diulang).
-- ADR-0022 (bagian 1–7).
+- `authorization/domain`: authority ceiling (`GrantTarget`, `CheckCeiling`, `CeilingError`; docs/06 §5.3) dan aturan assignment murni (`ValidateAssignment`, `CheckRevocation`, `CheckRoleMutable`, `ValidateRoleBoundary`; ADR-0022 butir 9, 47-49): super-admin hanya di platform dan hanya super-admin di platform, template sistem hanya di scope-nya, role non-sistem di dalam boundary, role sistem tidak dapat diubah, super-admin platform terakhir tidak dapat dicabut. Belum ada pemakai (T5b).
+- ADR-0022 (bagian 1–8).
 
 #### Changed
 - `ErrInvalidScope` dari resolver di middleware `Scope` kini 500 (sebelumnya 503).
