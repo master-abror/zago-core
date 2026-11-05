@@ -166,7 +166,8 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 
 	// Katalog permission core dan role sistem disinkronkan dari kode ke database SEKALI saat start,
 	// sebelum autentikasi dirakit (ADR-0022 butir 7). Hanya bila pool nyata ada: di tes dengan fake
-	// tanpa pool, langkah ini dilewati. Galat = ExitFailed: API yang berjalan dengan katalog atau
+	// tanpa pool, langkah ini dilewati. Kegagalan dependensi diulang terbatas dengan backoff (T4d,
+	// ADR-0022 butir 46). Galat sesudah itu = ExitFailed: API yang berjalan dengan katalog atau
 	// role yang tidak sinkron akan menolak (atau lebih buruk, menerima) request secara keliru.
 	var authz authzStack
 	if appPool != nil {
@@ -175,7 +176,7 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 			log.Error("gagal merakit otorisasi", "error", err)
 			return ExitFailed
 		}
-		if err = syncAuthorization(ctx, appPool, authz.invalidator, log); err != nil {
+		if err = syncAuthorizationWithRetry(ctx, appPool, authz.invalidator, log, syncRetryPolicy()); err != nil {
 			log.Error("gagal menyinkronkan katalog otorisasi", "error", err)
 			return ExitFailed
 		}

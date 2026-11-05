@@ -72,10 +72,12 @@ func (s authzStack) entryChecker() authsvc.PlatformEntryChecker {
 // tidak ada lagi di katalog (orphan) hanya dilaporkan dan tidak pernah dihapus otomatis.
 // inv (boleh nil) menaikkan versi platform cache bila sinkron mengubah sesuatu; kegagalannya hanya
 // di-log dan tidak menggagalkan start (ADR-0022 butir 21).
+// Fungsi ini SATU percobaan; retry terbatas saat start ada di syncAuthorizationWithRetry (T4d,
+// ADR-0022 butir 46).
 func syncAuthorization(ctx context.Context, db authzapp.Beginner, inv authzapp.Invalidator, log *slog.Logger) error {
 	syncer, err := authzapp.NewDefaultSyncer()
 	if err != nil {
-		return fmt.Errorf("rakit syncer otorisasi: %w", err)
+		return fmt.Errorf("rakit syncer otorisasi: %w: %w", errSyncSetup, err)
 	}
 	if inv != nil {
 		syncer = syncer.WithInvalidator(inv, log)
