@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1; ◆CP4 tercapai, berikutnya T5b2-T5b4 repositori tulis, T5c-T5e)
 
 #### Added
 - `internal/permission`: katalog permission core (41 kode, docs/06 §5.4), validasi kode, sinkron tanpa hapus (orphan dilaporkan).
