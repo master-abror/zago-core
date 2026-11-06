@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1)
 
 #### Added
 - `internal/permission`: katalog permission core (41 kode, docs/06 §5.4), validasi kode, sinkron tanpa hapus (orphan dilaporkan).
@@ -32,10 +32,13 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - Kode error `field_permission_denied` (403) dan `authzhttp.FieldError` (respons tanpa nama field dan tanpa penyebab).
 - `internal/app`: retry terbatas sinkron katalog saat start (5 percobaan, backoff 1/2/4/8 detik, batas 30 detik per percobaan; konflik kode core, kegagalan merakit syncer, dan pembatalan konteks tidak diulang).
 - `authorization/domain`: authority ceiling (`GrantTarget`, `CheckCeiling`, `CeilingError`; docs/06 §5.3) dan aturan assignment murni (`ValidateAssignment`, `CheckRevocation`, `CheckRoleMutable`, `ValidateRoleBoundary`; ADR-0022 butir 9, 47-49): super-admin hanya di platform dan hanya super-admin di platform, template sistem hanya di scope-nya, role non-sistem di dalam boundary, role sistem tidak dapat diubah, super-admin platform terakhir tidak dapat dicabut. Belum ada pemakai (T5b).
-- ADR-0022 (bagian 1–8).
+- `policy`: validasi tulis (`Draft`, `Validate`, `ActionCatalog`, `CheckPolicyCount`): ekspresi lolos `Parse`, actions 1..50 tanpa duplikat dan WAJIB ada di katalog (wildcard hanya untuk resource yang ada), kode/nama/deskripsi/efek, batas policy aktif 50 per organisasi + 50 global (<= `MaxPoliciesPerCheck`). Belum ada pemanggil (repositori tulis di T5b4).
+- `permission.ValidateDeclaration`: kode dengan segmen `field` di posisi ketiga dari kanan hanya boleh beraksi read atau write; dipakai `permission.Sync`.
+- ADR-0022 (bagian 1–9).
 
 #### Changed
 - `ErrInvalidScope` dari resolver di middleware `Scope` kini 500 (sebelumnya 503).
+- Deklarasi kode field dengan aksi selain read/write di katalog core kini menggagalkan `Sync` saat start (tidak di-retry, ADR-0022 butir 52).
 - API tidak lagi start bila database tidak terjangkau saat startup (galat sinkron otorisasi sesudah retry terbatas = `ExitFailed`); sebelumnya hanya `/health/ready` yang 503.
 
 ### M03 — Authentication (2026-10-29; tag `m03-done`)
