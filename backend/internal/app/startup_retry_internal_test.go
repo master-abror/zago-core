@@ -291,6 +291,8 @@ func TestSyncRetryableClassification(t *testing.T) {
 		{name: "galat koneksi biasa", err: errRetryBoom, want: true},
 		{name: "batas waktu percobaan", err: context.DeadlineExceeded, want: true},
 		{name: "konflik kode core", err: fmt.Errorf("sinkron: %w", permission.ErrCodeConflict), want: false},
+		{name: "kode katalog tidak sah", err: fmt.Errorf("sinkron: %w", permission.ErrInvalidCode), want: false},
+		{name: "deklarasi kode field rusak", err: fmt.Errorf("sinkron: %w", permission.ErrInvalidFieldDeclaration), want: false},
 		{name: "syncer tidak dapat dirakit", err: fmt.Errorf("rakit syncer otorisasi: %w: %w", errSyncSetup, errRetryBoom), want: false},
 	}
 	for _, c := range cases {

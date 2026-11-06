@@ -49,7 +49,7 @@ func Sync(ctx context.Context, tx pgx.Tx, defs []Def) (SyncResult, error) {
 	codes := make([]string, 0, len(defs))
 	seen := make(map[string]bool, len(defs))
 	for _, d := range defs {
-		if _, _, err := Split(d.Code); err != nil {
+		if err := ValidateDeclaration(d.Code); err != nil {
 			return SyncResult{}, err
 		}
 		if seen[d.Code] {

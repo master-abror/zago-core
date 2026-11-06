@@ -16,10 +16,15 @@ var errSyncSetup = errors.New("syncer otorisasi tidak dapat dirakit")
 
 // syncRetryable memutuskan apakah kegagalan sinkron katalog layak diulang (ADR-0022 butir 46).
 // Yang tidak diulang hanyalah yang terbukti deterministik: kode core yang dimiliki modul
-// (permission.ErrCodeConflict) dan kegagalan merakit syncer. Selain itu, termasuk galat yang
-// tidak dikenal, diulang: ruginya paling banyak jeda total kebijakan sebelum ExitFailed.
+// (permission.ErrCodeConflict), kode katalog yang tidak sah atau deklarasi kode field yang rusak
+// (ErrInvalidCode, ErrInvalidFieldDeclaration: cacat kode, bukan gangguan dependensi), dan
+// kegagalan merakit syncer. Selain itu, termasuk galat yang tidak dikenal, diulang: ruginya
+// paling banyak jeda total kebijakan sebelum ExitFailed.
 func syncRetryable(err error) bool {
-	return !errors.Is(err, permission.ErrCodeConflict) && !errors.Is(err, errSyncSetup)
+	return !errors.Is(err, permission.ErrCodeConflict) &&
+		!errors.Is(err, permission.ErrInvalidCode) &&
+		!errors.Is(err, permission.ErrInvalidFieldDeclaration) &&
+		!errors.Is(err, errSyncSetup)
 }
 
 // defaultSyncRetry adalah kebijakan start API: 5 percobaan dengan jeda 1, 2, 4, lalu 8 detik
