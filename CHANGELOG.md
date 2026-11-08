@@ -4,9 +4,11 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1, T5b2; berikutnya T5b3-T5b4 repositori tulis assignment dan policy, T5c-T5e)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1, T5b2, T5b3; berikutnya T5b4 repositori tulis policy, T5c-T5e)
 
 #### Added
+- `authorization/application.AssignmentWriter` (T5b3, ADR-0022 butir 56-58): buat dan cabut assignment dalam satu transaksi (advisory lock organisasi atau platform sebagai langkah pertama, dipilih dari scope pemberi; batas scope, role, `ValidateAssignment`, authority ceiling atas himpunan pemberi dari PostgreSQL di transaksi, verifikasi subjek/grup di database, duplikat dua bentuk scope organisasi, invalidasi cache, audit `role_assignment.create|revoke` dengan penolakan kebijakan `denied` di transaksi terpisah, event `authz.role_assignment.created|revoked`; super-admin platform terakhir tidak dapat dicabut, hitungan di bawah kunci platform).
+- `authorization/repository.Assignments` (T5b3): SQL tulis assignment (`Role`, `UserActive`, `OrganizationMember`, `OrganizationActive`, `ActiveDuplicate`, `Insert`, `ForUpdate` dengan filter tenant, `Revoke`, `ActiveSuperAdmins`) dan `authorization/domain` `AssignmentRecord`, `ScopeColumns`, `TargetFromColumns`, galat sentinel `ErrAssignmentNotFound|Revoked|Exists` dan `ErrSubjectNotFound`.
 - `authorization/application.RoleWriter` (T5b2, ADR-0022 butir 53-55): buat, ubah nama/deskripsi, arsipkan role, dan `PUT` set permission dalam satu transaksi (advisory lock organisasi, himpunan pemberi dari PostgreSQL di transaksi, boundary + authority ceiling atas gabungan himpunan lama dan baru, audit, event outbox, invalidasi cache hanya bila himpunan efektif berubah); role sistem tidak pernah berubah; belum dirakit dan belum punya endpoint.
 - `authorization/repository.Roles`, `LockOrganization`/`LockPlatform` (kunci advisory dua-int, hanya di dalam transaksi), `authorization/domain` `NormalizeRoleDraft`/`NormalizePermissionCodes` dan galat sentinel jalur tulis role.
 - `internal/permission`: katalog permission core (41 kode, docs/06 §5.4), validasi kode, sinkron tanpa hapus (orphan dilaporkan).
