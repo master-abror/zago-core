@@ -257,6 +257,488 @@
                 }
             }
         },
+        "/api/v1/permissions": {
+            "get": {
+                "description": "Katalog bersifat global (core dan modul), terurut menurut kode.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Katalog permission",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Nomor halaman (mulai 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Ukuran halaman (bawaan 25, maksimum 100)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_PermissionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/roles": {
+            "get": {
+                "description": "Role sistem ditambah role organisasi pemanggil; scope platform hanya melihat role sistem. Bawaan hanya role aktif.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Daftar role yang terlihat bagi pemanggil",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "active (bawaan), archived, atau all",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Nomor halaman (mulai 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Ukuran halaman (bawaan 25, maksimum 100)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_RoleResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Organisasi berasal dari sesi, bukan dari body. Permission awal tunduk pada authority ceiling pemanggil.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Buat role di organisasi pemanggil",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Role baru",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authzhttp.CreateRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RoleDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed, invalid_scope",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, scope_mismatch, grant_exceeds_authority, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "role_slug_taken",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "permission_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/roles/{id}": {
+            "get": {
+                "description": "Role organisasi lain dan role yang tidak ada sama-sama 404 role_not_found.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Detail satu role beserta permission-nya",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID role",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RoleDetailResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "role_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Role tidak dihapus; role terarsip tidak dapat dikembalikan dan assignment-nya berhenti berlaku. Role sistem tidak dapat diarsipkan.",
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Arsipkan role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID role",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, scope_mismatch, grant_exceeds_authority, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "role_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "role_immutable, role_archived",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "description": "Hanya field yang dikirim yang berubah; slug dan permission tidak dapat diubah di sini. Role sistem tidak dapat diubah.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Ubah nama dan deskripsi role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID role",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Perubahan",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authzhttp.UpdateRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RoleDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, scope_mismatch, grant_exceeds_authority, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "role_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "role_immutable, role_archived",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/roles/{id}/permissions": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Permission yang dipegang satu role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID role",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RolePermissionsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "role_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Himpunan PENUH yang baru; field permissions wajib ada (irisan kosong mencabut semuanya). Authority ceiling berlaku atas gabungan himpunan lama dan baru. Permission role sistem tidak dapat diubah.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Ganti himpunan permission role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID role",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Himpunan permission baru",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authzhttp.SetPermissionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RolePermissionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, scope_mismatch, grant_exceeds_authority, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "role_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "role_immutable, role_archived",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "permission_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/security/events": {
             "get": {
                 "description": "Hanya event milik pemanggil, terbaru dulu, paginasi cursor (meta.pagination). Tidak ada parameter pengguna.",
@@ -549,6 +1031,185 @@
         }
     },
     "definitions": {
+        "authzhttp.CreateRoleRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "Description adalah deskripsi bebas.",
+                    "type": "string"
+                },
+                "group_id": {
+                    "description": "GroupID wajib untuk role bertipe group dan hanya untuk itu.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan role.",
+                    "type": "string"
+                },
+                "permissions": {
+                    "description": "Permissions adalah kode permission awal role.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "slug": {
+                    "description": "Slug adalah pengenal role, unik per organisasi.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type adalah organization, group, atau custom (system ditolak penulis).",
+                    "type": "string"
+                }
+            }
+        },
+        "authzhttp.PermissionResponse": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "description": "Action adalah bagian kode setelah titik terakhir.",
+                    "type": "string"
+                },
+                "code": {
+                    "description": "Code adalah kode lengkap, mis. role.manage.",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "Description adalah uraian permission (string kosong bila tidak ada).",
+                    "type": "string"
+                },
+                "is_system": {
+                    "description": "IsSystem benar untuk permission yang dideklarasikan core.",
+                    "type": "boolean"
+                },
+                "module": {
+                    "description": "Module adalah kode modul pemilik; null untuk permission core.",
+                    "type": "string"
+                },
+                "resource": {
+                    "description": "Resource adalah bagian kode sebelum titik terakhir.",
+                    "type": "string"
+                }
+            }
+        },
+        "authzhttp.RoleDetailResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "Description adalah deskripsi role.",
+                    "type": "string"
+                },
+                "group_id": {
+                    "description": "GroupID terisi untuk role bertipe group, selain itu null.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID adalah id role.",
+                    "type": "string"
+                },
+                "is_system": {
+                    "description": "IsSystem benar untuk role sistem (tidak dapat diubah lewat API).",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan.",
+                    "type": "string"
+                },
+                "permissions": {
+                    "description": "Permissions selalu ada pada respons (irisan kosong, bukan null).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "slug": {
+                    "description": "Slug adalah pengenal role.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active atau archived.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type adalah system, organization, group, atau custom.",
+                    "type": "string"
+                }
+            }
+        },
+        "authzhttp.RolePermissionsResponse": {
+            "type": "object",
+            "properties": {
+                "permissions": {
+                    "description": "Permissions selalu ada pada respons (irisan kosong, bukan null).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "authzhttp.RoleResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "Description adalah deskripsi role.",
+                    "type": "string"
+                },
+                "group_id": {
+                    "description": "GroupID terisi untuk role bertipe group, selain itu null.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID adalah id role.",
+                    "type": "string"
+                },
+                "is_system": {
+                    "description": "IsSystem benar untuk role sistem (tidak dapat diubah lewat API).",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan.",
+                    "type": "string"
+                },
+                "slug": {
+                    "description": "Slug adalah pengenal role.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active atau archived.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type adalah system, organization, group, atau custom.",
+                    "type": "string"
+                }
+            }
+        },
+        "authzhttp.SetPermissionsRequest": {
+            "type": "object",
+            "properties": {
+                "permissions": {
+                    "description": "Permissions adalah himpunan lengkap kode permission; wajib ada (irisan kosong sah dan\nberarti mencabut semuanya, tetapi field yang hilang atau null ditolak supaya body yang\nsalah ketik tidak menghapus seluruh permission role).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "authzhttp.UpdateRoleRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "Description adalah deskripsi baru; string kosong menghapus deskripsi.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama baru.",
+                    "type": "string"
+                }
+            }
+        },
         "backend_internal_auth_transport_http.CSRFResponse": {
             "type": "object",
             "properties": {
@@ -803,6 +1464,34 @@
                 }
             }
         },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_PermissionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/authzhttp.PermissionResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_RoleResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/authzhttp.RoleResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
         "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_auth_transport_http_SecurityEventView": {
             "type": "object",
             "properties": {
@@ -811,6 +1500,28 @@
                     "items": {
                         "$ref": "#/definitions/backend_internal_auth_transport_http.SecurityEventView"
                     }
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RoleDetailResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/authzhttp.RoleDetailResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RolePermissionsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/authzhttp.RolePermissionsResponse"
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
