@@ -4,9 +4,10 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1, T5b2, T5b3, T5b4, T5c1a; berikutnya T5c1b-T5c3 endpoint, T5d perakitan, T5e smoke)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1, T5b2, T5b3, T5b4, T5c1a, T5c1b-1; berikutnya T5c1b-2 sampai T5c3 endpoint, T5d perakitan, T5e smoke)
 
 #### Added
+- Jalur BACA role dan permission (T5c1b-1, ADR-0022 butir 63): `repository.RoleReader` (`List` dengan filter status dan jendela offset, `Get` dengan permission dalam satu pernyataan; role sistem + role organisasi pemanggil, nil = hanya role sistem, role organisasi lain = `ErrRoleNotFound` identik dengan role tidak ada), `repository.PermissionReader.List` (katalog global terurut menurut byte), dan `domain.Window`/`ClampWindow`/`RoleListQuery`/`RolePage`/`PermissionRecord`/`PermissionPage`.
 - `authzhttp.DomainError` (T5c1a, ADR-0022 butir 62): memetakan galat `RoleWriter`, `AssignmentWriter`, `PolicyWriter`, dan validasi policy ke satu respons HTTP (galat pemrograman 500, kode langsung, galat masukan 400 `validation_failed` dengan satu entri `details.fields`, selain itu 503 gagal-tertutup); respons tidak memuat nilai klien, daftar permission yang kurang, indeks, atau posisi ekspresi.
 - Kode error baru di `authzhttp` (T5c1a): `role_not_found` 404, `permission_not_found` 422, `grant_exceeds_authority` 403, `invalid_scope` 400, dan 409 `role_slug_taken`, `role_immutable`, `role_archived`, `assignment_exists`, `assignment_revoked`, `last_super_admin`, `policy_code_taken`, `policy_limit_reached`.
 - DTO role di `authzhttp` (T5c1a): `CreateRoleRequest`, `UpdateRoleRequest` (PATCH, menolak perubahan kosong), `SetPermissionsRequest` (PUT, field `permissions` wajib ada), `RoleResponse`, `RoleDetailResponse`; tanpa `organization_id` atau scope (field itu ditolak `unknown_field`).
