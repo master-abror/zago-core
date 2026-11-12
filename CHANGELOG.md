@@ -4,9 +4,10 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1, T5b2, T5b3, T5b4, T5c1a, T5c1b-1, T5c1b-2; berikutnya T5c2a sampai T5c3 endpoint, T5d perakitan, T5e smoke)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1, T5b2, T5b3, T5b4, T5c1a, T5c1b; berikutnya T5c2a sampai T5c3 endpoint, T5d perakitan, T5e smoke)
 
 #### Added
+- Swagger (T5c1b): operasi role dan permission di `docs/api/swagger.json` (hasil `make generate` dari anotasi handler; commit `chore(generate)`).
 - `authzhttp.RoleHandlers` (T5c1b-2, ADR-0022 butir 64): handler `GET`/`POST /roles`, `GET`/`PATCH`/`DELETE /roles/{id}`, `GET`/`PUT /roles/{id}/permissions`, `GET /permissions`; `Mount` memasang `Authorize` per rute (`role.read`, `role.manage`, `permission.assign`, `permission.read`) dan panik tanpa `authorize`; `Grantor` hanya dari `Identity` dan `ScopeContext`; paginasi offset (`page`, `per_page`, `meta.pagination`); `PermissionResponse`, `RolePermissionsResponse`. Belum dirakit di `internal/app` (T5d).
 - Jalur BACA role dan permission (T5c1b-1, ADR-0022 butir 63): `repository.RoleReader` (`List` dengan filter status dan jendela offset, `Get` dengan permission dalam satu pernyataan; role sistem + role organisasi pemanggil, nil = hanya role sistem, role organisasi lain = `ErrRoleNotFound` identik dengan role tidak ada), `repository.PermissionReader.List` (katalog global terurut menurut byte), dan `domain.Window`/`ClampWindow`/`RoleListQuery`/`RolePage`/`PermissionRecord`/`PermissionPage`.
 - `authzhttp.DomainError` (T5c1a, ADR-0022 butir 62): memetakan galat `RoleWriter`, `AssignmentWriter`, `PolicyWriter`, dan validasi policy ke satu respons HTTP (galat pemrograman 500, kode langsung, galat masukan 400 `validation_failed` dengan satu entri `details.fields`, selain itu 503 gagal-tertutup); respons tidak memuat nilai klien, daftar permission yang kurang, indeks, atau posisi ekspresi.
