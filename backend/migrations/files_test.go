@@ -22,7 +22,7 @@ var wantOrder = []string{
 	"021_password_reset_tokens", "022_notifications", "023_inbox_items", "024_conversations",
 	"025_conversation_members", "026_messages", "027_message_reads", "028_message_reactions",
 	"029_attachments", "030_activities", "031_system_logs", "032_outbox_events", "033_grants",
-	"034_policies_actions",
+	"034_policies_actions", "035_role_assignments_unique_org",
 }
 
 func TestMigrationFilesMatchDocumentedOrderAndArePaired(t *testing.T) {
