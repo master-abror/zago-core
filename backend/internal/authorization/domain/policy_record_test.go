@@ -115,3 +115,12 @@ func TestCheckPolicyActionsFailsClosedOnMalformedActions(t *testing.T) {
 		require.NotErrorIs(t, err, domain.ErrProtectedPolicyAction, "%q", bad)
 	}
 }
+
+func TestValidPolicyFilterAcceptsAllAndStatusesOnly(t *testing.T) {
+	for _, ok := range []string{domain.PolicyFilterAll, domain.PolicyActive, domain.PolicyDisabled} {
+		require.True(t, domain.ValidPolicyFilter(ok), ok)
+	}
+	for _, bad := range []string{"", "ACTIVE", "archived", "bogus", " all"} {
+		require.False(t, domain.ValidPolicyFilter(bad), bad)
+	}
+}
