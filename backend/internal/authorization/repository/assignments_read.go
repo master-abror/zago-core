@@ -17,7 +17,7 @@ import (
 // "semua assignment".
 var errUnknownAssignmentFilter = errors.New("authorization: filter status assignment tidak dikenal")
 
-// AssignmentReader membaca role_assignments untuk GET /role-assignments (ADR-0022 butir 65).
+// AssignmentReader membaca role_assignments untuk GET /role-assignments (ADR-0022 butir 66).
 // Berbeda dari role, TIDAK ada jalur lain yang melindungi baca assignment, jadi setiap kueri
 // memfilter organisasi sendiri: parameter organizationID adalah organisasi dari ScopeContext;
 // tenant hanya melihat assignment organisasinya dan nil (scope platform) hanya assignment platform

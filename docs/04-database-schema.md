@@ -491,6 +491,8 @@ CREATE UNIQUE INDEX uq_role_assignments_active ON role_assignments
     WHERE revoked_at IS NULL;
 ```
 
+**Amended by migration 035 (ADR-0022 item 65).** The index above lacked `organization_id`: the canonical organization-scope form stores `scope_id` NULL, so the same system role for the same user in two organizations collided and was misreported as a duplicate. Migration `035_role_assignments_unique_org` replaces the index under the same name with `COALESCE(organization_id, '00000000-0000-0000-0000-000000000000'::uuid)` added to the key (before the `scope_id` term). The `scope_id` NULL form and the `scope_id` = organization form remain two distinct keys; the application's `ActiveDuplicate` check covers both forms.
+
 `subject_id` is intentionally not a foreign key — it can point at `users`, `groups`, or `organizations` depending on `subject_type` (03 §15). Existence and same-organization are verified in the application's `role_assignment` service inside the granting transaction. This is the one deliberate exception to "the database enforces referential integrity", confined to this single column.
 
 ```sql
@@ -1043,6 +1045,7 @@ Supersedes 03-database-erd.md's first-draft §45:
 032_outbox_events
 033_grants
 034_policies_actions
+035_role_assignments_unique_org
 ```
 
 Each numbered step has a paired `.up.sql` / `.down.sql`. A module's own tables (e.g. `announcements_posts`) are **never** part of core's sequence: they use the module's own migration sequence and version table (§15.2), run when that module is installed.
