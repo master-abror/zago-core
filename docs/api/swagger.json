@@ -309,6 +309,212 @@
                 }
             }
         },
+        "/api/v1/role-assignments": {
+            "get": {
+                "description": "Tenant hanya melihat assignment organisasinya; scope platform hanya assignment platform. Bawaan hanya yang berlaku (active). Terbaru dulu, paginasi cursor.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Daftar assignment organisasi pemanggil",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "active (bawaan), revoked, expired, atau all",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Saring satu role (UUID)",
+                        "name": "role_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Saring satu subjek (UUID)",
+                        "name": "subject_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Ukuran halaman (bawaan 25, maksimum 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor dari meta.pagination.next_cursor",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_AssignmentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed (parameter salah, invalid_cursor, cursor_mismatch)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Organisasi berasal dari sesi, bukan dari body. Pemanggil platform hanya memberi di scope platform; masuk dulu ke organisasi (switch-organization) untuk memberi di sana. Authority ceiling berlaku. Idempotency-Key wajib; kunci yang sama di scope berbeda tidak diputar ulang.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Beri role kepada subjek di scope pemanggil",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Kunci idempotensi (1-128 karakter)",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Assignment baru",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authzhttp.CreateAssignmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_AssignmentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed, invalid_scope",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, scope_mismatch, grant_exceeds_authority, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "role_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "assignment_exists, role_archived, idempotency_in_progress",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "idempotency_key_conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/role-assignments/{id}": {
+            "delete": {
+                "description": "Tenant hanya dapat mencabut assignment organisasinya, platform hanya assignment platform; yang lain sama dengan tidak ada (404). Assignment super-admin platform terakhir tidak dapat dicabut.",
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Cabut assignment di scope pemanggil",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID assignment",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, scope_mismatch, grant_exceeds_authority, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "assignment_revoked, last_super_admin",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/roles": {
             "get": {
                 "description": "Role sistem ditambah role organisasi pemanggil; scope platform hanya melihat role sistem. Bawaan hanya role aktif.",
@@ -1031,6 +1237,96 @@
         }
     },
     "definitions": {
+        "authzhttp.AssignmentResponse": {
+            "type": "object",
+            "properties": {
+                "assigned_by": {
+                    "description": "AssignedBy adalah pemberi; null bila tidak tercatat.",
+                    "type": "string"
+                },
+                "created_at": {
+                    "description": "CreatedAt adalah waktu pembuatan.",
+                    "type": "string"
+                },
+                "expires_at": {
+                    "description": "ExpiresAt adalah masa berlaku; null berarti tidak kedaluwarsa.",
+                    "type": "string"
+                },
+                "group_id": {
+                    "description": "GroupID terisi untuk scope group, selain itu null.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID adalah id assignment.",
+                    "type": "string"
+                },
+                "revoked_at": {
+                    "description": "RevokedAt terisi bila assignment sudah dicabut.",
+                    "type": "string"
+                },
+                "role_id": {
+                    "description": "RoleID adalah role yang diberikan.",
+                    "type": "string"
+                },
+                "role_name": {
+                    "description": "RoleName adalah nama role (kosong bila role tidak terbaca).",
+                    "type": "string"
+                },
+                "role_slug": {
+                    "description": "RoleSlug adalah slug role.",
+                    "type": "string"
+                },
+                "role_status": {
+                    "description": "RoleStatus adalah active atau archived.",
+                    "type": "string"
+                },
+                "scope_type": {
+                    "description": "ScopeType adalah platform, organization, atau group.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active, expired, atau revoked pada saat respons dibuat.",
+                    "type": "string"
+                },
+                "subject_id": {
+                    "description": "SubjectID adalah subjek penerima.",
+                    "type": "string"
+                },
+                "subject_type": {
+                    "description": "SubjectType adalah jenis subjek.",
+                    "type": "string"
+                }
+            }
+        },
+        "authzhttp.CreateAssignmentRequest": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "description": "ExpiresAt adalah masa berlaku (RFC 3339); kosong berarti tanpa masa berlaku.",
+                    "type": "string"
+                },
+                "group_id": {
+                    "description": "GroupID wajib untuk scope group dan hanya untuk itu.",
+                    "type": "string"
+                },
+                "role_id": {
+                    "description": "RoleID adalah role yang diberikan.",
+                    "type": "string"
+                },
+                "scope_type": {
+                    "description": "ScopeType adalah platform, organization, atau group. Organisasi scope diambil dari sesi.",
+                    "type": "string"
+                },
+                "subject_id": {
+                    "description": "SubjectID adalah subjek penerima.",
+                    "type": "string"
+                },
+                "subject_type": {
+                    "description": "SubjectType adalah jenis subjek (nilai sah dinilai penulis).",
+                    "type": "string"
+                }
+            }
+        },
         "authzhttp.CreateRoleRequest": {
             "type": "object",
             "properties": {
@@ -1464,6 +1760,20 @@
                 }
             }
         },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_AssignmentResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/authzhttp.AssignmentResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
         "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_PermissionResponse": {
             "type": "object",
             "properties": {
@@ -1500,6 +1810,17 @@
                     "items": {
                         "$ref": "#/definitions/backend_internal_auth_transport_http.SecurityEventView"
                     }
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_AssignmentResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/authzhttp.AssignmentResponse"
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
