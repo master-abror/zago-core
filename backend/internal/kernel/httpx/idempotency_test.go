@@ -379,3 +379,96 @@ func TestIdempotencyExpiredLockOwnerCannotOverwriteNewerResult(t *testing.T) {
 	require.Equal(t, "true", c.Header().Get("Idempotent-Replayed"))
 	require.Equal(t, `{"n":2}`, c.Body.String(), "hasil B tidak boleh tertimpa A")
 }
+
+// Scope idempotensi (ADR-0022 butir 67): pemanggil yang sama di dua scope berbeda tidak boleh
+// memutar ulang respons milik scope lain.
+
+func scopeFromHeader(r *http.Request) (string, bool) {
+	s := r.Header.Get("X-Test-Scope")
+	return s, s != ""
+}
+
+func idemDoScope(h http.Handler, user, scope, key, body string) *httptest.ResponseRecorder {
+	r := httptest.NewRequest(http.MethodPost, "/things", strings.NewReader(body))
+	r = r.WithContext(logger.WithRequestID(r.Context(), "req-idem"))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("X-Test-User", user)
+	r.Header.Set("X-Test-Scope", scope)
+	r.Header.Set("Idempotency-Key", key)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, r)
+	return rec
+}
+
+// KONTROL: tanpa opsi Scope, user dan kunci dan body yang sama di scope berbeda mendapat replay.
+// Tes ini membuktikan risiko yang ditutup opsi Scope; bila kelak gagal, kuncinya berubah dan
+// perakit tidak perlu lagi mengisi Scope (periksa ADR-0022 butir 67 sebelum menghapusnya).
+func TestIdempotencyWithoutScopeReplaysAcrossScopes(t *testing.T) {
+	var calls atomic.Int32
+	h := newIdempotency(t, testRedis(t), nil).Require()(countingHandler(&calls))
+
+	first := idemDoScope(h, "user-1", "org-a", "key-0001", `{"a":1}`)
+	second := idemDoScope(h, "user-1", "org-b", "key-0001", `{"a":1}`)
+	require.Equal(t, http.StatusCreated, first.Code)
+	require.Equal(t, "true", second.Header().Get("Idempotent-Replayed"))
+	require.Equal(t, first.Body.String(), second.Body.String())
+	require.EqualValues(t, 1, calls.Load())
+}
+
+func TestIdempotencyScopeKeepsReplaysInsideOneScope(t *testing.T) {
+	var calls atomic.Int32
+	i := newIdempotency(t, testRedis(t), func(o *httpx.IdempotencyOptions) { o.Scope = scopeFromHeader })
+	h := i.Require()(countingHandler(&calls))
+
+	a1 := idemDoScope(h, "user-1", "org-a", "key-0001", `{"a":1}`)
+	b1 := idemDoScope(h, "user-1", "org-b", "key-0001", `{"a":1}`)
+	require.Equal(t, http.StatusCreated, a1.Code)
+	require.Equal(t, http.StatusCreated, b1.Code)
+	require.Empty(t, b1.Header().Get("Idempotent-Replayed"), "scope lain harus dieksekusi, bukan diputar ulang")
+	require.Contains(t, a1.Body.String(), `"n":1`)
+	require.Contains(t, b1.Body.String(), `"n":2`)
+	require.EqualValues(t, 2, calls.Load())
+
+	a2 := idemDoScope(h, "user-1", "org-a", "key-0001", `{"a":1}`)
+	b2 := idemDoScope(h, "user-1", "org-b", "key-0001", `{"a":1}`)
+	require.Equal(t, "true", a2.Header().Get("Idempotent-Replayed"))
+	require.Equal(t, "true", b2.Header().Get("Idempotent-Replayed"))
+	require.Equal(t, a1.Body.String(), a2.Body.String())
+	require.Equal(t, b1.Body.String(), b2.Body.String())
+	require.EqualValues(t, 2, calls.Load())
+}
+
+func TestIdempotencyScopeIsPartOfTheRedisKey(t *testing.T) {
+	rdb := testRedis(t)
+	var calls atomic.Int32
+	i := newIdempotency(t, rdb, func(o *httpx.IdempotencyOptions) { o.Scope = scopeFromHeader })
+	h := i.Require()(countingHandler(&calls))
+	require.Equal(t, http.StatusCreated, idemDoScope(h, "user-1", "org-a", "key-0001", `{}`).Code)
+
+	keys, err := rdb.Keys(context.Background(), "idem:*").Result()
+	require.NoError(t, err)
+	require.Equal(t, []string{"idem:user-1:org-a:POST:/things:key-0001"}, keys)
+}
+
+// Scope tak tersedia = gagal-tertutup: handler tidak dieksekusi dan tidak ada kunci yang ditulis.
+func TestIdempotencyScopeUnavailableFailsClosed(t *testing.T) {
+	rdb := testRedis(t)
+	var calls atomic.Int32
+
+	missing := newIdempotency(t, rdb, func(o *httpx.IdempotencyOptions) { o.Scope = scopeFromHeader })
+	rec := idemDoScope(missing.Require()(countingHandler(&calls)), "user-1", "", "key-0001", `{}`)
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Equal(t, "internal_error", errorCode(t, rec))
+
+	empty := newIdempotency(t, rdb, func(o *httpx.IdempotencyOptions) {
+		o.Scope = func(*http.Request) (string, bool) { return "", true }
+	})
+	rec = idemDoScope(empty.Require()(countingHandler(&calls)), "user-1", "org-a", "key-0001", `{}`)
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Equal(t, "internal_error", errorCode(t, rec))
+
+	require.EqualValues(t, 0, calls.Load())
+	keys, err := rdb.Keys(context.Background(), "idem:*").Result()
+	require.NoError(t, err)
+	require.Empty(t, keys)
+}
