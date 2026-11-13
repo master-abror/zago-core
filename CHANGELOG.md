@@ -4,9 +4,10 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1, T5b2, T5b3, T5b4, T5c1a, T5c1b; berikutnya T5c2a sampai T5c3 endpoint, T5d perakitan, T5e smoke)
+### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1, T5b2, T5b3, T5b4, T5c1a, T5c1b, T5c2a-1, migrasi 035; berikutnya T5c2a-2 sampai T5c3 endpoint, T5d perakitan, T5e smoke)
 
 #### Added
+- Jalur BACA assignment (T5c2a-1, ADR-0022 butir 66): `repository.AssignmentReader.List` (filter organisasi wajib: tenant hanya assignment organisasinya, platform hanya assignment platform; filter `status`/`role_id`/`subject_id`; keyset `(created_at, id)` menurun; ringkasan role; scope `resource`/`own` tidak terlihat) dan tipe baca di `authorization/domain` (`AssignmentListQuery`, `AssignmentPosition`, `AssignmentView`, `AssignmentRecord.State`, `ClampAssignmentLimit`). Belum ada handler atau rute (T5c2a-2).
 - Migrasi `035_role_assignments_unique_org` (ADR-0022 butir 65): `uq_role_assignments_active` kini memuat `organization_id`; sebelumnya role sistem yang sama untuk user yang sama di dua organisasi bertabrakan (409 `assignment_exists` palsu). Down gagal dengan pesan terbaca bila ada assignment aktif identik lintas organisasi. Tes: tiga tes migrasi dan satu tes repositori.
 - Swagger (T5c1b): operasi role dan permission di `docs/api/swagger.json` (hasil `make generate` dari anotasi handler; commit `chore(generate)`).
 - `authzhttp.RoleHandlers` (T5c1b-2, ADR-0022 butir 64): handler `GET`/`POST /roles`, `GET`/`PATCH`/`DELETE /roles/{id}`, `GET`/`PUT /roles/{id}/permissions`, `GET /permissions`; `Mount` memasang `Authorize` per rute (`role.read`, `role.manage`, `permission.assign`, `permission.read`) dan panik tanpa `authorize`; `Grantor` hanya dari `Identity` dan `ScopeContext`; paginasi offset (`page`, `per_page`, `meta.pagination`); `PermissionResponse`, `RolePermissionsResponse`. Belum dirakit di `internal/app` (T5d).
