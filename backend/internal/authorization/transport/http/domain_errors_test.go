@@ -126,6 +126,9 @@ func TestDomainErrorMapsInputErrorsToOneFieldEach(t *testing.T) {
 		{domain.ErrProtectedPolicyAction, "actions", "protected"},
 		{domain.ErrInvalidPolicyStatus, "status", "invalid"},
 		{domain.ErrEmptyPolicyPatch, "", "empty_patch"},
+		{domain.ErrSimulationTargetNotFound, "user_id", "not_found"},
+		{domain.ErrInvalidSimulationAttrs, "resource.attrs", "invalid"},
+		{domain.ErrReservedSimulationAttr, "resource.attrs", "reserved"},
 	}
 	for _, c := range cases {
 		got := authzhttp.DomainError(fmt.Errorf("validasi: %w", c.err))

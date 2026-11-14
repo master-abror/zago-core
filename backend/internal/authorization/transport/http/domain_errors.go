@@ -80,6 +80,9 @@ var fieldRules = []fieldRule{
 	{domain.ErrProtectedPolicyAction, "actions", "protected", "Policy management actions cannot be restricted by a policy."},
 	{domain.ErrInvalidPolicyStatus, "status", "invalid", "The policy status is invalid."},
 	{domain.ErrEmptyPolicyPatch, "", "empty_patch", "The request changes nothing."},
+	{domain.ErrSimulationTargetNotFound, "user_id", "not_found", "The user was not found."},
+	{domain.ErrInvalidSimulationAttrs, "resource.attrs", "invalid", "The resource attributes are invalid."},
+	{domain.ErrReservedSimulationAttr, "resource.attrs", "reserved", "A resource attribute name is reserved."},
 }
 
 // DomainError memetakan galat jalur pengelolaan otorisasi (RoleWriter, AssignmentWriter,
