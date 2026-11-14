@@ -309,6 +309,205 @@
                 }
             }
         },
+        "/api/v1/policies": {
+            "get": {
+                "description": "Pemanggil tenant melihat policy organisasinya dan policy global (global=true, hanya-baca); scope platform hanya policy global. Bawaan memuat policy aktif dan nonaktif.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Daftar policy yang terlihat bagi pemanggil",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "all (bawaan), active, atau disabled",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Nomor halaman (bawaan 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Ukuran halaman (bawaan 25, maksimum 100)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_PolicyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Pemanggil tenant membuat policy organisasinya; pemanggil platform membuat policy global; pemanggil dengan grup aktif ditolak. Policy hanya membatasi (deny menolak, allow menjadi syarat tambahan); aksi policy.* tidak dapat dibatasi. Batas 50 policy aktif per cakupan.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Buat policy",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Policy baru",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authzhttp.CreatePolicyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_PolicyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, scope_mismatch, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "policy_code_taken, policy_limit_reached",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/policies/{id}": {
+            "patch": {
+                "description": "Field yang tidak dikirim tidak diubah; kode dan cakupan tidak dapat diubah. Menonaktifkan selalu boleh; mengaktifkan kembali tunduk pada batas 50. Policy global dari pemanggil tenant sama dengan tidak ada (404).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Ubah sebagian policy",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID policy",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Perubahan",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authzhttp.UpdatePolicyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_PolicyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed (termasuk empty_patch)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, scope_mismatch, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "policy_limit_reached",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/role-assignments": {
             "get": {
                 "description": "Tenant hanya melihat assignment organisasinya; scope platform hanya assignment platform. Bawaan hanya yang berlaku (active). Terbaru dulu, paginasi cursor.",
@@ -1327,6 +1526,42 @@
                 }
             }
         },
+        "authzhttp.CreatePolicyRequest": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "description": "Actions adalah kode permission yang dibatasi policy ini (juga \"resource.*\"); wajib, tidak kosong.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "code": {
+                    "description": "Code adalah kode unik pada cakupannya (huruf kecil, angka, titik, garis bawah).",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "Description adalah deskripsi bebas (boleh kosong).",
+                    "type": "string"
+                },
+                "effect": {
+                    "description": "Effect adalah allow atau deny.",
+                    "type": "string"
+                },
+                "expression": {
+                    "description": "Expression adalah ekspresi policy (bahasa ekspresi internal/policy).",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active (bawaan bila kosong) atau disabled.",
+                    "type": "string"
+                }
+            }
+        },
         "authzhttp.CreateRoleRequest": {
             "type": "object",
             "properties": {
@@ -1384,6 +1619,58 @@
                 },
                 "resource": {
                     "description": "Resource adalah bagian kode sebelum titik terakhir.",
+                    "type": "string"
+                }
+            }
+        },
+        "authzhttp.PolicyResponse": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "description": "Actions adalah kode permission yang dibatasi (tidak pernah null).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "code": {
+                    "description": "Code adalah kode policy.",
+                    "type": "string"
+                },
+                "created_at": {
+                    "description": "CreatedAt adalah waktu pembuatan.",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "Description adalah deskripsi (kosong bila tidak ada).",
+                    "type": "string"
+                },
+                "effect": {
+                    "description": "Effect adalah allow atau deny.",
+                    "type": "string"
+                },
+                "expression": {
+                    "description": "Expression adalah ekspresi policy.",
+                    "type": "string"
+                },
+                "global": {
+                    "description": "Global benar untuk policy global.",
+                    "type": "boolean"
+                },
+                "id": {
+                    "description": "ID adalah id policy.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active atau disabled.",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "UpdatedAt adalah waktu perubahan terakhir.",
                     "type": "string"
                 }
             }
@@ -1490,6 +1777,38 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "authzhttp.UpdatePolicyRequest": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "description": "Actions adalah himpunan PENUH yang baru; irisan kosong ditolak penulis.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "description": "Description adalah deskripsi baru; string kosong menghapus deskripsi.",
+                    "type": "string"
+                },
+                "effect": {
+                    "description": "Effect adalah allow atau deny.",
+                    "type": "string"
+                },
+                "expression": {
+                    "description": "Expression adalah ekspresi baru.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama baru.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active atau disabled.",
+                    "type": "string"
                 }
             }
         },
@@ -1788,6 +2107,20 @@
                 }
             }
         },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_PolicyResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/authzhttp.PolicyResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
         "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_RoleResponse": {
             "type": "object",
             "properties": {
@@ -1821,6 +2154,17 @@
             "properties": {
                 "data": {
                     "$ref": "#/definitions/authzhttp.AssignmentResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_PolicyResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/authzhttp.PolicyResponse"
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
