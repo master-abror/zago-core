@@ -309,6 +309,65 @@
                 }
             }
         },
+        "/api/v1/permissions/simulate": {
+            "post": {
+                "description": "Menjalankan Authorizer.Can sungguhan untuk user target di organisasi pemanggil. Target harus anggota aktif organisasi pemanggil; selain itu galat seragam 400 (field user_id, not_found). Pemanggil level group hanya menyimulasikan anggota grup aktifnya. Pemanggil di scope platform ditolak (403 scope_mismatch). policy_code dan deferred_policies hanya terisi bila pemanggil juga memegang policy.read.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization"
+                ],
+                "summary": "Simulasikan keputusan otorisasi untuk satu user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Pertanyaan simulasi",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authzhttp.SimulateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_SimulateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, scope_mismatch, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/policies": {
             "get": {
                 "description": "Pemanggil tenant melihat policy organisasinya dan policy global (global=true, hanya-baca); scope platform hanya policy global. Bawaan memuat policy aktif dan nonaktif.",
@@ -1780,6 +1839,85 @@
                 }
             }
         },
+        "authzhttp.SimulateRequest": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "description": "Action adalah kode permission yang ditanyakan.",
+                    "type": "string"
+                },
+                "active_group_id": {
+                    "description": "ActiveGroupID adalah grup aktif simulasi (opsional). Pemanggil level group hanya boleh\nmengosongkannya atau mengisinya dengan grup aktifnya sendiri.",
+                    "type": "string"
+                },
+                "resource": {
+                    "description": "Resource adalah sumber daya hipotetis (opsional; kosong untuk aksi list/create).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/authzhttp.SimulateResourceRequest"
+                        }
+                    ]
+                },
+                "user_id": {
+                    "description": "UserID adalah user yang disimulasikan; harus anggota aktif organisasi pemanggil.",
+                    "type": "string"
+                }
+            }
+        },
+        "authzhttp.SimulateResourceRequest": {
+            "type": "object",
+            "properties": {
+                "attrs": {
+                    "description": "Attrs adalah atribut tambahan yang dapat dirujuk ekspresi policy: nilai skalar atau daftar\nskalar, paling banyak 32 atribut; nama type, id, organization_id, owner_id, dan group_id\ndicadangkan.",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "group_id": {
+                    "description": "GroupID adalah grup pemilik sumber daya (opsional).",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID adalah id sumber daya.",
+                    "type": "string"
+                },
+                "owner_id": {
+                    "description": "OwnerID adalah pemilik sumber daya (opsional).",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type adalah jenis sumber daya (huruf kecil, angka, garis bawah; diawali huruf).",
+                    "type": "string"
+                }
+            }
+        },
+        "authzhttp.SimulateResponse": {
+            "type": "object",
+            "properties": {
+                "deferred_policies": {
+                    "description": "DeferredPolicies adalah kode policy yang butuh sumber daya tetapi simulasi tanpa resource;\ntidak pernah null, dikosongkan bila pemanggil tidak berhak membaca policy.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "level": {
+                    "description": "Level adalah scope yang memberi izin; null bila ditolak.",
+                    "type": "string"
+                },
+                "policy_code": {
+                    "description": "PolicyCode adalah kode policy yang menolak; null bila tidak ada atau bila pemanggil tidak\nberhak membaca policy (policy.read).",
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "Reason adalah kode alasan stabil: granted, no_permission, scope_mismatch, policy_denied,\natau policy_evaluation_failed.",
+                    "type": "string"
+                },
+                "result": {
+                    "description": "Result adalah ALLOW atau DENY.",
+                    "type": "string"
+                }
+            }
+        },
         "authzhttp.UpdatePolicyRequest": {
             "type": "object",
             "properties": {
@@ -2187,6 +2325,17 @@
             "properties": {
                 "data": {
                     "$ref": "#/definitions/authzhttp.RolePermissionsResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_SimulateResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/authzhttp.SimulateResponse"
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
