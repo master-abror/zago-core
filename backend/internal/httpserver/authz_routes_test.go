@@ -27,7 +27,10 @@ import (
 // ScopeResolver dan Authorizer diganti palsu (yang nyata diuji di paket authorization); yang
 // dibuktikan di sini hanya urutan dan efeknya lewat NewHandler.
 
-const probePath = "/api/v1/_authz/probe"
+const (
+	probeRelative = "/_authz/probe"
+	probePath     = httpserver.APIPrefix + probeRelative
+)
 
 type authzFakeResolver struct {
 	mu    sync.Mutex
@@ -81,7 +84,7 @@ type authzProbe struct {
 }
 
 func (p *authzProbe) Mount(r chi.Router, authorize func(action string) func(http.Handler) http.Handler) {
-	r.With(authorize("role.read")).Get(probePath, func(w http.ResponseWriter, req *http.Request) {
+	r.With(authorize("role.read")).Get(probeRelative, func(w http.ResponseWriter, req *http.Request) {
 		p.mu.Lock()
 		defer p.mu.Unlock()
 		p.reached++
@@ -279,4 +282,48 @@ func TestAuthzNilMounterInRoutesIsSkippedNotPanicking(t *testing.T) {
 
 	rec := e.get(sessionHeaders(tokenA, sessionA)...)
 	require.Equal(t, http.StatusNoContent, rec.Code, "mounter nil dilewati, mounter sesudahnya tetap terpasang")
+}
+
+func passAuthorize(string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler { return next }
+}
+
+// Handler mendaftarkan jalur relatif (/roles) sesuai swagger /api/v1/roles: prefiks harus
+// ditambahkan sekali oleh pemasang, lewat With maupun metode langsung.
+func TestMountAuthzRoutesPrefixesRelativePathsWithAPIV1(t *testing.T) {
+	probe := &authzProbe{}
+	r := chi.NewRouter()
+
+	httpserver.MountAuthzRoutes(r, []httpserver.AuthzMounter{probe}, passAuthorize)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, probePath, nil))
+	require.Equal(t, http.StatusNoContent, rec.Code)
+
+	rec = httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, probeRelative, nil))
+	require.Equal(t, http.StatusNotFound, rec.Code, "jalur tanpa prefiks tidak boleh terpasang")
+	require.Equal(t, 1, probe.reachedCount())
+}
+
+func TestMountAuthzRoutesPanicsOnRegistrationItCannotPrefix(t *testing.T) {
+	h := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	cases := map[string]func(r chi.Router){
+		"Handle":     func(r chi.Router) { r.Handle("/x", h) },
+		"HandleFunc": func(r chi.Router) { r.HandleFunc("/x", h) },
+		"Method":     func(r chi.Router) { r.Method(http.MethodGet, "/x", h) },
+		"MethodFunc": func(r chi.Router) { r.MethodFunc(http.MethodGet, "/x", h) },
+		"Head":       func(r chi.Router) { r.Head("/x", h) },
+		"Options":    func(r chi.Router) { r.Options("/x", h) },
+		"Mount":      func(r chi.Router) { r.Mount("/x", h) },
+		"Route":      func(r chi.Router) { r.Route("/x", func(chi.Router) {}) },
+		"Group":      func(r chi.Router) { r.Group(func(chi.Router) {}) },
+	}
+	for name, register := range cases {
+		mount := httpserver.AuthzMounterFunc(func(r chi.Router, _ func(string) func(http.Handler) http.Handler) { register(r) })
+
+		require.Panics(t, func() {
+			httpserver.MountAuthzRoutes(chi.NewRouter(), []httpserver.AuthzMounter{mount}, passAuthorize)
+		}, name)
+	}
 }
