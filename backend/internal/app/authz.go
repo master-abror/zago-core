@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/redis/go-redis/v9"
 
 	authsvc "github.com/master-abror/zago-core/backend/internal/auth/service"
@@ -15,7 +17,6 @@ import (
 	authzhttp "github.com/master-abror/zago-core/backend/internal/authorization/transport/http"
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
-	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
 	modulesdk "github.com/master-abror/zago-core/packages/module-sdk"
 )
 
@@ -65,9 +66,9 @@ func newAuthzStack(db kernel.DBTX, rdb redis.UniversalClient, log *slog.Logger) 
 
 // httpAPI merakit rakitan HTTP otorisasi (T5d, ADR-0022 butir 25): middleware Scope dan Authorize
 // di atas Authorizer stack ini (yang SUDAH WithPolicies), ScopeResolver berbasis PostgreSQL, dan
-// rute pengelolaan yang sudah dirakit (T5d2: role dan katalog permission). Hanya merakit objek:
+// rute pengelolaan yang sudah dirakit (T5d2: role dan katalog permission; T5d3: assignment). Hanya merakit objek:
 // tidak ada I/O. Penulis mencatat audit dan event di transaksinya sendiri, jadi audit wajib ada.
-func (s authzStack) httpAPI(pool kernel.Pool, audit modulesdk.AuditRecorder, rs *httpx.Responder, log *slog.Logger) (*httpserver.AuthzAPI, error) {
+func (s authzStack) httpAPI(pool kernel.Pool, audit modulesdk.AuditRecorder, kern *httpserver.KernelServices, log *slog.Logger) (*httpserver.AuthzAPI, error) {
 	// Pointer nil yang dibungkus interface akan lolos pemeriksaan nil di authzhttp.New dan panik di
 	// request pertama; periksa di sini supaya kesalahan wiring gagal saat start.
 	if s.authorizer == nil {
@@ -76,12 +77,17 @@ func (s authzStack) httpAPI(pool kernel.Pool, audit modulesdk.AuditRecorder, rs 
 	if audit == nil {
 		return nil, errors.New("rakit http otorisasi: perekam audit wajib ada")
 	}
+	// Rute POST assignment memakai TenantIdempotency (kunci memuat scope, ADR-0022 butir 67), bukan
+	// Idempotency bersama yang bisa memutar ulang respons lintas organisasi.
+	if kern == nil || kern.Responder == nil || kern.Cursors == nil || kern.TenantIdempotency == nil {
+		return nil, errors.New("rakit http otorisasi: toolkit kernel (Responder, Cursors, TenantIdempotency) wajib ada")
+	}
 	resolver, err := authzapp.NewScopeResolver(authzrepo.NewGroups(pool), log)
 	if err != nil {
 		return nil, fmt.Errorf("rakit scope resolver: %w", err)
 	}
 	mw, err := authzhttp.New(authzhttp.Deps{
-		Scope: resolver, Authorizer: s.authorizer, Audit: audit, Responder: rs, Log: log,
+		Scope: resolver, Authorizer: s.authorizer, Audit: audit, Responder: kern.Responder, Log: log,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("rakit middleware otorisasi: %w", err)
@@ -96,11 +102,25 @@ func (s authzStack) httpAPI(pool kernel.Pool, audit modulesdk.AuditRecorder, rs 
 	if err != nil {
 		return nil, fmt.Errorf("rakit role writer: %w", err)
 	}
-	roles, err := authzhttp.NewRoleHandlers(rs, authzrepo.NewRoleReader(pool), roleWriter, authzrepo.NewPermissionReader(pool))
+	roles, err := authzhttp.NewRoleHandlers(kern.Responder, authzrepo.NewRoleReader(pool), roleWriter, authzrepo.NewPermissionReader(pool))
 	if err != nil {
 		return nil, fmt.Errorf("rakit role handlers: %w", err)
 	}
-	return &httpserver.AuthzAPI{Middleware: mw, Routes: []httpserver.AuthzMounter{roles}}, nil
+
+	assignWriter, err := authzapp.NewAssignmentWriter(tx, authzrepo.NewAssignments(pool), audit, bus, s.txInvalidator)
+	if err != nil {
+		return nil, fmt.Errorf("rakit assignment writer: %w", err)
+	}
+	assigns, err := authzhttp.NewAssignmentHandlers(kern.Responder, kern.Cursors, authzrepo.NewAssignmentReader(pool), assignWriter)
+	if err != nil {
+		return nil, fmt.Errorf("rakit assignment handlers: %w", err)
+	}
+	idem := kern.TenantIdempotency.Require()
+	assignRoutes := httpserver.AuthzMounterFunc(func(r chi.Router, authorize func(action string) func(http.Handler) http.Handler) {
+		assigns.Mount(r, authorize, idem)
+	})
+
+	return &httpserver.AuthzAPI{Middleware: mw, Routes: []httpserver.AuthzMounter{roles, assignRoutes}}, nil
 }
 
 // entryChecker mengembalikan PlatformEntryChecker untuk AuthService, atau interface nil bila tidak

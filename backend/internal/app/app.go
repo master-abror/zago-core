@@ -223,7 +223,7 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 	// dan toolkit kernel (Redis). Tanpa salah satunya tidak ada rute otorisasi yang terpasang.
 	var authzAPI *httpserver.AuthzAPI
 	if appPool != nil && kern != nil {
-		authzAPI, err = authz.httpAPI(appPool, auditor, kern.Responder, log)
+		authzAPI, err = authz.httpAPI(appPool, auditor, kern, log)
 		if err != nil {
 			log.Error("gagal merakit HTTP otorisasi", "error", err)
 			return ExitFailed
