@@ -27,6 +27,7 @@ import (
 type authzStack struct {
 	authorizer    *authzapp.Authorizer
 	invalidator   authzapp.Invalidator
+	txInvalidator authzapp.TxInvalidator
 	platformEntry *authzapp.PlatformEntry
 	fieldGuard    *authzapp.FieldGuard
 }
@@ -38,10 +39,11 @@ func newAuthzStack(db kernel.DBTX, rdb redis.UniversalClient, log *slog.Logger) 
 	var (
 		effCache authzapp.EffectiveCache
 		inv      authzapp.Invalidator
+		txInv    authzapp.TxInvalidator
 	)
 	if rdb != nil {
 		c := authzcache.New(rdb, authzcache.Options{Log: log})
-		effCache, inv = c, c
+		effCache, inv, txInv = c, c, c
 	}
 	authorizer, err := authzapp.NewAuthorizer(authzrepo.NewEffective(db), effCache)
 	if err != nil {
@@ -58,21 +60,23 @@ func newAuthzStack(db kernel.DBTX, rdb redis.UniversalClient, log *slog.Logger) 
 	if err != nil {
 		return authzStack{}, fmt.Errorf("rakit field guard: %w", err)
 	}
-	return authzStack{authorizer: authorizer, invalidator: inv, platformEntry: entry, fieldGuard: guard}, nil
+	return authzStack{authorizer: authorizer, invalidator: inv, txInvalidator: txInv, platformEntry: entry, fieldGuard: guard}, nil
 }
 
 // httpAPI merakit rakitan HTTP otorisasi (T5d, ADR-0022 butir 25): middleware Scope dan Authorize
-// di atas Authorizer stack ini (yang SUDAH WithPolicies) dan ScopeResolver berbasis PostgreSQL.
-// Hanya merakit objek: tidak ada I/O. Routes diisi bertahap oleh task perakitan berikutnya; tanpa
-// rute, middleware ini tidak memengaruhi request mana pun. audit boleh nil (penolakan tidak
-// direkam); composition root selalu memberinya.
-func (s authzStack) httpAPI(db kernel.DBTX, audit modulesdk.AuditRecorder, rs *httpx.Responder, log *slog.Logger) (*httpserver.AuthzAPI, error) {
+// di atas Authorizer stack ini (yang SUDAH WithPolicies), ScopeResolver berbasis PostgreSQL, dan
+// rute pengelolaan yang sudah dirakit (T5d2: role dan katalog permission). Hanya merakit objek:
+// tidak ada I/O. Penulis mencatat audit dan event di transaksinya sendiri, jadi audit wajib ada.
+func (s authzStack) httpAPI(pool kernel.Pool, audit modulesdk.AuditRecorder, rs *httpx.Responder, log *slog.Logger) (*httpserver.AuthzAPI, error) {
 	// Pointer nil yang dibungkus interface akan lolos pemeriksaan nil di authzhttp.New dan panik di
 	// request pertama; periksa di sini supaya kesalahan wiring gagal saat start.
 	if s.authorizer == nil {
 		return nil, errors.New("rakit http otorisasi: authorizer belum dirakit")
 	}
-	resolver, err := authzapp.NewScopeResolver(authzrepo.NewGroups(db), log)
+	if audit == nil {
+		return nil, errors.New("rakit http otorisasi: perekam audit wajib ada")
+	}
+	resolver, err := authzapp.NewScopeResolver(authzrepo.NewGroups(pool), log)
 	if err != nil {
 		return nil, fmt.Errorf("rakit scope resolver: %w", err)
 	}
@@ -82,7 +86,21 @@ func (s authzStack) httpAPI(db kernel.DBTX, audit modulesdk.AuditRecorder, rs *h
 	if err != nil {
 		return nil, fmt.Errorf("rakit middleware otorisasi: %w", err)
 	}
-	return &httpserver.AuthzAPI{Middleware: mw}, nil
+
+	// Satu transaksi dan satu bus untuk semua penulis. txInvalidator adalah interface nil tanpa
+	// Redis (penulis menerimanya nil; jangan bungkus pointer nil di sini).
+	tx := kernel.NewTxManager(pool, log)
+	bus := kernel.NewBus(pool, log)
+
+	roleWriter, err := authzapp.NewRoleWriter(tx, authzrepo.NewRoles(pool), audit, bus, s.txInvalidator)
+	if err != nil {
+		return nil, fmt.Errorf("rakit role writer: %w", err)
+	}
+	roles, err := authzhttp.NewRoleHandlers(rs, authzrepo.NewRoleReader(pool), roleWriter, authzrepo.NewPermissionReader(pool))
+	if err != nil {
+		return nil, fmt.Errorf("rakit role handlers: %w", err)
+	}
+	return &httpserver.AuthzAPI{Middleware: mw, Routes: []httpserver.AuthzMounter{roles}}, nil
 }
 
 // entryChecker mengembalikan PlatformEntryChecker untuk AuthService, atau interface nil bila tidak
