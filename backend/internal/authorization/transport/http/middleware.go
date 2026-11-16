@@ -63,6 +63,7 @@ func New(d Deps) (*Middleware, error) {
 // RequireAuth; bila Identity tidak ada (salah urutan pemasangan) request ditolak 401 (fail-closed)
 // alih-alih lanjut tanpa scope. Kegagalan verifikasi karena infrastruktur menjadi 503, bukan 403:
 // klien tidak boleh mengira dirinya ditolak, dan request tidak boleh lanjut tanpa scope.
+// Selain domain.ScopeContext, middleware mengisi kernel.Scope pada context untuk perekam audit.
 func (m *Middleware) Scope(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, ok := authdomain.IdentityFromContext(r.Context())
@@ -83,6 +84,9 @@ func (m *Middleware) Scope(next http.Handler) http.Handler {
 			m.rs.Error(w, r, httpx.ServiceUnavailable.Wrap(err))
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(domain.WithScope(r.Context(), scope)))
+		// kernel.Scope diisi dari ScopeContext yang SAMA (grup aktif terverifikasi > organisasi >
+		// platform; pemetaan auditContext) supaya activity yang ditulis handler membawa scope.
+		ctx := auditContext(domain.WithScope(r.Context(), scope), scope)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

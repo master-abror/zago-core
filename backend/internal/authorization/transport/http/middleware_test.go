@@ -16,6 +16,7 @@ import (
 	authdomain "github.com/master-abror/zago-core/backend/internal/auth/domain"
 	"github.com/master-abror/zago-core/backend/internal/authorization/domain"
 	authzhttp "github.com/master-abror/zago-core/backend/internal/authorization/transport/http"
+	"github.com/master-abror/zago-core/backend/internal/kernel"
 	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
 	"github.com/master-abror/zago-core/backend/pkg/id"
 )
@@ -37,10 +38,12 @@ func (f *fakeResolver) Resolve(_ context.Context, ident authdomain.Identity, hea
 }
 
 type rig struct {
-	handler http.Handler
-	reached bool
-	seen    domain.ScopeContext
-	hasSeen bool
+	handler    http.Handler
+	reached    bool
+	seen       domain.ScopeContext
+	hasSeen    bool
+	kernelSeen kernel.Scope
+	hasKernel  bool
 }
 
 func newRig(t *testing.T, res *fakeResolver) *rig {
@@ -53,6 +56,7 @@ func newRig(t *testing.T, res *fakeResolver) *rig {
 	r.handler = mw.Scope(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		r.reached = true
 		r.seen, r.hasSeen = domain.ScopeFromContext(req.Context())
+		r.kernelSeen, r.hasKernel = kernel.ScopeFromContext(req.Context())
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	return r
@@ -175,4 +179,37 @@ func TestScopeInvalidInvariantIs500NotRetryable503(t *testing.T) {
 	require.Equal(t, http.StatusInternalServerError, w.Code)
 	require.Equal(t, "internal_error", errCode(t, w))
 	require.False(t, r.reached, "request tidak boleh lanjut tanpa scope")
+}
+
+func requireKernelScope(t *testing.T, scope domain.ScopeContext, want kernel.Scope) {
+	t.Helper()
+	r := newRig(t, &fakeResolver{scope: scope})
+	ident := tenantIdentity()
+
+	w := r.do(nil, &ident)
+
+	require.Equal(t, http.StatusNoContent, w.Code)
+	require.True(t, r.hasKernel, "kernel.Scope harus terisi supaya activity request membawa scope")
+	require.Equal(t, want, r.kernelSeen)
+}
+
+// Perekam audit membaca kernel.Scope (audit.go), bukan ScopeContext: tanpa ini activity yang
+// ditulis handler (role.*, role_assignment.*, policy.*) tidak membawa scope_type/scope_id.
+func TestScopeSetsKernelScopeForAuditRows(t *testing.T) {
+	org, grp := id.NewID(), id.NewID()
+
+	requireKernelScope(t, domain.ScopeContext{}, kernel.Scope{Type: "platform"})
+	requireKernelScope(t, domain.ScopeContext{OrganizationID: &org}, kernel.Scope{Type: "organization", ID: org})
+	requireKernelScope(t, domain.ScopeContext{OrganizationID: &org, ActiveGroupID: &grp}, kernel.Scope{Type: "group", ID: grp})
+}
+
+func TestScopeDoesNotSetKernelScopeWhenResolutionFails(t *testing.T) {
+	r := newRig(t, &fakeResolver{err: errors.New("postgres down")})
+	ident := tenantIdentity()
+
+	w := r.do(nil, &ident)
+
+	require.Equal(t, http.StatusServiceUnavailable, w.Code)
+	require.False(t, r.reached)
+	require.False(t, r.hasKernel)
 }
