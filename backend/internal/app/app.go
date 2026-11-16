@@ -219,6 +219,17 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 		log.Warn("tanpa PostgreSQL atau Redis: autentikasi HTTP tidak dirakit, rute terlindungi menolak semua request")
 	}
 
+	// HTTP otorisasi (Scope dan Authorize) mengikuti syarat yang sama dengan autentikasi: PostgreSQL
+	// dan toolkit kernel (Redis). Tanpa salah satunya tidak ada rute otorisasi yang terpasang.
+	var authzAPI *httpserver.AuthzAPI
+	if appPool != nil && kern != nil {
+		authzAPI, err = authz.httpAPI(appPool, auditor, kern.Responder, log)
+		if err != nil {
+			log.Error("gagal merakit HTTP otorisasi", "error", err)
+			return ExitFailed
+		}
+	}
+
 	devEndpoints := cfg.DevEndpointsEnabled()
 	if devEndpoints && kern != nil {
 		log.Warn("endpoint dev/test aktif: " + httpserver.EchoPath + " (tidak pernah aktif di staging/production)")
@@ -249,6 +260,7 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 		Kernel:         kern,
 		Auth:           auth.mw,
 		AuthAPI:        auth.api,
+		Authz:          authzAPI,
 		DevEndpoints:   devEndpoints,
 		Metrics:        httpMetrics,
 	})

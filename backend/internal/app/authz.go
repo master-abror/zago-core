@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -11,7 +12,11 @@ import (
 	authzapp "github.com/master-abror/zago-core/backend/internal/authorization/application"
 	authzcache "github.com/master-abror/zago-core/backend/internal/authorization/cache"
 	authzrepo "github.com/master-abror/zago-core/backend/internal/authorization/repository"
+	authzhttp "github.com/master-abror/zago-core/backend/internal/authorization/transport/http"
+	"github.com/master-abror/zago-core/backend/internal/httpserver"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
+	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
+	modulesdk "github.com/master-abror/zago-core/packages/module-sdk"
 )
 
 // authzStack adalah hasil perakitan Authorization Engine (ADR-0022 bagian 3): Authorizer di atas
@@ -54,6 +59,30 @@ func newAuthzStack(db kernel.DBTX, rdb redis.UniversalClient, log *slog.Logger) 
 		return authzStack{}, fmt.Errorf("rakit field guard: %w", err)
 	}
 	return authzStack{authorizer: authorizer, invalidator: inv, platformEntry: entry, fieldGuard: guard}, nil
+}
+
+// httpAPI merakit rakitan HTTP otorisasi (T5d, ADR-0022 butir 25): middleware Scope dan Authorize
+// di atas Authorizer stack ini (yang SUDAH WithPolicies) dan ScopeResolver berbasis PostgreSQL.
+// Hanya merakit objek: tidak ada I/O. Routes diisi bertahap oleh task perakitan berikutnya; tanpa
+// rute, middleware ini tidak memengaruhi request mana pun. audit boleh nil (penolakan tidak
+// direkam); composition root selalu memberinya.
+func (s authzStack) httpAPI(db kernel.DBTX, audit modulesdk.AuditRecorder, rs *httpx.Responder, log *slog.Logger) (*httpserver.AuthzAPI, error) {
+	// Pointer nil yang dibungkus interface akan lolos pemeriksaan nil di authzhttp.New dan panik di
+	// request pertama; periksa di sini supaya kesalahan wiring gagal saat start.
+	if s.authorizer == nil {
+		return nil, errors.New("rakit http otorisasi: authorizer belum dirakit")
+	}
+	resolver, err := authzapp.NewScopeResolver(authzrepo.NewGroups(db), log)
+	if err != nil {
+		return nil, fmt.Errorf("rakit scope resolver: %w", err)
+	}
+	mw, err := authzhttp.New(authzhttp.Deps{
+		Scope: resolver, Authorizer: s.authorizer, Audit: audit, Responder: rs, Log: log,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("rakit middleware otorisasi: %w", err)
+	}
+	return &httpserver.AuthzAPI{Middleware: mw}, nil
 }
 
 // entryChecker mengembalikan PlatformEntryChecker untuk AuthService, atau interface nil bila tidak
