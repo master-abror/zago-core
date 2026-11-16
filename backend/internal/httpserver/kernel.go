@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
+	authzhttp "github.com/master-abror/zago-core/backend/internal/authorization/transport/http"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
 	"github.com/master-abror/zago-core/backend/internal/kernel/httpx"
 	modulesdk "github.com/master-abror/zago-core/packages/module-sdk"
@@ -25,12 +26,19 @@ type KernelDeps struct {
 // KernelServices adalah satu set toolkit httpx yang dibagi semua endpoint (docs/10 §3): satu
 // Responder, satu CursorCodec, satu Idempotency, satu RateLimiter. Dibuat sekali di composition
 // root dan diteruskan lewat Options.Kernel.
+//
+// Idempotency membentuk kunci dari subjek (user id) saja dan hanya untuk rute tanpa scope
+// (mis. echo dev). TenantIdempotency menambahkan scope dari ScopeContext (authzhttp.IdempotencyScope)
+// ke kunci dan WAJIB dipakai rute otorisasi: tanpa itu pemanggil yang sama dengan kunci dan body
+// yang sama di organisasi lain menerima respons tersimpan milik organisasi pertama (ADR-0022
+// butir 67). Ia membutuhkan middleware Scope di depannya; tanpa ScopeContext request gagal-tertutup 500.
 type KernelServices struct {
-	Responder   *httpx.Responder
-	Cursors     *httpx.CursorCodec
-	Idempotency *httpx.Idempotency
-	RateLimiter *httpx.RateLimiter
-	Audit       modulesdk.AuditRecorder
+	Responder         *httpx.Responder
+	Cursors           *httpx.CursorCodec
+	Idempotency       *httpx.Idempotency
+	TenantIdempotency *httpx.Idempotency
+	RateLimiter       *httpx.RateLimiter
+	Audit             modulesdk.AuditRecorder
 }
 
 // NewKernelServices memvalidasi bahan baku dan merakit toolkit. Subject idempotency adalah
@@ -51,11 +59,19 @@ func NewKernelServices(d KernelDeps) (*KernelServices, error) {
 	if err != nil {
 		return nil, err
 	}
+	tenantIdem, err := httpx.NewIdempotency(httpx.IdempotencyOptions{
+		Redis: d.Redis, Responder: rs, Subject: actorSubject, Scope: authzhttp.IdempotencyScope, Route: routePattern, Log: d.Log,
+	})
+	if err != nil {
+		return nil, err
+	}
 	rl, err := httpx.NewRateLimiter(d.Redis, rs, d.Log)
 	if err != nil {
 		return nil, err
 	}
-	return &KernelServices{Responder: rs, Cursors: codec, Idempotency: idem, RateLimiter: rl, Audit: d.Audit}, nil
+	return &KernelServices{
+		Responder: rs, Cursors: codec, Idempotency: idem, TenantIdempotency: tenantIdem, RateLimiter: rl, Audit: d.Audit,
+	}, nil
 }
 
 // actorSubject mengembalikan user id aktor request; ok=false bila belum terautentikasi.

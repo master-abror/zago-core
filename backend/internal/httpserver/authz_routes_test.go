@@ -18,6 +18,7 @@ import (
 	authzhttp "github.com/master-abror/zago-core/backend/internal/authorization/transport/http"
 	"github.com/master-abror/zago-core/backend/internal/httpserver"
 	"github.com/master-abror/zago-core/backend/internal/kernel"
+	"github.com/master-abror/zago-core/backend/internal/testkit"
 	"github.com/master-abror/zago-core/backend/pkg/id"
 	"github.com/master-abror/zago-core/backend/pkg/logger"
 )
@@ -30,6 +31,8 @@ import (
 const (
 	probeRelative = "/_authz/probe"
 	probePath     = httpserver.APIPrefix + probeRelative
+	idemRelative  = "/_authz/idem"
+	idemPath      = httpserver.APIPrefix + idemRelative
 )
 
 type authzFakeResolver struct {
@@ -44,6 +47,12 @@ func (f *authzFakeResolver) Resolve(_ context.Context, ident authdomain.Identity
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, ident)
 	return f.scope, f.err
+}
+
+func (f *authzFakeResolver) setScope(s domain.ScopeContext) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.scope = s
 }
 
 func (f *authzFakeResolver) count() int {
@@ -81,6 +90,8 @@ type authzProbe struct {
 	hasScope    bool
 	kernelScope kernel.Scope
 	hasKernel   bool
+	idem        func(http.Handler) http.Handler
+	posted      int
 }
 
 func (p *authzProbe) Mount(r chi.Router, authorize func(action string) func(http.Handler) http.Handler) {
@@ -92,6 +103,24 @@ func (p *authzProbe) Mount(r chi.Router, authorize func(action string) func(http
 		p.kernelScope, p.hasKernel = kernel.ScopeFromContext(req.Context())
 		w.WriteHeader(http.StatusNoContent)
 	})
+	if p.idem == nil {
+		return
+	}
+	// Urutan sama dengan AssignmentHandlers.Mount: Authorize dulu, lalu idempotensi.
+	r.With(authorize("role.assign"), p.idem).Post(idemRelative, func(w http.ResponseWriter, _ *http.Request) {
+		p.mu.Lock()
+		p.posted++
+		p.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"ok":true}}`))
+	})
+}
+
+func (p *authzProbe) postedCount() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.posted
 }
 
 func (p *authzProbe) reachedCount() int {
@@ -121,6 +150,14 @@ func buildAuthz(t *testing.T, withAuth, withAuthz bool) authzEnv {
 	t.Helper()
 	rdb := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1"})
 	t.Cleanup(func() { _ = rdb.Close() })
+	return buildAuthzOn(t, rdb, withAuth, withAuthz, nil)
+}
+
+// idemPicker memilih middleware idempotensi dari KernelServices untuk rute POST uji.
+type idemPicker func(*httpserver.KernelServices) func(http.Handler) http.Handler
+
+func buildAuthzOn(t *testing.T, rdb redis.UniversalClient, withAuth, withAuthz bool, pick idemPicker) authzEnv {
+	t.Helper()
 
 	var buf bytes.Buffer
 	log := logger.New(&buf, slog.LevelDebug)
@@ -135,6 +172,9 @@ func buildAuthz(t *testing.T, withAuth, withAuthz bool) authzEnv {
 		resolver:   &authzFakeResolver{scope: domain.ScopeContext{OrganizationID: &org}},
 		authorizer: &authzFakeAuthorizer{decision: domain.Decision{Allowed: true, Reason: domain.ReasonGranted, Level: domain.LevelOrganization}},
 		probe:      &authzProbe{},
+	}
+	if pick != nil {
+		e.probe.idem = pick(kern)
 	}
 	mw, err := authzhttp.New(authzhttp.Deps{
 		Scope: e.resolver, Authorizer: e.authorizer, Audit: aud, Responder: kern.Responder, Log: log,
@@ -326,4 +366,55 @@ func TestMountAuthzRoutesPanicsOnRegistrationItCannotPrefix(t *testing.T) {
 			httpserver.MountAuthzRoutes(chi.NewRouter(), []httpserver.AuthzMounter{mount}, passAuthorize)
 		}, name)
 	}
+}
+
+func tenantIdem(k *httpserver.KernelServices) func(http.Handler) http.Handler {
+	return k.TenantIdempotency.Require()
+}
+
+func sharedIdem(k *httpserver.KernelServices) func(http.Handler) http.Handler {
+	return k.Idempotency.Require()
+}
+
+func (e authzEnv) postIdem(key string) *httptest.ResponseRecorder {
+	opts := append(sessionHeaders(tokenA, sessionA), hdr("Idempotency-Key", key), hdr("Content-Type", "application/json"))
+	return e.do(http.MethodPost, idemPath, `{"a":1}`, opts...)
+}
+
+// Kewajiban mengikat butir 67: kunci idempotensi rute otorisasi memuat scope. Pemanggil yang sama
+// dengan Idempotency-Key dan body yang sama di organisasi lain WAJIB dieksekusi, bukan menerima
+// respons yang tersimpan milik organisasi pertama.
+func TestTenantIdempotencyDoesNotReplayAcrossOrganizations(t *testing.T) {
+	e := buildAuthzOn(t, testkit.Redis(t).Client(t), true, true, tenantIdem)
+	key := id.NewID().String()
+	orgB := id.NewID()
+
+	first := e.postIdem(key)
+	require.Equal(t, http.StatusCreated, first.Code, first.Body.String())
+	require.Equal(t, 1, e.probe.postedCount())
+
+	e.resolver.setScope(domain.ScopeContext{OrganizationID: &orgB})
+	second := e.postIdem(key)
+	require.Equal(t, http.StatusCreated, second.Code, second.Body.String())
+	require.Equal(t, 2, e.probe.postedCount(), "organisasi lain dengan kunci sama harus dieksekusi, bukan replay")
+
+	// Di dalam scope yang sama kunci tetap bekerja (idempotensi tidak dimatikan).
+	third := e.postIdem(key)
+	require.Equal(t, http.StatusCreated, third.Code, third.Body.String())
+	require.Equal(t, 2, e.probe.postedCount(), "kunci yang sama di scope yang sama harus replay")
+}
+
+// KONTROL: instans bersama tanpa Scope memutar ulang respons lintas organisasi. Tes ini
+// mendokumentasikan alasan TenantIdempotency ada; bila instans bersama kelak diberi Scope, ubah tes
+// ini dengan sengaja.
+func TestControlSharedIdempotencyWithoutScopeReplaysAcrossOrganizations(t *testing.T) {
+	e := buildAuthzOn(t, testkit.Redis(t).Client(t), true, true, sharedIdem)
+	key := id.NewID().String()
+	orgB := id.NewID()
+
+	require.Equal(t, http.StatusCreated, e.postIdem(key).Code)
+	e.resolver.setScope(domain.ScopeContext{OrganizationID: &orgB})
+	require.Equal(t, http.StatusCreated, e.postIdem(key).Code)
+
+	require.Equal(t, 1, e.probe.postedCount(), "tanpa Scope respons organisasi pertama diputar ulang untuk organisasi lain")
 }
