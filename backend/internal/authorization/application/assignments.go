@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -62,6 +63,10 @@ type AssignmentWriter struct {
 	audit  modulesdk.AuditRecorder
 	events EventPublisher
 	inv    TxInvalidator
+
+	// sessions dan log hanya dipasang WithSessionRevoker (assignments_sessions.go).
+	sessions SessionRevoker
+	log      *slog.Logger
 }
 
 // NewAssignmentWriter merakit AssignmentWriter. inv boleh nil (tanpa cache); lainnya wajib.
@@ -144,6 +149,8 @@ func (w *AssignmentWriter) Create(ctx context.Context, g Grantor, in CreateAssig
 // kunci platform. Assignment yang sudah dicabut memberi domain.ErrAssignmentRevoked.
 func (w *AssignmentWriter) Revoke(ctx context.Context, g Grantor, assignmentID uuid.UUID) error {
 	org, tenant := g.Scope.Tenant()
+	var sessionUser uuid.UUID
+	var revokesSessions bool
 	err := w.tx.WithinTx(ctx, func(ctx context.Context) error {
 		if err := w.lock(ctx, org, tenant); err != nil {
 			return err
@@ -181,12 +188,17 @@ func (w *AssignmentWriter) Revoke(ctx context.Context, g Grantor, assignmentID u
 		if err := w.invalidate(ctx, rec.Scope); err != nil {
 			return err
 		}
+		sessionUser, revokesSessions = platformUserSubject(rec)
 		w.recordAudit(ctx, g, org, "role_assignment.revoke", rec.ID, assignmentMeta(role, rec))
 		return w.publish(ctx, "authz.role_assignment.revoked", g, org, role, rec)
 	})
 	if err != nil {
 		w.recordDenial(ctx, g, org, "role_assignment.revoke", assignmentID, err)
 		return err
+	}
+	// Sesudah commit: sesi user pemegang assignment platform dicabut. Kegagalan tidak mengubah hasil.
+	if revokesSessions {
+		w.revokeSessions(ctx, g, org, assignmentID, sessionUser)
 	}
 	return nil
 }
