@@ -66,13 +66,19 @@ func newAuthzStack(db kernel.DBTX, rdb redis.UniversalClient, log *slog.Logger) 
 
 // httpAPI merakit rakitan HTTP otorisasi (T5d, ADR-0022 butir 25): middleware Scope dan Authorize
 // di atas Authorizer stack ini (yang SUDAH WithPolicies), ScopeResolver berbasis PostgreSQL, dan
-// rute pengelolaan yang sudah dirakit (T5d2: role dan katalog permission; T5d3: assignment). Hanya merakit objek:
-// tidak ada I/O. Penulis mencatat audit dan event di transaksinya sendiri, jadi audit wajib ada.
+// rute pengelolaan (T5d2: role dan katalog permission; T5d3: assignment; T5d4: policy dan simulate).
+// Hanya merakit objek: tidak ada I/O. Penulis mencatat audit dan event di transaksinya sendiri,
+// jadi audit wajib ada.
 func (s authzStack) httpAPI(pool kernel.Pool, audit modulesdk.AuditRecorder, kern *httpserver.KernelServices, log *slog.Logger) (*httpserver.AuthzAPI, error) {
 	// Pointer nil yang dibungkus interface akan lolos pemeriksaan nil di authzhttp.New dan panik di
 	// request pertama; periksa di sini supaya kesalahan wiring gagal saat start.
 	if s.authorizer == nil {
 		return nil, errors.New("rakit http otorisasi: authorizer belum dirakit")
+	}
+	// Authorize dan Simulator memakai Authorizer yang sama; tanpa policy keduanya mengabaikan
+	// setiap policy tanpa suara (ADR-0022 butir 31 dan 69h).
+	if !s.authorizer.PoliciesEnabled() {
+		return nil, errors.New("rakit http otorisasi: authorizer tanpa policy")
 	}
 	if audit == nil {
 		return nil, errors.New("rakit http otorisasi: perekam audit wajib ada")
@@ -120,7 +126,45 @@ func (s authzStack) httpAPI(pool kernel.Pool, audit modulesdk.AuditRecorder, ker
 		assigns.Mount(r, authorize, idem)
 	})
 
-	return &httpserver.AuthzAPI{Middleware: mw, Routes: []httpserver.AuthzMounter{roles, assignRoutes}}, nil
+	// Policy tidak di-cache dan tidak mengubah himpunan permission efektif, jadi PolicyWriter tidak
+	// menerima invalidator (ADR-0022 butir 59). Rute policy tidak memakai Idempotency-Key.
+	policyWriter, err := authzapp.NewPolicyWriter(tx, authzrepo.NewPolicies(pool), audit, bus)
+	if err != nil {
+		return nil, fmt.Errorf("rakit policy writer: %w", err)
+	}
+	policies, err := authzhttp.NewPolicyHandlers(kern.Responder, authzrepo.NewPolicyReader(pool), policyWriter)
+	if err != nil {
+		return nil, fmt.Errorf("rakit policy handlers: %w", err)
+	}
+
+	sim, err := s.newSimulator(pool, audit)
+	if err != nil {
+		return nil, err
+	}
+	simulate, err := authzhttp.NewSimulateHandlers(kern.Responder, sim)
+	if err != nil {
+		return nil, fmt.Errorf("rakit simulate handlers: %w", err)
+	}
+
+	return &httpserver.AuthzAPI{Middleware: mw, Routes: []httpserver.AuthzMounter{roles, assignRoutes, policies, simulate}}, nil
+}
+
+// newSimulator merakit Simulator di atas Authorizer stack ini, yang HARUS sudah WithPolicies
+// (ADR-0022 butir 69h): Authorizer tanpa policy membuat simulasi menjawab ALLOW untuk request yang
+// produksi tolak, tanpa galat apa pun. Karena itu stack tanpa policy ditolak saat start, bukan
+// hanya dijaga tes. Hanya merakit objek: tidak ada I/O.
+func (s authzStack) newSimulator(db kernel.DBTX, audit modulesdk.AuditRecorder) (*authzapp.Simulator, error) {
+	if s.authorizer == nil {
+		return nil, errors.New("rakit simulator: authorizer belum dirakit")
+	}
+	if !s.authorizer.PoliciesEnabled() {
+		return nil, errors.New("rakit simulator: authorizer tanpa policy akan menjawab ALLOW untuk request yang ditolak policy")
+	}
+	sim, err := authzapp.NewSimulator(s.authorizer, authzrepo.NewMembers(db), authzrepo.NewGroups(db), audit)
+	if err != nil {
+		return nil, fmt.Errorf("rakit simulator: %w", err)
+	}
+	return sim, nil
 }
 
 // entryChecker mengembalikan PlatformEntryChecker untuk AuthService, atau interface nil bila tidak
