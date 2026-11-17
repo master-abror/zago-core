@@ -41,6 +41,7 @@ func newTestAuthzAPI(t *testing.T) *httpserver.AuthzAPI {
 	log := jsonLogger(&buf)
 	s, err := newAuthzStack(nil, nil, log)
 	require.NoError(t, err)
+	s = s.withSessionRevoker(fakeSessionRevoker{})
 
 	api, err := s.httpAPI(nil, discardAudit{}, newTestKernel(t, log), log)
 
@@ -74,6 +75,7 @@ func TestAuthzStackHTTPAPIRefusesAMissingAuditRecorder(t *testing.T) {
 	log := jsonLogger(&buf)
 	s, err := newAuthzStack(nil, nil, log)
 	require.NoError(t, err)
+	s = s.withSessionRevoker(fakeSessionRevoker{})
 
 	api, err := s.httpAPI(nil, nil, newTestKernel(t, log), log)
 
@@ -86,6 +88,7 @@ func TestAuthzStackHTTPAPIRefusesAnIncompleteKernel(t *testing.T) {
 	log := jsonLogger(&buf)
 	s, err := newAuthzStack(nil, nil, log)
 	require.NoError(t, err)
+	s = s.withSessionRevoker(fakeSessionRevoker{})
 
 	nilKernel, err := s.httpAPI(nil, discardAudit{}, nil, log)
 	require.Error(t, err)

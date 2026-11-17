@@ -21,6 +21,9 @@ import (
 type authStack struct {
 	mw  *authhttp.Middleware
 	api *authhttp.Handlers
+
+	// sessions dipakai perakitan otorisasi untuk mencabut sesi (ADR-0022 butir 76).
+	sessions *service.SessionService
 }
 
 // newAuthStack merakit autentikasi HTTP (docs/05 §3, §8–§9, ADR-0020) dari konfigurasi: cookie
@@ -87,5 +90,5 @@ func newAuthStack(cfg *config.Config, pool kernel.Pool, rdb redis.UniversalClien
 	if err != nil {
 		return authStack{}, fmt.Errorf("handler auth: %w", err)
 	}
-	return authStack{mw: mw, api: api}, nil
+	return authStack{mw: mw, api: api, sessions: sessions}, nil
 }

@@ -24,13 +24,22 @@ import (
 // repositori effective permissions (PostgreSQL, otoritatif) dan cache berversi di Redis.
 // invalidator nil bila tanpa Redis (tanpa cache, tidak ada yang perlu dibatalkan); platformEntry
 // nil bila tanpa PostgreSQL. fieldGuard (ADR-0022 butir 41-43) memakai Authorizer yang sama dan
-// definisi field dari katalog di PostgreSQL.
+// definisi field dari katalog di PostgreSQL. sessions diisi withSessionRevoker setelah auth dirakit
+// (T5d5, ADR-0022 butir 76): httpAPI menolak stack tanpa itu.
 type authzStack struct {
 	authorizer    *authzapp.Authorizer
 	invalidator   authzapp.Invalidator
 	txInvalidator authzapp.TxInvalidator
 	platformEntry *authzapp.PlatformEntry
 	fieldGuard    *authzapp.FieldGuard
+	sessions      authzapp.SessionRevoker
+}
+
+// withSessionRevoker mengembalikan salinan stack dengan pencabut sesi yang dipakai AssignmentWriter
+// saat assignment platform dicabut. Hanya menyimpan referensi: tidak ada I/O.
+func (s authzStack) withSessionRevoker(r authzapp.SessionRevoker) authzStack {
+	s.sessions = r
+	return s
 }
 
 // newAuthzStack merakit engine. Hanya merakit objek: tidak ada I/O. rdb nil = tanpa cache
@@ -117,6 +126,12 @@ func (s authzStack) httpAPI(pool kernel.Pool, audit modulesdk.AuditRecorder, ker
 	if err != nil {
 		return nil, fmt.Errorf("rakit assignment writer: %w", err)
 	}
+	// Tanpa pencabut sesi, sesi hasil masuk-lewat-platform tetap hidup setelah assignment platform
+	// dicabut tanpa suara; stack tanpa itu ditolak saat start, bukan hanya dijaga tes.
+	if s.sessions == nil {
+		return nil, errors.New("rakit http otorisasi: pencabut sesi belum dirakit")
+	}
+	assignWriter = assignWriter.WithSessionRevoker(s.sessions, log)
 	assigns, err := authzhttp.NewAssignmentHandlers(kern.Responder, kern.Cursors, authzrepo.NewAssignmentReader(pool), assignWriter)
 	if err != nil {
 		return nil, fmt.Errorf("rakit assignment handlers: %w", err)
