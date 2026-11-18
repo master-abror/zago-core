@@ -285,7 +285,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_PermissionResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_authorization_transport_http_PermissionResponse"
                         }
                     },
                     "400": {
@@ -336,7 +336,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/authzhttp.SimulateRequest"
+                            "$ref": "#/definitions/backend_internal_authorization_transport_http.SimulateRequest"
                         }
                     }
                 ],
@@ -344,7 +344,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_SimulateResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_SimulateResponse"
                         }
                     },
                     "400": {
@@ -402,7 +402,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_PolicyResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_authorization_transport_http_PolicyResponse"
                         }
                     },
                     "400": {
@@ -451,7 +451,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/authzhttp.CreatePolicyRequest"
+                            "$ref": "#/definitions/backend_internal_authorization_transport_http.CreatePolicyRequest"
                         }
                     }
                 ],
@@ -459,7 +459,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_PolicyResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_PolicyResponse"
                         }
                     },
                     "400": {
@@ -523,7 +523,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/authzhttp.UpdatePolicyRequest"
+                            "$ref": "#/definitions/backend_internal_authorization_transport_http.UpdatePolicyRequest"
                         }
                     }
                 ],
@@ -531,7 +531,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_PolicyResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_PolicyResponse"
                         }
                     },
                     "400": {
@@ -613,7 +613,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_AssignmentResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_authorization_transport_http_AssignmentResponse"
                         }
                     },
                     "400": {
@@ -669,7 +669,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/authzhttp.CreateAssignmentRequest"
+                            "$ref": "#/definitions/backend_internal_authorization_transport_http.CreateAssignmentRequest"
                         }
                     }
                 ],
@@ -677,7 +677,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_AssignmentResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_AssignmentResponse"
                         }
                     },
                     "400": {
@@ -807,7 +807,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_RoleResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_authorization_transport_http_RoleResponse"
                         }
                     },
                     "400": {
@@ -856,7 +856,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/authzhttp.CreateRoleRequest"
+                            "$ref": "#/definitions/backend_internal_authorization_transport_http.CreateRoleRequest"
                         }
                     }
                 ],
@@ -864,7 +864,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RoleDetailResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_RoleDetailResponse"
                         }
                     },
                     "400": {
@@ -923,7 +923,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RoleDetailResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_RoleDetailResponse"
                         }
                     },
                     "401": {
@@ -1031,7 +1031,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/authzhttp.UpdateRoleRequest"
+                            "$ref": "#/definitions/backend_internal_authorization_transport_http.UpdateRoleRequest"
                         }
                     }
                 ],
@@ -1039,7 +1039,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RoleDetailResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_RoleDetailResponse"
                         }
                     },
                     "400": {
@@ -1097,7 +1097,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RolePermissionsResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_RolePermissionsResponse"
                         }
                     },
                     "401": {
@@ -1153,7 +1153,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/authzhttp.SetPermissionsRequest"
+                            "$ref": "#/definitions/backend_internal_authorization_transport_http.SetPermissionsRequest"
                         }
                     }
                 ],
@@ -1161,7 +1161,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RolePermissionsResponse"
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_RolePermissionsResponse"
                         }
                     },
                     "400": {
@@ -1495,474 +1495,6 @@
         }
     },
     "definitions": {
-        "authzhttp.AssignmentResponse": {
-            "type": "object",
-            "properties": {
-                "assigned_by": {
-                    "description": "AssignedBy adalah pemberi; null bila tidak tercatat.",
-                    "type": "string"
-                },
-                "created_at": {
-                    "description": "CreatedAt adalah waktu pembuatan.",
-                    "type": "string"
-                },
-                "expires_at": {
-                    "description": "ExpiresAt adalah masa berlaku; null berarti tidak kedaluwarsa.",
-                    "type": "string"
-                },
-                "group_id": {
-                    "description": "GroupID terisi untuk scope group, selain itu null.",
-                    "type": "string"
-                },
-                "id": {
-                    "description": "ID adalah id assignment.",
-                    "type": "string"
-                },
-                "revoked_at": {
-                    "description": "RevokedAt terisi bila assignment sudah dicabut.",
-                    "type": "string"
-                },
-                "role_id": {
-                    "description": "RoleID adalah role yang diberikan.",
-                    "type": "string"
-                },
-                "role_name": {
-                    "description": "RoleName adalah nama role (kosong bila role tidak terbaca).",
-                    "type": "string"
-                },
-                "role_slug": {
-                    "description": "RoleSlug adalah slug role.",
-                    "type": "string"
-                },
-                "role_status": {
-                    "description": "RoleStatus adalah active atau archived.",
-                    "type": "string"
-                },
-                "scope_type": {
-                    "description": "ScopeType adalah platform, organization, atau group.",
-                    "type": "string"
-                },
-                "status": {
-                    "description": "Status adalah active, expired, atau revoked pada saat respons dibuat.",
-                    "type": "string"
-                },
-                "subject_id": {
-                    "description": "SubjectID adalah subjek penerima.",
-                    "type": "string"
-                },
-                "subject_type": {
-                    "description": "SubjectType adalah jenis subjek.",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.CreateAssignmentRequest": {
-            "type": "object",
-            "properties": {
-                "expires_at": {
-                    "description": "ExpiresAt adalah masa berlaku (RFC 3339); kosong berarti tanpa masa berlaku.",
-                    "type": "string"
-                },
-                "group_id": {
-                    "description": "GroupID wajib untuk scope group dan hanya untuk itu.",
-                    "type": "string"
-                },
-                "role_id": {
-                    "description": "RoleID adalah role yang diberikan.",
-                    "type": "string"
-                },
-                "scope_type": {
-                    "description": "ScopeType adalah platform, organization, atau group. Organisasi scope diambil dari sesi.",
-                    "type": "string"
-                },
-                "subject_id": {
-                    "description": "SubjectID adalah subjek penerima.",
-                    "type": "string"
-                },
-                "subject_type": {
-                    "description": "SubjectType adalah jenis subjek (nilai sah dinilai penulis).",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.CreatePolicyRequest": {
-            "type": "object",
-            "properties": {
-                "actions": {
-                    "description": "Actions adalah kode permission yang dibatasi policy ini (juga \"resource.*\"); wajib, tidak kosong.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "code": {
-                    "description": "Code adalah kode unik pada cakupannya (huruf kecil, angka, titik, garis bawah).",
-                    "type": "string"
-                },
-                "description": {
-                    "description": "Description adalah deskripsi bebas (boleh kosong).",
-                    "type": "string"
-                },
-                "effect": {
-                    "description": "Effect adalah allow atau deny.",
-                    "type": "string"
-                },
-                "expression": {
-                    "description": "Expression adalah ekspresi policy (bahasa ekspresi internal/policy).",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "Name adalah nama tampilan.",
-                    "type": "string"
-                },
-                "status": {
-                    "description": "Status adalah active (bawaan bila kosong) atau disabled.",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.CreateRoleRequest": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "description": "Description adalah deskripsi bebas.",
-                    "type": "string"
-                },
-                "group_id": {
-                    "description": "GroupID wajib untuk role bertipe group dan hanya untuk itu.",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "Name adalah nama tampilan role.",
-                    "type": "string"
-                },
-                "permissions": {
-                    "description": "Permissions adalah kode permission awal role.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "slug": {
-                    "description": "Slug adalah pengenal role, unik per organisasi.",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "Type adalah organization, group, atau custom (system ditolak penulis).",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.PermissionResponse": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "description": "Action adalah bagian kode setelah titik terakhir.",
-                    "type": "string"
-                },
-                "code": {
-                    "description": "Code adalah kode lengkap, mis. role.manage.",
-                    "type": "string"
-                },
-                "description": {
-                    "description": "Description adalah uraian permission (string kosong bila tidak ada).",
-                    "type": "string"
-                },
-                "is_system": {
-                    "description": "IsSystem benar untuk permission yang dideklarasikan core.",
-                    "type": "boolean"
-                },
-                "module": {
-                    "description": "Module adalah kode modul pemilik; null untuk permission core.",
-                    "type": "string"
-                },
-                "resource": {
-                    "description": "Resource adalah bagian kode sebelum titik terakhir.",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.PolicyResponse": {
-            "type": "object",
-            "properties": {
-                "actions": {
-                    "description": "Actions adalah kode permission yang dibatasi (tidak pernah null).",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "code": {
-                    "description": "Code adalah kode policy.",
-                    "type": "string"
-                },
-                "created_at": {
-                    "description": "CreatedAt adalah waktu pembuatan.",
-                    "type": "string"
-                },
-                "description": {
-                    "description": "Description adalah deskripsi (kosong bila tidak ada).",
-                    "type": "string"
-                },
-                "effect": {
-                    "description": "Effect adalah allow atau deny.",
-                    "type": "string"
-                },
-                "expression": {
-                    "description": "Expression adalah ekspresi policy.",
-                    "type": "string"
-                },
-                "global": {
-                    "description": "Global benar untuk policy global.",
-                    "type": "boolean"
-                },
-                "id": {
-                    "description": "ID adalah id policy.",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "Name adalah nama tampilan.",
-                    "type": "string"
-                },
-                "status": {
-                    "description": "Status adalah active atau disabled.",
-                    "type": "string"
-                },
-                "updated_at": {
-                    "description": "UpdatedAt adalah waktu perubahan terakhir.",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.RoleDetailResponse": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "description": "Description adalah deskripsi role.",
-                    "type": "string"
-                },
-                "group_id": {
-                    "description": "GroupID terisi untuk role bertipe group, selain itu null.",
-                    "type": "string"
-                },
-                "id": {
-                    "description": "ID adalah id role.",
-                    "type": "string"
-                },
-                "is_system": {
-                    "description": "IsSystem benar untuk role sistem (tidak dapat diubah lewat API).",
-                    "type": "boolean"
-                },
-                "name": {
-                    "description": "Name adalah nama tampilan.",
-                    "type": "string"
-                },
-                "permissions": {
-                    "description": "Permissions selalu ada pada respons (irisan kosong, bukan null).",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "slug": {
-                    "description": "Slug adalah pengenal role.",
-                    "type": "string"
-                },
-                "status": {
-                    "description": "Status adalah active atau archived.",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "Type adalah system, organization, group, atau custom.",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.RolePermissionsResponse": {
-            "type": "object",
-            "properties": {
-                "permissions": {
-                    "description": "Permissions selalu ada pada respons (irisan kosong, bukan null).",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "authzhttp.RoleResponse": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "description": "Description adalah deskripsi role.",
-                    "type": "string"
-                },
-                "group_id": {
-                    "description": "GroupID terisi untuk role bertipe group, selain itu null.",
-                    "type": "string"
-                },
-                "id": {
-                    "description": "ID adalah id role.",
-                    "type": "string"
-                },
-                "is_system": {
-                    "description": "IsSystem benar untuk role sistem (tidak dapat diubah lewat API).",
-                    "type": "boolean"
-                },
-                "name": {
-                    "description": "Name adalah nama tampilan.",
-                    "type": "string"
-                },
-                "slug": {
-                    "description": "Slug adalah pengenal role.",
-                    "type": "string"
-                },
-                "status": {
-                    "description": "Status adalah active atau archived.",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "Type adalah system, organization, group, atau custom.",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.SetPermissionsRequest": {
-            "type": "object",
-            "properties": {
-                "permissions": {
-                    "description": "Permissions adalah himpunan lengkap kode permission; wajib ada (irisan kosong sah dan\nberarti mencabut semuanya, tetapi field yang hilang atau null ditolak supaya body yang\nsalah ketik tidak menghapus seluruh permission role).",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "authzhttp.SimulateRequest": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "description": "Action adalah kode permission yang ditanyakan.",
-                    "type": "string"
-                },
-                "active_group_id": {
-                    "description": "ActiveGroupID adalah grup aktif simulasi (opsional). Pemanggil level group hanya boleh\nmengosongkannya atau mengisinya dengan grup aktifnya sendiri.",
-                    "type": "string"
-                },
-                "resource": {
-                    "description": "Resource adalah sumber daya hipotetis (opsional; kosong untuk aksi list/create).",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/authzhttp.SimulateResourceRequest"
-                        }
-                    ]
-                },
-                "user_id": {
-                    "description": "UserID adalah user yang disimulasikan; harus anggota aktif organisasi pemanggil.",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.SimulateResourceRequest": {
-            "type": "object",
-            "properties": {
-                "attrs": {
-                    "description": "Attrs adalah atribut tambahan yang dapat dirujuk ekspresi policy: nilai skalar atau daftar\nskalar, paling banyak 32 atribut; nama type, id, organization_id, owner_id, dan group_id\ndicadangkan.",
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "group_id": {
-                    "description": "GroupID adalah grup pemilik sumber daya (opsional).",
-                    "type": "string"
-                },
-                "id": {
-                    "description": "ID adalah id sumber daya.",
-                    "type": "string"
-                },
-                "owner_id": {
-                    "description": "OwnerID adalah pemilik sumber daya (opsional).",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "Type adalah jenis sumber daya (huruf kecil, angka, garis bawah; diawali huruf).",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.SimulateResponse": {
-            "type": "object",
-            "properties": {
-                "deferred_policies": {
-                    "description": "DeferredPolicies adalah kode policy yang butuh sumber daya tetapi simulasi tanpa resource;\ntidak pernah null, dikosongkan bila pemanggil tidak berhak membaca policy.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "level": {
-                    "description": "Level adalah scope yang memberi izin; null bila ditolak.",
-                    "type": "string"
-                },
-                "policy_code": {
-                    "description": "PolicyCode adalah kode policy yang menolak; null bila tidak ada atau bila pemanggil tidak\nberhak membaca policy (policy.read).",
-                    "type": "string"
-                },
-                "reason": {
-                    "description": "Reason adalah kode alasan stabil: granted, no_permission, scope_mismatch, policy_denied,\natau policy_evaluation_failed.",
-                    "type": "string"
-                },
-                "result": {
-                    "description": "Result adalah ALLOW atau DENY.",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.UpdatePolicyRequest": {
-            "type": "object",
-            "properties": {
-                "actions": {
-                    "description": "Actions adalah himpunan PENUH yang baru; irisan kosong ditolak penulis.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "description": {
-                    "description": "Description adalah deskripsi baru; string kosong menghapus deskripsi.",
-                    "type": "string"
-                },
-                "effect": {
-                    "description": "Effect adalah allow atau deny.",
-                    "type": "string"
-                },
-                "expression": {
-                    "description": "Expression adalah ekspresi baru.",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "Name adalah nama baru.",
-                    "type": "string"
-                },
-                "status": {
-                    "description": "Status adalah active atau disabled.",
-                    "type": "string"
-                }
-            }
-        },
-        "authzhttp.UpdateRoleRequest": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "description": "Description adalah deskripsi baru; string kosong menghapus deskripsi.",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "Name adalah nama baru.",
-                    "type": "string"
-                }
-            }
-        },
         "backend_internal_auth_transport_http.CSRFResponse": {
             "type": "object",
             "properties": {
@@ -2202,6 +1734,474 @@
                 }
             }
         },
+        "backend_internal_authorization_transport_http.AssignmentResponse": {
+            "type": "object",
+            "properties": {
+                "assigned_by": {
+                    "description": "AssignedBy adalah pemberi; null bila tidak tercatat.",
+                    "type": "string"
+                },
+                "created_at": {
+                    "description": "CreatedAt adalah waktu pembuatan.",
+                    "type": "string"
+                },
+                "expires_at": {
+                    "description": "ExpiresAt adalah masa berlaku; null berarti tidak kedaluwarsa.",
+                    "type": "string"
+                },
+                "group_id": {
+                    "description": "GroupID terisi untuk scope group, selain itu null.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID adalah id assignment.",
+                    "type": "string"
+                },
+                "revoked_at": {
+                    "description": "RevokedAt terisi bila assignment sudah dicabut.",
+                    "type": "string"
+                },
+                "role_id": {
+                    "description": "RoleID adalah role yang diberikan.",
+                    "type": "string"
+                },
+                "role_name": {
+                    "description": "RoleName adalah nama role (kosong bila role tidak terbaca).",
+                    "type": "string"
+                },
+                "role_slug": {
+                    "description": "RoleSlug adalah slug role.",
+                    "type": "string"
+                },
+                "role_status": {
+                    "description": "RoleStatus adalah active atau archived.",
+                    "type": "string"
+                },
+                "scope_type": {
+                    "description": "ScopeType adalah platform, organization, atau group.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active, expired, atau revoked pada saat respons dibuat.",
+                    "type": "string"
+                },
+                "subject_id": {
+                    "description": "SubjectID adalah subjek penerima.",
+                    "type": "string"
+                },
+                "subject_type": {
+                    "description": "SubjectType adalah jenis subjek.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.CreateAssignmentRequest": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "description": "ExpiresAt adalah masa berlaku (RFC 3339); kosong berarti tanpa masa berlaku.",
+                    "type": "string"
+                },
+                "group_id": {
+                    "description": "GroupID wajib untuk scope group dan hanya untuk itu.",
+                    "type": "string"
+                },
+                "role_id": {
+                    "description": "RoleID adalah role yang diberikan.",
+                    "type": "string"
+                },
+                "scope_type": {
+                    "description": "ScopeType adalah platform, organization, atau group. Organisasi scope diambil dari sesi.",
+                    "type": "string"
+                },
+                "subject_id": {
+                    "description": "SubjectID adalah subjek penerima.",
+                    "type": "string"
+                },
+                "subject_type": {
+                    "description": "SubjectType adalah jenis subjek (nilai sah dinilai penulis).",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.CreatePolicyRequest": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "description": "Actions adalah kode permission yang dibatasi policy ini (juga \"resource.*\"); wajib, tidak kosong.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "code": {
+                    "description": "Code adalah kode unik pada cakupannya (huruf kecil, angka, titik, garis bawah).",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "Description adalah deskripsi bebas (boleh kosong).",
+                    "type": "string"
+                },
+                "effect": {
+                    "description": "Effect adalah allow atau deny.",
+                    "type": "string"
+                },
+                "expression": {
+                    "description": "Expression adalah ekspresi policy (bahasa ekspresi internal/policy).",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active (bawaan bila kosong) atau disabled.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.CreateRoleRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "Description adalah deskripsi bebas.",
+                    "type": "string"
+                },
+                "group_id": {
+                    "description": "GroupID wajib untuk role bertipe group dan hanya untuk itu.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan role.",
+                    "type": "string"
+                },
+                "permissions": {
+                    "description": "Permissions adalah kode permission awal role.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "slug": {
+                    "description": "Slug adalah pengenal role, unik per organisasi.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type adalah organization, group, atau custom (system ditolak penulis).",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.PermissionResponse": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "description": "Action adalah bagian kode setelah titik terakhir.",
+                    "type": "string"
+                },
+                "code": {
+                    "description": "Code adalah kode lengkap, mis. role.manage.",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "Description adalah uraian permission (string kosong bila tidak ada).",
+                    "type": "string"
+                },
+                "is_system": {
+                    "description": "IsSystem benar untuk permission yang dideklarasikan core.",
+                    "type": "boolean"
+                },
+                "module": {
+                    "description": "Module adalah kode modul pemilik; null untuk permission core.",
+                    "type": "string"
+                },
+                "resource": {
+                    "description": "Resource adalah bagian kode sebelum titik terakhir.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.PolicyResponse": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "description": "Actions adalah kode permission yang dibatasi (tidak pernah null).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "code": {
+                    "description": "Code adalah kode policy.",
+                    "type": "string"
+                },
+                "created_at": {
+                    "description": "CreatedAt adalah waktu pembuatan.",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "Description adalah deskripsi (kosong bila tidak ada).",
+                    "type": "string"
+                },
+                "effect": {
+                    "description": "Effect adalah allow atau deny.",
+                    "type": "string"
+                },
+                "expression": {
+                    "description": "Expression adalah ekspresi policy.",
+                    "type": "string"
+                },
+                "global": {
+                    "description": "Global benar untuk policy global.",
+                    "type": "boolean"
+                },
+                "id": {
+                    "description": "ID adalah id policy.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active atau disabled.",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "UpdatedAt adalah waktu perubahan terakhir.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.RoleDetailResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "Description adalah deskripsi role.",
+                    "type": "string"
+                },
+                "group_id": {
+                    "description": "GroupID terisi untuk role bertipe group, selain itu null.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID adalah id role.",
+                    "type": "string"
+                },
+                "is_system": {
+                    "description": "IsSystem benar untuk role sistem (tidak dapat diubah lewat API).",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan.",
+                    "type": "string"
+                },
+                "permissions": {
+                    "description": "Permissions selalu ada pada respons (irisan kosong, bukan null).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "slug": {
+                    "description": "Slug adalah pengenal role.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active atau archived.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type adalah system, organization, group, atau custom.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.RolePermissionsResponse": {
+            "type": "object",
+            "properties": {
+                "permissions": {
+                    "description": "Permissions selalu ada pada respons (irisan kosong, bukan null).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.RoleResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "Description adalah deskripsi role.",
+                    "type": "string"
+                },
+                "group_id": {
+                    "description": "GroupID terisi untuk role bertipe group, selain itu null.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID adalah id role.",
+                    "type": "string"
+                },
+                "is_system": {
+                    "description": "IsSystem benar untuk role sistem (tidak dapat diubah lewat API).",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan.",
+                    "type": "string"
+                },
+                "slug": {
+                    "description": "Slug adalah pengenal role.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active atau archived.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type adalah system, organization, group, atau custom.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.SetPermissionsRequest": {
+            "type": "object",
+            "properties": {
+                "permissions": {
+                    "description": "Permissions adalah himpunan lengkap kode permission; wajib ada (irisan kosong sah dan\nberarti mencabut semuanya, tetapi field yang hilang atau null ditolak supaya body yang\nsalah ketik tidak menghapus seluruh permission role).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.SimulateRequest": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "description": "Action adalah kode permission yang ditanyakan.",
+                    "type": "string"
+                },
+                "active_group_id": {
+                    "description": "ActiveGroupID adalah grup aktif simulasi (opsional). Pemanggil level group hanya boleh\nmengosongkannya atau mengisinya dengan grup aktifnya sendiri.",
+                    "type": "string"
+                },
+                "resource": {
+                    "description": "Resource adalah sumber daya hipotetis (opsional; kosong untuk aksi list/create).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/backend_internal_authorization_transport_http.SimulateResourceRequest"
+                        }
+                    ]
+                },
+                "user_id": {
+                    "description": "UserID adalah user yang disimulasikan; harus anggota aktif organisasi pemanggil.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.SimulateResourceRequest": {
+            "type": "object",
+            "properties": {
+                "attrs": {
+                    "description": "Attrs adalah atribut tambahan yang dapat dirujuk ekspresi policy: nilai skalar atau daftar\nskalar, paling banyak 32 atribut; nama type, id, organization_id, owner_id, dan group_id\ndicadangkan.",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "group_id": {
+                    "description": "GroupID adalah grup pemilik sumber daya (opsional).",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID adalah id sumber daya.",
+                    "type": "string"
+                },
+                "owner_id": {
+                    "description": "OwnerID adalah pemilik sumber daya (opsional).",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type adalah jenis sumber daya (huruf kecil, angka, garis bawah; diawali huruf).",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.SimulateResponse": {
+            "type": "object",
+            "properties": {
+                "deferred_policies": {
+                    "description": "DeferredPolicies adalah kode policy yang butuh sumber daya tetapi simulasi tanpa resource;\ntidak pernah null, dikosongkan bila pemanggil tidak berhak membaca policy.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "level": {
+                    "description": "Level adalah scope yang memberi izin; null bila ditolak.",
+                    "type": "string"
+                },
+                "policy_code": {
+                    "description": "PolicyCode adalah kode policy yang menolak; null bila tidak ada atau bila pemanggil tidak\nberhak membaca policy (policy.read).",
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "Reason adalah kode alasan stabil: granted, no_permission, scope_mismatch, policy_denied,\natau policy_evaluation_failed.",
+                    "type": "string"
+                },
+                "result": {
+                    "description": "Result adalah ALLOW atau DENY.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.UpdatePolicyRequest": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "description": "Actions adalah himpunan PENUH yang baru; irisan kosong ditolak penulis.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "description": "Description adalah deskripsi baru; string kosong menghapus deskripsi.",
+                    "type": "string"
+                },
+                "effect": {
+                    "description": "Effect adalah allow atau deny.",
+                    "type": "string"
+                },
+                "expression": {
+                    "description": "Expression adalah ekspresi baru.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama baru.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active atau disabled.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_authorization_transport_http.UpdateRoleRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "Description adalah deskripsi baru; string kosong menghapus deskripsi.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama baru.",
+                    "type": "string"
+                }
+            }
+        },
         "backend_internal_health.Report": {
             "type": "object",
             "properties": {
@@ -2214,62 +2214,6 @@
                 "status": {
                     "type": "string",
                     "example": "ok"
-                }
-            }
-        },
-        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_AssignmentResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/authzhttp.AssignmentResponse"
-                    }
-                },
-                "meta": {
-                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
-                }
-            }
-        },
-        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_PermissionResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/authzhttp.PermissionResponse"
-                    }
-                },
-                "meta": {
-                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
-                }
-            }
-        },
-        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_PolicyResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/authzhttp.PolicyResponse"
-                    }
-                },
-                "meta": {
-                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
-                }
-            }
-        },
-        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_authzhttp_RoleResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/authzhttp.RoleResponse"
-                    }
-                },
-                "meta": {
-                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
                 }
             }
         },
@@ -2287,55 +2231,56 @@
                 }
             }
         },
-        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_AssignmentResponse": {
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_authorization_transport_http_AssignmentResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/authzhttp.AssignmentResponse"
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/backend_internal_authorization_transport_http.AssignmentResponse"
+                    }
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
                 }
             }
         },
-        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_PolicyResponse": {
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_authorization_transport_http_PermissionResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/authzhttp.PolicyResponse"
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/backend_internal_authorization_transport_http.PermissionResponse"
+                    }
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
                 }
             }
         },
-        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RoleDetailResponse": {
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_authorization_transport_http_PolicyResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/authzhttp.RoleDetailResponse"
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/backend_internal_authorization_transport_http.PolicyResponse"
+                    }
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
                 }
             }
         },
-        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_RolePermissionsResponse": {
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_authorization_transport_http_RoleResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/authzhttp.RolePermissionsResponse"
-                },
-                "meta": {
-                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
-                }
-            }
-        },
-        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-authzhttp_SimulateResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "$ref": "#/definitions/authzhttp.SimulateResponse"
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/backend_internal_authorization_transport_http.RoleResponse"
+                    }
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
@@ -2424,6 +2369,61 @@
             "properties": {
                 "data": {
                     "$ref": "#/definitions/backend_internal_auth_transport_http.SwitchOrganizationResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_AssignmentResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_authorization_transport_http.AssignmentResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_PolicyResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_authorization_transport_http.PolicyResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_RoleDetailResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_authorization_transport_http.RoleDetailResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_RolePermissionsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_authorization_transport_http.RolePermissionsResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_authorization_transport_http_SimulateResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_authorization_transport_http.SimulateResponse"
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
