@@ -23,8 +23,10 @@
 #      lain DIEKSEKUSI (id baru, baris baru): replay lintas organisasi tidak boleh terjadi.
 #   5. batas organisasi: adminB tidak melihat dan tidak dapat mencabut assignment organisasi A (404).
 #   6. alur exit docs/21 dengan M: 403 → diberi role organization-admin → 200 segera → policy deny
-#      → 403 policy_denied (simulate menjelaskan policy_code) → policy dinonaktifkan → 200 → role
-#      dicabut → 403 segera; pencabutan ulang 409 assignment_revoked.
+#      → 403 permission_denied SERAGAM (klien tidak melihat policy; ADR-0022 butir 32e) sedangkan
+#      simulate menjelaskan reason policy_denied + policy_code kepada pemegang policy.read dan audit
+#      authz.access_denied memuat policy_code → policy dinonaktifkan → 200 → role dicabut → 403
+#      segera; pencabutan ulang 409 assignment_revoked.
 #   7. pencabutan assignment platform mencabut SEMUA sesi user itu (ADR-0022 butir 76): sesi user
 #      bootstrap "platform" 200 → assignment-nya dicabut Super Admin smoke → cookie yang sama 401.
 #      Super Admin smoke utama TIDAK pernah dicabut atau dikunci.
@@ -180,6 +182,10 @@ switch_org() { # switch_org <jar> <csrf> <organisasi>: token CSRF baru di SW_CSR
   want 200 "switch-organization ke $3"
   SW_CSRF=$(json_field csrf_token)
   [ -n "$SW_CSRF" ] || fail "switch-organization tanpa csrf_token: $BODY"
+}
+
+policy_denied_audits() { # policy_denied_audits <user> <kode-policy>: penolakan authz berkode policy itu di audit
+  sql1 "SELECT count(*) FROM activities WHERE action = 'authz.access_denied' AND result = 'denied' AND actor_user_id = '$1' AND metadata->>'policy_code' = '$2'"
 }
 
 count_assign() { # count_assign <organisasi> <subjek> <role>: assignment aktif
@@ -401,7 +407,7 @@ has '"result":"ALLOW"' "simulate sesudah"
 has '"reason":"granted"' "simulate sesudah"
 has '"level":"organization"' "simulate sesudah"
 
-step "policy deny untuk M pada role.read → M 403 policy_denied; simulate menyebut policy_code; GET /policies memuatnya"
+step "policy deny untuk M pada role.read → M 403 permission_denied seragam; simulate menyebut policy_denied + policy_code; audit memuat policy_code; GET /policies memuatnya"
 POLICY_CODE="smoke_m04_$RUN"
 call "$A_JAR" "$A_CSRF" POST /policies \
   "{\"code\":\"$POLICY_CODE\",\"name\":\"Smoke M04 deny\",\"description\":\"smoke\",\"effect\":\"deny\",\"expression\":\"current_user.id == \\\"$UM\\\"\",\"actions\":[\"role.read\"],\"status\":\"active\"}"
@@ -410,7 +416,14 @@ POLICY_ID=$(json_field id)
 [ -n "$POLICY_ID" ] || fail "POST /policies tanpa id: $BODY"
 call "$M_JAR" "$M_CSRF" GET /roles
 want 403 "M GET /roles dengan policy deny"
-has '"policy_denied"' "M GET /roles dengan policy deny"
+has '"permission_denied"' "M GET /roles dengan policy deny"
+hasnt "$POLICY_CODE|policy_denied|policy" "M GET /roles dengan policy deny (klien tidak boleh melihat policy)"
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  [ "$(policy_denied_audits "$UM" "$POLICY_CODE")" -ge 1 ] && break
+  sleep 0.5
+done
+[ "$(policy_denied_audits "$UM" "$POLICY_CODE")" -ge 1 ] ||
+  fail "audit authz.access_denied tanpa policy_code=$POLICY_CODE untuk M setelah penolakan policy"
 call "$A_JAR" "$A_CSRF" POST /permissions/simulate "{\"user_id\":\"$UM\",\"action\":\"role.read\"}"
 want 200 "simulate M role.read (policy)"
 has '"result":"DENY"' "simulate policy"
