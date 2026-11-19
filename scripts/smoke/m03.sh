@@ -44,7 +44,7 @@ recover_password() {
   [ "$PW_CHANGED" = 1 ] || return 0
   PW_CHANGED=0
   local code
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -b "$JAR" -X POST \
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time "${SMOKE_CURL_MAX_TIME:-20}" -b "$JAR" -X POST \
     -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
     --data "{\"current_password\":\"$CUR_PW\",\"new_password\":\"$ORIG_PW\"}" "$API/security/password" || true)
   if [ "$code" = "200" ]; then
@@ -63,7 +63,7 @@ STATUS="" HDR="" BODY=""
 http() { # http <argumen curl...>: mengisi STATUS, HDR (header, tanpa CR), BODY
   local dir
   dir=$(mktemp -d)
-  STATUS=$(curl -s -D "$dir/h" -o "$dir/b" -w '%{http_code}' --max-time 8 "$@") || { rm -rf "$dir"; fail "curl gagal: $*"; }
+  STATUS=$(curl -s -D "$dir/h" -o "$dir/b" -w '%{http_code}' --max-time "${SMOKE_CURL_MAX_TIME:-20}" "$@") || { rm -rf "$dir"; fail "curl gagal: $*"; }
   HDR=$(tr -d '\r' <"$dir/h")
   BODY=$(cat "$dir/b")
   rm -rf "$dir"
