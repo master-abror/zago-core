@@ -1,47 +1,116 @@
-# Open Source Modular Application Platform
+# ZaGo Core
 
-Platform aplikasi modular: **inti kecil** (identitas, otorisasi, audit, event, sistem modul) dan **modul bisnis**
-yang dipasang di atasnya. Stack: Go · PostgreSQL 18 · Redis 8 · Svelte 5 · Docker.
+**Build the business, not the boilerplate.**
 
-> Status per milestone ada di [`docs/STATUS.md`](docs/STATUS.md). Seluruh desain ada di [`docs/`](docs/)
-> (mulai dari [`docs/00-errata-and-amendments.md`](docs/00-errata-and-amendments.md) dan [`CLAUDE.md`](CLAUDE.md)).
+An open-source, multi-tenant application platform that gives you authentication, organizations, fine-grained permissions, audit trails and realtime messaging out of the box — so a new product starts as a *module*, not as another rewrite of login and user management.
 
-## Prasyarat
+![Go](https://img.shields.io/badge/Go-backend-00ADD8?logo=go&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-8-DC382D?logo=redis&logoColor=white)
+![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 
-| Alat | Versi | Catatan |
-|---|---|---|
-| Go | 1.26.5 | lihat `go.mod`, ADR-0002 |
-| Node.js | 24 | `.nvmrc` (`nvm install`) |
-| Docker + Compose | terbaru | untuk datastore, tes integrasi, dan `make verify` |
-| `make`, `bash`, `curl` | | |
-| C compiler (`gcc`) | | hanya untuk `go test -race` (Ubuntu/WSL: `sudo apt install build-essential`) |
+> ZaGo Core is under active development toward v1.0. The design documents in [`docs/`](docs/) describe the complete system.
 
-**Windows:** jalankan semuanya di dalam WSL2 dan **simpan repo di filesystem Linux** (mis. `~/projects/platform`),
-bukan di `/mnt/c/...` atau folder OneDrive: I/O lintas-filesystem membuat `npm`, `go test`, Vitest, hot reload,
-dan bind-mount Docker jauh lebih lambat dan bisa menyebabkan timeout. Pasang Go dan Node **di dalam WSL**
-(bukan memakai `npm` Windows), dan aktifkan WSL Integration di Docker Desktop.
+---
 
-## Mulai cepat
+## Why ZaGo Core?
 
-```bash
-git clone https://github.com/master-abror/zago-core.git && cd zago-core
-make setup          # .env, dependensi, datastore (postgres, redis, mailpit), migrasi
-make dev            # api + worker + frontend native, hot reload, satu terminal (Ctrl-C menghentikan semuanya)
+Almost every internal tool, admin panel or B2B SaaS needs the same foundation before any real business logic can begin: *who can log in, how are they organized, what are they allowed to do, and what did they do?* Teams rebuild this again and again — usually without proper audit trails, with permissions bolted on as an afterthought.
+
+ZaGo Core builds that foundation **once, to a production-grade standard**:
+
+- **Security is the default posture.** Everything is denied unless a rule explicitly allows it.
+- **Multi-tenant from the schema up.** Tenant isolation is enforced by the database and by code structure, not by developer memory.
+- **Extensible without forking.** Business capabilities (Finance, HR, CRM, …) are modules that depend only on a small, stable SDK.
+- **Operable from day one.** Health checks, metrics, tracing, structured logs, graceful shutdown and one-command verification.
+
+## What you get
+
+### Identity & organizations
+- Platform → Organizations → Groups (hierarchical, acyclic, bounded depth) → Members
+- Email invitations with a preset group and role, and password reset by email
+- Users can belong to several organizations and switch between them; groups can be switched per request
+
+### Authentication
+- Opaque 256-bit session tokens — only a hash is ever stored, never the token
+- Argon2id password hashing with rehash-on-login and timing-equalized responses (no account enumeration)
+- `HttpOnly`, `SameSite=Lax` cookies (`__Host-` prefixed in production) and session-bound CSRF tokens
+- Temporary account locking with progressive delay, plus per-IP throttling
+- Sessions survive an API restart, and survive Redis going down (PostgreSQL is the authority)
+- Revoked sessions close live WebSocket connections immediately
+
+### Authorization
+- Roles, permissions and role assignments at **platform, organization, group, resource and own** scope
+- **Field-level permissions**: a restricted field is simply absent from REST responses, WebSocket events and exports
+- **Policies**: conditional allow/deny rules in a small, sandboxed expression language (hand-written parser, no `eval`, fuzz-tested)
+- **Authority ceiling**: an admin can never grant more than they hold themselves
+- **Instant revocation** through versioned cache keys — no waiting for a TTL
+- A **permission simulator** that runs through the exact production code path
+
+### Modules
+- Modules declare their permissions, routes, migrations, events, notification templates, jobs and UI in a single manifest
+- Enable or disable a module **per organization**; disabling preserves data
+- Each module has its own migrations and version table, and its own table prefix
+- A module can only import `packages/module-sdk` — Go's `internal/` visibility rule enforces the boundary at compile time
+
+### Realtime
+- WebSocket delivery for **notifications**, an actionable **inbox**, and **chat** (direct and group, with attachments)
+- Horizontally scalable through Redis Pub/Sub
+- Everything is persisted first; offline users catch up over REST and reconnecting clients resync
+
+### Audit & observability
+- Three separate logs for three audiences: **activities** (business actions, role-scoped visibility), **security events** (auth-specific), **system logs** (Super Admin only)
+- Append-only by database privilege: the runtime role cannot `UPDATE` or `DELETE` audit rows
+- State change, audit record and event are committed **atomically** through a transactional outbox
+- Structured JSON logs, Prometheus metrics, OpenTelemetry traces and honest readiness checks
+
+### Developer experience
+- REST API under `/api/v1` with a consistent envelope, signed cursor pagination, idempotency keys and rate limiting
+- OpenAPI generated from code and turned into a typed TypeScript SDK
+- `make` is the single interface for contributors and CI alike
+- Translation-key-driven UI and error codes, UTC storage with per-user locale and timezone
+
+## How it fits together
+
+```text
+Browser (Svelte 5 SPA)
+   │  same origin: /, /api, /ws
+   ▼
+Reverse proxy ───────────────┐
+   │                         │
+   ▼                         ▼
+ cmd/api                 cmd/worker
+ HTTP + WebSocket        outbox relay, jobs, email,
+ authn → scope → authz   exports, retention
+   │                         │
+   └───────┬─────────────────┘
+           ▼
+   PostgreSQL 18  ◄── authoritative state, outbox, audit
+   Redis 8        ◄── sessions, cache, rate limits, Pub/Sub (rebuildable)
 ```
 
-Lalu: `curl localhost:8080/health/ready` → `200` dengan `postgres` dan `redis` `ok`; frontend di
-<http://localhost:5173> (Vite meneruskan `/api` dan `/ws` ke `:8080`); email pengembangan di <http://localhost:8025> (Mailpit).
+- **Layering:** transport → application → domain → repository. Only application services talk to the authorizer, audit recorder and event bus.
+- **Three binaries, one codebase:** `api`, `worker` and `migrate` share code but never memory.
+- **Three database roles:** `app_migrator` (DDL), `app_user` (runtime), `app_maintenance` (retention and anonymization only).
+- **Dependency failures degrade, they don't fail open:** Redis down means PostgreSQL fallback; PostgreSQL down means `503`, never stale answers.
 
-Semua stack di Docker: `make docker-up` / `make docker-down`.
+## Build a module
 
-Admin pertama (setelah stack jalan): `make db-seed && make bootstrap-admin EMAIL=kamu@example.org`, lalu `POST /api/v1/auth/login`
-(cookie sesi `HttpOnly` + `csrf_token` di body; kirim `X-CSRF-Token` pada setiap request pengubah-state).
+A module is a manifest plus a small amount of Go and Svelte:
 
-**Keamanan login (M03, ADR-0020):** Argon2id; token sesi 256-bit yang hanya disimpan sebagai hash (Redis + PostgreSQL, tetap berjalan bila Redis mati);
-rotasi sesi saat login, ganti password, refresh, dan pindah organisasi; CSRF terikat sesi; 5 password salah/15 menit mengunci akun secara **tak terlihat**
-(login tetap "email atau password salah", durasi berlipat 15→30→60 menit) dan 30 kegagalan/15 menit per IP ditolak 429 + `Retry-After`.
-Pembuka kunci darurat: `redis-cli DEL auth:lock:<user_id>`. Batas yang diketahui (kunci akun bisa dipakai mengunci korban yang emailnya diketahui,
-password spraying lintas IP, tanpa MFA/CAPTCHA) ada di `docs/handover/HANDOVER-M03.md`. Tidak ada jaminan keamanan absolut.
+```yaml
+id: announcements
+name: Announcements
+version: 1.0.0
+
+permissions:
+  - code: announcement.read
+    resource: announcement
+    action: read
+  - code: announcement.publish
+    resource: announcement
+    action: publish
 
 **Otorisasi (M04, ADR-0022):** katalog permission core dan empat role sistem ada di kode dan disinkronkan saat start; setiap rute terlindungi melewati `Authenticate → CSRF → RequireAuth → Scope → Authorize(action)`;
 hak efektif di-cache per versi di Redis (gagal-aman, dicabut seketika lewat invalidasi eksplisit) dan policy hanya membatasi (deny menang, galat evaluasi = tolak); authority ceiling mencegah admin memberi lebih dari yang ia pegang.
@@ -50,9 +119,25 @@ hak efektif di-cache per versi di Redis (gagal-aman, dicabut seketika lewat inva
 Port host bentrok dengan proyek lain? Jangan edit `.env` manual: `bash scripts/env-ports.sh --force POSTGRES=25000 REDIS=25001 API=25002 WEB=25003 SMTP=25004 MAILUI=25005`
 (ADR-0021; port di dalam jaringan compose tidak berubah).
 
-## Perintah utama (`make help` untuk daftar lengkap)
+notifications:
+  - event: announcements.announcement.published
+    type: announcements.published
+    recipients: payload.recipient_ids
+```
 
-| Perintah | Fungsi |
+```go
+func (m *Module) RegisterRoutes(r modulesdk.Router, deps modulesdk.CoreDeps) {
+    r.Get("/announcements", m.list, modulesdk.Require("announcement.read"))
+    r.Post("/announcements/{id}/publish", m.publish,
+        modulesdk.Require("announcement.publish"), modulesdk.Idempotent())
+}
+```
+
+Every route must declare the permission it needs, or registration fails. See the [Module Developer Guide](docs/17-module-developer-guide.md) for the full walkthrough.
+
+## Tech stack
+
+| Area | Choice |
 |---|---|
 | `make verify` | **Gerbang tunggal**: lint + `generate-check` + tes + migrate-roundtrip + build + smoke pada stack Docker sementara. Harus hijau sebelum merge. |
 | `make lint` / `make test` | lint Go + frontend + pemeriksaan struktural / tes backend (`-race`, testcontainers) + frontend |
@@ -79,25 +164,49 @@ Build pertama dengan cache dingin butuh beberapa menit; jangan hentikan saat tam
 ## Struktur
 
 ```text
-backend/{cmd,internal,pkg,migrations}   Go: api, worker, migrate; kernel
-apps/web                                 Svelte 5 SPA (runes)
-packages/{module-sdk,ts-sdk,ui}          kontrak modul, SDK TypeScript, UI kit
-modules/                                 modul bisnis (hanya impor packages/module-sdk)
-deploy/{docker,db,nginx}                 Dockerfile, init SQL, konfigurasi web
-scripts/                                 dev, smoke, lint-structure, handover, repo-zip
-docs/                                    desain 00–23, ADR, STATUS, handover
+backend/       Go: cmd/{api,worker,migrate}, internal/*, pkg/*, migrations
+packages/      module-sdk (the only package modules may import), ts-sdk, ui
+modules/       business modules
+apps/web/      Svelte SPA
+deploy/        Dockerfiles and database init scripts
+docs/          the full design series, ADRs and API spec
 ```
 
-## Lisensi komponen: Redis atau Valkey
+## Documentation
 
-Redis 8 dirilis dengan opsi lisensi **RSALv2 / SSPLv1 / AGPLv3**; **Valkey** adalah fork berlisensi **BSD**.
-Pilihan proyek ini: kode hanya memakai perintah Redis dasar, sehingga operator bebas memakai Redis atau Valkey
-tanpa mengubah kode. `docker-compose.yml` memakai `redis:8` hanya untuk kenyamanan pengembangan lokal.
-Kompatibilitas Valkey **belum diuji di CI** (dijadwalkan di `docs/20-roadmap.md`); sampai itu ada, anggap Valkey
-sebagai kompatibel menurut desain, bukan menurut bukti. Alasan pemilihan: `docs/adr/0001-stack.md`.
+The `docs/` folder is the specification, and it is meant to be read in order:
 
-## Kontribusi
+| | |
+|---|---|
+| [01 Product Requirements](docs/01-product-requirements.md) | Why, for whom, and what "done" means |
+| [02 Domain Model](docs/02-domain-model.md) | Entities, relationships and invariants |
+| [04 Database Schema](docs/04-database-schema.md) | Exact SQL, roles and grants |
+| [05 Authentication](docs/05-authentication-design.md) | "Who is this?" |
+| [06 Authorization](docs/06-authorization-engine.md) | "What can they do?" |
+| [07 Module System](docs/07-module-system.md) | How the platform is extended |
+| [08 API Specification](docs/08-api-specification.md) | REST conventions and catalog |
+| [09 Realtime](docs/09-websocket-protocol.md) | WebSocket, notifications, inbox, chat |
+| [10 Backend Architecture](docs/10-backend-architecture.md) | Packages, transactions, outbox |
+| [12 Threat Model](docs/12-security-threat-model.md) | Who attacks what, and how it's handled |
+| [13 Audit Logging](docs/13-audit-logging.md) | Activities, security events, system logs |
 
-Baca [`CLAUDE.md`](CLAUDE.md) (aturan keras) dan [`docs/22-handover-protocol.md`](docs/22-handover-protocol.md).
-Perubahan yang menyimpang dari dokumen wajib punya ADR di `docs/adr/`.
-Lisensi proyek ini sendiri belum ditetapkan di dokumen; tentukan sebelum rilis publik.
+Architecture decisions are recorded as short ADRs in [`docs/adr/`](docs/adr/); where an ADR and a document disagree, the newer ADR wins.
+
+## Deliberately out of scope for v1.0
+
+These are boundaries drawn on purpose, so v1.0 has a real, shippable edge: TOTP MFA and recovery codes, WebAuthn/passkeys, enterprise SSO (OIDC), a module marketplace, sandboxed modules, S3-compatible storage and multi-region deployment. See the [roadmap](docs/20-roadmap.md) for the reasoning.
+
+A note on honesty: modules run in the same process as core. Treat installing a third-party module like merging an external pull request into production — review it first. The [threat model](docs/12-security-threat-model.md) states this trade-off plainly.
+
+## Contributing
+
+Contributions are welcome. Start with [`docs/10-backend-architecture.md`](docs/10-backend-architecture.md) and [`docs/18-testing-strategy.md`](docs/18-testing-strategy.md). A few ground rules:
+
+- Write the negative tests first for anything touching authentication, authorization or tenant isolation.
+- Use Conventional Commits.
+- Record any deviation from the docs as an ADR instead of drifting silently.
+- Run `make verify` before opening a pull request.
+
+## License
+
+License to be announced.
