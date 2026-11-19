@@ -79,7 +79,9 @@ STATUS="" HDR="" BODY=""
 http() { # http <argumen curl...>: mengisi STATUS, HDR (header, tanpa CR), BODY
   local dir
   dir=$(mktemp -d)
-  STATUS=$(curl -s -D "$dir/h" -o "$dir/b" -w '%{http_code}' --max-time "${SMOKE_CURL_MAX_TIME:-20}" "$@") || { rm -rf "$dir"; fail "curl gagal: $*"; }
+  local rc=0 t0=$SECONDS
+  STATUS=$(curl -s -D "$dir/h" -o "$dir/b" -w '%{http_code}' --max-time "${SMOKE_CURL_MAX_TIME:-20}" "$@") || rc=$?
+  [ "$rc" -eq 0 ] || { rm -rf "$dir"; fail "curl gagal (exit=$rc, $((SECONDS - t0)) dtk): $*"; }
   HDR=$(tr -d '\r' <"$dir/h")
   BODY=$(cat "$dir/b")
   rm -rf "$dir"
