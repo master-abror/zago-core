@@ -27,6 +27,9 @@ Three tables, three audiences, three purposes. Conflating any two of them is the
 
 ## 2.1 What gets recorded
 
+> **As built (M04):** activities written by the authorization core: `role.create`, `role.update`, `role.permissions.update`, `role.archive`; `role_assignment.create`, `role_assignment.revoke`, `role_assignment.sessions_revoke`; `policy.create`, `policy.update` (metadata without name, description or expression); `permission.simulate` (target as resource, no attribute values; written outside any transaction); `authz.access_denied` (with `policy_code` when a policy refused). Policy refusals of a writer are written as `result=denied` in a separate transaction. Outbox events: `authz.role.created|updated|permissions_changed|archived`, `authz.role_assignment.created|revoked`, `authz.policy.changed` (payload `change` = `created|updated`).
+
+
 Every state-changing operation, and every access to something sensitive enough to warrant a trail, produces one `activities` row (03 §32):
 
 ```text

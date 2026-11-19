@@ -208,6 +208,9 @@ An assignment whose subject is a **group** (`subject_type = 'group'`) is inherit
 
 ## 5.3 Authority ceiling — admins cannot escalate
 
+> **As built (M04, ADR-0022 #47-#49, #53-#58):** the granter's set is computed from PostgreSQL *inside* the granting transaction, never from the cache. On `PUT /roles/{id}/permissions` the ceiling is checked against the union of the old and the new set, and it also applies to renaming and archiving a role and to revoking an assignment (a Group Admin cannot revoke an organization-level assignment). A group-level granter covers only the active group. A platform target is reachable only from platform scope; a tenant target only from the caller's organization; a Super Admin never grants inside an organization from platform scope and must enter it first through `switch-organization`. Platform assignments carry no `expires_at`, the only platform subject is `user`, and subject type `service` is rejected until it is supported. The last active Super Admin assignment cannot be revoked. Every writer takes the organization advisory lock (platform lock for platform scope and global policies) as the first step of its transaction (#54); any new writer MUST do the same or the ceiling-then-write gap reopens.
+
+
 An Admin granting a role or permission must never be able to grant more than their own authority:
 
 ```text
@@ -246,6 +249,9 @@ message        message.send  .moderate
 
 ## 5.5 System roles and their default permission sets
 
+> **As built (M04, ADR-0022 #47, #53):** the allowed scope per system-role template is a table in code. The four system-role slugs are reserved, and the permissions of a system role cannot be changed through the API. Role slugs match `^[a-z0-9]+(-[a-z0-9]+)*$` (at most 100 characters) and cannot be renamed. The canonical form of an organization-scope assignment stores `scope_id` as NULL (docs/02 §15).
+
+
 Seeded from code (idempotent upsert by slug) with these defaults; an organization may clone and adjust them as custom roles.
 
 | Role | Boundary | Default permissions |
@@ -264,6 +270,9 @@ Endpoints that act only on the caller's own records — `GET /auth/me`, `/securi
 ---
 
 # 6. Policy Layer
+
+> **As built (M04, ADR-0022 #30-#34, #50, #59-#61):** a policy can only *restrict*: `deny` refuses, `allow` is an additional condition, and an evaluation error refuses (`policy_evaluation_failed`, 403). A policy that needs resource attributes is deferred when the check carries no resource (`Decision.DeferredPolicies`); resource-level callers MUST apply it. The expression language lives in `internal/policy` (two-segment roots `resource`, `current_user`, `scope`; allow-listed functions `lower`, `len`, `startsWith`, `endsWith`, `contains`; strict typing; hard limits; no `group()` and no `has()`). Writes validate that `actions` exist in the catalog, cap active policies at 50 per organization plus 50 global, and refuse any policy that targets a `policy.*` action (otherwise a `deny` could lock out its own manager). A write needs organization scope or platform scope without an active group. `PATCH` never changes `code`, `null` means unchanged, disabling is always allowed, and there is no `DELETE`. Policies are not cached. Clients always see a policy refusal as `permission_denied` (#32e); the policy code appears only in the simulator (for holders of `policy.read`) and in the `authz.access_denied` audit metadata.
+
 
 Policies add conditional logic on top of a raw permission grant.
 
@@ -286,6 +295,9 @@ Rules:
 ---
 
 # 7. Field-Level Permissions
+
+> **As built (M04, ADR-0022 #35-#45, #77):** field permissions are catalog codes `<type>.field.<name>.<read|write>` (the third segment from the right, `field`, is reserved); restriction is per action and the default is deny. `FieldGuard.For(ctx, identity, scope, type)` returns a `FieldFilter` with `Apply(ref, obj)` (a new map without restricted unreadable fields) and `CheckWrite(ref, obj)` (a `*FieldDeniedError`); errors are returned rather than hidden, which departs from the signature sketched here. Matching fails closed (non-ASCII keys require every restricted code), covers top-level keys only, and loads definitions from PostgreSQL on each filter creation. `authzhttp.FieldHelper` is the handler-side helper: `DecodeWrite` checks the *raw* keys before decoding into a struct (then `DisallowUnknownFields`), and `FilterRead` filters one object. A refusal is `403 field_permission_denied` without the field name; refusals are logged, not audited. The core catalog declares no field codes yet and no production handler uses the helper (first user: M05).
+
 
 Field permissions are enforced **during serialization**, after the object is loaded and before it leaves the server — not by the frontend deciding what to render.
 
@@ -317,6 +329,9 @@ A field's write permission is checked independently of its read permission — a
 The Effective Permission Set from §5.2 is the expensive part (multiple joins across `role_assignments` → `roles` → `role_permissions` → `permissions`) and the part that's safe to cache, because it doesn't depend on any single resource's state.
 
 ## 8.1 Versioned keys (O(1) invalidation)
+
+> **As built (M04, ADR-0022 #16-#20, #28):** invalidation is called explicitly inside the mutating transaction, before and after commit, not through the event bus. The key version is the pair (organization counter, platform counter); changing a system role bumps the platform counter; versions derive from the clock. TTL is 2 minutes. The catalog `Syncer` bumps the platform counter around its commit when anything changed; a failed bump is logged and does not stop startup. Without Redis the cache and the invalidator are nil interfaces and every check reads PostgreSQL.
+
 
 A per-organization version counter makes invalidation a single `INCR`, with no key scanning and no need to know which users a changed role affects:
 
@@ -355,6 +370,9 @@ Policies and field permissions are **not** cached (§6, §7) — only the role �
 
 # 9. Middleware & Composition with Authentication
 
+> **As built (M04, ADR-0022 #25, #70):** the protected route order is `Authenticate -> CSRF -> RequireAuth -> Scope -> Authorize(action)`; `Scope` also fills `kernel.Scope` so activities carry the scope. `Authorize` answers 401 without an identity and 500 without a scope; an engine error always wins over a decision (`ErrInvalidCheck`/`ErrInvalidScope` = 500, infrastructure = 503, never ALLOW); a refusal is `403 permission_denied` (`scope_mismatch` has its own code) and writes the `authz.access_denied` activity. Authorization routes are mounted only when the kernel toolkit, authentication and the middleware exist; otherwise they answer 404.
+
+
 ```text
 HTTP Request
      │
@@ -384,6 +402,9 @@ Routes declare the action they require (`Authorize("invoice.read")` in core, `mo
 ---
 
 # 10. Permission Simulator
+
+> **As built (M04, ADR-0022 #69, #75):** `POST /api/v1/permissions/simulate` calls the real `Authorizer.Can` with the target's identity in the caller's organization; there is no parallel implementation, and the assembly refuses to start with an authorizer that has no policies. The target must be an active member of the caller's organization; anything else is a uniform `400 validation_failed` on `user_id` (`not_found`). A platform caller gets `403 scope_mismatch`; a group-level caller is locked to their group; for an organization-level caller, groups that are not the target's memberships are dropped as the production header would. The request is `{user_id, action, active_group_id?, resource?{type,id,owner_id,group_id,attrs}}` with bounded attributes (at most 32, reserved core names). The response is `{result: ALLOW|DENY, reason, level, policy_code, deferred_policies}`: `reason` is a stable code rather than a sentence, there is no `evaluated`, and `policy_code`/`deferred_policies` are shown only to callers who also pass `Can(policy.read)`. The audit action `permission.simulate` is written outside the transaction and carries no attribute values. The answer describes the state now, not a guarantee for a later request; rate limiting is deferred to M15.
+
 
 Directly useful for support and for Admins debugging their own configuration:
 
@@ -418,6 +439,9 @@ The simulator runs through the exact same `Authorizer.Can` code path as producti
 
 # 11. REST API Surface
 
+> **As built (M04, ADR-0022 #62-#68, #70-#76):** all 15 routes are mounted under `/api/v1`. Actions: `role.read` for `GET /roles`, `GET /roles/{id}`, `GET /roles/{id}/permissions` and `GET /role-assignments`; `role.manage` for `POST/PATCH/DELETE /roles`; `permission.assign` for `PUT /roles/{id}/permissions`; `permission.read` for `GET /permissions`; `role.assign` for `POST/DELETE /role-assignments`; `policy.read` for `GET /policies`; `policy.manage` for `POST/PATCH /policies`; `permission.simulate` for simulate. Lists are `{data: [...], meta: {pagination}}`; roles, permissions and policies use offset pagination (08 §4), role-assignments use a cursor. `GET/PUT /roles/{id}/permissions` use `{permissions: [...]}`. `GET /roles` shows system roles plus the caller's organization roles (platform scope: system roles only) with filter `status` (`active` by default); `PATCH /roles/{id}` reads the effective values, merges and writes (two concurrent PATCHes on different fields can overwrite each other). `GET /policies` defaults to status `all` and shows global policies marked `global`, without `organization_id`. `POST /role-assignments` requires `Idempotency-Key` (08 §6) and is checked after `Authorize`; a platform caller asking for an organization or group scope gets `403 scope_mismatch`. `DELETE /role-assignments/{id}` on a platform-scope assignment revokes every session of the subject user after commit (activity `role_assignment.sessions_revoke`; a failure is logged and audited and does not roll back the revocation). Request bodies never carry `organization_id` or a scope; the organization comes only from `ScopeContext`.
+
+
 ```text
 GET    /api/v1/roles
 POST   /api/v1/roles
@@ -447,6 +471,9 @@ Every one of these endpoints is itself gated by the same engine (`role.read`, `r
 
 # 12. Error Model
 
+> **As built (M04, ADR-0022 #62):** statuses: `role_not_found` 404, `permission_not_found` 422, `grant_exceeds_authority` 403, `invalid_scope` 400, `scope_mismatch` 403, `policy_evaluation_failed` 403, `field_permission_denied` 403. Eight codes beyond this list are 409: `role_slug_taken`, `role_immutable`, `role_archived`, `assignment_exists`, `assignment_revoked`, `last_super_admin`, `policy_code_taken`, `policy_limit_reached`. `resource_not_found` is used for a missing assignment or policy. Another organization's role is indistinguishable from a missing one; a missing subject or group is a `validation_failed` on `subject_id`/`group_id`. Responses carry no client values, permission lists, indexes or expression positions. Any new domain sentinel MUST be added to `programmingErrors`, `codeRules` or `fieldRules` in `authzhttp.DomainError`, otherwise it falls through to 503.
+
+
 ```json
 {
   "error": {
@@ -474,6 +501,9 @@ field_permission_denied
 
 # 13. Package Structure
 
+> **As built (M04):** `backend/internal/{permission,role,policy}` plus `backend/internal/authorization/{domain,application,repository,cache,transport/http}`. Writers (`RoleWriter`, `AssignmentWriter`, `PolicyWriter`), readers, the `Simulator`, `FieldGuard`, the `Authorizer` and `PlatformEntry` live in `application`; SQL in `repository`; HTTP, DTOs, `Scope`, `Authorize` and `FieldHelper` in `transport/http` (`authzhttp`). Assembly: `authzStack` and `httpAPI` in `internal/app/authz.go`, route mounting in `internal/httpserver/authz_routes.go`.
+
+
 ```text
 internal/
 ├── role/              # domain + repository for roles
@@ -500,6 +530,9 @@ internal/
 ---
 
 # 14. Testing Requirements
+
+> **As built (M04):** met at function and PostgreSQL level: ceiling, policy evaluation and deny-wins, a fuzz test of the parser (`internal/policy/fuzz_test.go`), group scope not leaking across groups, platform Super Admin path, uniform cross-organization negatives in both directions for every read and write path, per-route actions with the real `Authorize`, and concurrency proofs for the advisory lock. End to end with a real server, session, PostgreSQL and Redis, `scripts/smoke/m04.sh` proves 401, 403, `scope_mismatch`, immediate effect of grant and revoke, a policy deny, the simulator's explanation, `Idempotency-Key` not replaying across organizations, and session revocation on platform revoke. Field-level tests exist at function and PostgreSQL level and through `FieldHelper`; no REST, WebSocket or export path uses them yet.
+
 
 ```text
 Effective permission resolution

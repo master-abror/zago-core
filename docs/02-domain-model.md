@@ -587,6 +587,9 @@ Role ───< Role Permission >─── Permission
 
 # 15. Role Assignment
 
+> **As built (M04, ADR-0022 #47, #56, #65):** subject type `service` is not supported yet; platform assignments are for users only and carry no `expires_at`; an expiry must lie in the future. The canonical form of an organization-scope assignment is `scope_id` NULL (both forms read the same; the duplicate check covers both). Migration 035 made the unique index on active assignments include `organization_id`, so one user can hold the same system role in two organizations.
+
+
 A Role Assignment connects a role to a subject.
 
 A subject may be:
@@ -643,6 +646,9 @@ own
 ---
 
 # 16. Policy
+
+> **As built (M04, ADR-0022 #31, #50, #59):** `allow` is an additional condition and `deny` wins; a policy never grants anything. `actions` must exist in the catalog (checked on write only; a policy whose action later disappears never matches and can still be disabled). Actions of resource `policy` cannot be restricted by a policy. At most 50 active policies per organization plus 50 global.
+
 
 A Policy adds conditional logic to authorization.
 

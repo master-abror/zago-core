@@ -156,6 +156,9 @@ Each code is single-use; the database stores only hashes. A used or expired reco
 
 # 7. Session Architecture
 
+> **As built (M04, ADR-0022 #76):** revoking a platform-scope assignment whose subject is a user revokes every session of that user after the commit, with reason `revoke_all` (the same reason as 11.1); sessions created by entering an organization through the platform path die with them.
+
+
 Two stores, two jobs:
 
 | | Stores | Purpose |
@@ -474,6 +477,9 @@ Future flow: `User → Passkey → WebAuthn → Identity verified → Session cr
 ---
 
 # 17. REST API Surface
+
+> **As built (M04, ADR-0022 #27):** an identity with no membership (a platform Super Admin, `Identity.OrganizationID == nil`) enters an organization through `switch-organization`. The engine (`organization.read` at platform scope) is asked first, then the organization is checked to be `active`; every refusal is the same `403 permission_denied`; `auth.organization.switched` and its activity carry `via=platform`, and the decision level stays `platform`.
+
 
 ```text
 POST   /api/v1/auth/login

@@ -83,6 +83,9 @@ Kalau proses mati setelah `Save` tetapi sebelum `audit.Record`, jejak audit hila
 Tambahkan `ALTER DEFAULT PRIVILEGES FOR ROLE app_migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;`. Env baru: `MIGRATION_DATABASE_URL`, `MAINTENANCE_DATABASE_URL`. Berlaku: M01 (grants), M06 (maintenance), M07 (module install).
 
 ## B-04 — Tidak ada bootstrap Super Admin; katalog permission tidak lengkap (Doc 04 §16)
+
+> **Dikerjakan (M04, ADR-0022 butir 1-9):** katalog permission core (41 kode) dan empat role sistem ada di kode dan disinkronkan saat start (`Syncer`); bagian bootstrap dikerjakan di M03.
+
 Seed membuat role Super Admin tapi tidak ada user pemegangnya; kriteria sukses 01 §5 tidak bisa dimulai. Seed hanya 10 permission, sedangkan endpoint di 08 butuh jauh lebih banyak (`organization.*`, `group.*`, `profile.update`, `conversation.*`, `policy.*`, `permission.simulate`, `settings.*`, `activity.read_group`, dst.).
 
 **Keputusan:**
