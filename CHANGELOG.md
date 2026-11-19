@@ -4,7 +4,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
-### M04 — Authorization Engine (dalam pengerjaan; T1, T1b, T2, T3a, T3b, T3c, T4a, T4b, T4c, T4d, T5a, T5b1, T5b2, T5b3, T5b4, T5c1a, T5c1b, T5c2a-1, migrasi 035, T5c2a-2, T5c2b, T5c3, T5d1, T5d2, T5d3, T5d4, T5d5, T5d6, T5e; berikutnya ritual akhir M04)
+### M04 — Authorization Engine (2026-11-19; tag `m04-done`)
 
 #### Added
 - `scripts/smoke/m04.sh` (T5e, ADR-0022 butir 78): smoke otorisasi ujung-ke-ujung dengan server, sesi, PostgreSQL, dan Redis nyata; fixture lewat `psql` (dua organisasi, user tenant dengan password disalin dari satu user bootstrap). Memuat 401 tanpa sesi, 403 `permission_denied` untuk Member, `scope_mismatch` untuk Super Admin platform, `Idempotency-Key` dan body sama di dua organisasi oleh user yang sama (diputar ulang di organisasi yang sama, DIEKSEKUSI di organisasi lain; butir 73d), batas organisasi, alur exit docs/21 (403, role 200 segera, policy deny seragam `permission_denied` dengan `policy_code` di simulate dan audit, dicabut 403 segera), dan pencabutan assignment platform yang mencabut sesi user itu (butir 76). `make verify` utuh hijau (`exit=0`; smoke m00/m02/m03/m04 OK).
@@ -75,6 +75,15 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 - `ErrInvalidScope` dari resolver di middleware `Scope` kini 500 (sebelumnya 503).
 - Deklarasi kode field dengan aksi selain read/write di katalog core kini menggagalkan `Sync` saat start (tidak di-retry, ADR-0022 butir 52).
 - API tidak lagi start bila database tidak terjangkau saat startup (galat sinkron otorisasi sesudah retry terbatas = `ExitFailed`); sebelumnya hanya `/health/ready` yang 503.
+- Rute otorisasi (15 rute di `/api/v1`) terpasang di server dengan urutan `Authenticate -> CSRF -> RequireAuth -> Scope -> Authorize(action)`; `DELETE /role-assignments/{id}` atas assignment berscope platform mencabut semua sesi user pemegangnya sesudah commit (ADR-0022 butir 75–76).
+- Nama definisi OpenAPI untuk paket `authzhttp` menjadi path penuh (`backend_internal_authorization_transport_http.X`) sejak `internal/app` mengimpornya; murni penamaan, hasil generator deterministik (butir 78e; utang).
+
+#### Docs
+- Doc-sync M04 sebagai blok "As built (M04, ADR-0022 …)" di docs/00 B-04, 02 §15–§16, 05 §7 dan §17, 06 §5.3–§14, 07 §7, 08 §4/§6/§9/§11, 10 §3/§11/§15, 12 §4.6, 13 §2.1, 16 §2.7, 18 §7, 19 §9; `docs/handover/HANDOVER-M04.md` (final), `docs/handover/PROMPT-M05.md` (P2 untuk M05), README (bagian otorisasi, smoke M04), STATUS. ADR-0022 bagian 1–23 (butir 1–78).
+
+#### Known issues
+- Nama definisi OpenAPI panjang (butir 78e): kembalikan nama pendek sebelum `packages/ts-sdk` memakai kontrak.
+- Scope `resource`/`own` belum dievaluasi (gagal-tertutup); `FieldGuard` belum dipakai handler produksi (M05); `simulate` belum dibatasi rate limit (M15); pencabutan sesi tanpa outbox/retry (M15); retry start menunda `/health/*` hingga ±165 dtk (M15); smoke M04 memakai fixture superuser dan menumpuk data di stack dev. Daftar lengkap: `docs/handover/HANDOVER-M04.md` §8.
 
 ### M03 — Authentication (2026-10-29; tag `m03-done`)
 

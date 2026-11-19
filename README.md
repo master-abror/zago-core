@@ -43,6 +43,10 @@ rotasi sesi saat login, ganti password, refresh, dan pindah organisasi; CSRF ter
 Pembuka kunci darurat: `redis-cli DEL auth:lock:<user_id>`. Batas yang diketahui (kunci akun bisa dipakai mengunci korban yang emailnya diketahui,
 password spraying lintas IP, tanpa MFA/CAPTCHA) ada di `docs/handover/HANDOVER-M03.md`. Tidak ada jaminan keamanan absolut.
 
+**Otorisasi (M04, ADR-0022):** katalog permission core dan empat role sistem ada di kode dan disinkronkan saat start; setiap rute terlindungi melewati `Authenticate → CSRF → RequireAuth → Scope → Authorize(action)`;
+hak efektif di-cache per versi di Redis (gagal-aman, dicabut seketika lewat invalidasi eksplisit) dan policy hanya membatasi (deny menang, galat evaluasi = tolak); authority ceiling mencegah admin memberi lebih dari yang ia pegang.
+15 rute di `/api/v1` (role, permission, role-assignment, policy, `permissions/simulate`); mencabut assignment platform mencabut semua sesi user itu. Rincian, batas yang diketahui, dan utang (mis. nama definisi OpenAPI) ada di `docs/handover/HANDOVER-M04.md`. Tidak ada jaminan keamanan absolut.
+
 Port host bentrok dengan proyek lain? Jangan edit `.env` manual: `bash scripts/env-ports.sh --force POSTGRES=25000 REDIS=25001 API=25002 WEB=25003 SMTP=25004 MAILUI=25005`
 (ADR-0021; port di dalam jaringan compose tidak berubah).
 
@@ -53,7 +57,7 @@ Port host bentrok dengan proyek lain? Jangan edit `.env` manual: `bash scripts/e
 | `make verify` | **Gerbang tunggal**: lint + `generate-check` + tes + migrate-roundtrip + build + smoke pada stack Docker sementara. Harus hijau sebelum merge. |
 | `make lint` / `make test` | lint Go + frontend + pemeriksaan struktural / tes backend (`-race`, testcontainers) + frontend |
 | `make generate` / `make generate-check` | regenerasi OpenAPI (`docs/api/swagger.json`), kode sqlc, SDK TS dan registri modul (bertahap per milestone) / gagal bila keluaran generator di disk basi |
-| `make smoke` | semua `scripts/smoke/m*.sh` terhadap stack yang berjalan (`M00`: fondasi; `M02`: kernel lewat endpoint echo; `M03`: login/logout, ganti password, kunci akun). Membuat user Super Admin smoke, jadi hanya terhadap localhost; butuh Go, DB terjangkau dari host, dan `docker compose exec redis` |
+| `make smoke` | semua `scripts/smoke/m*.sh` terhadap stack yang berjalan (`M00`: fondasi; `M02`: kernel lewat endpoint echo; `M03`: login/logout, ganti password, kunci akun; `M04`: otorisasi ujung-ke-ujung dengan fixture `psql`). Membuat user Super Admin smoke, jadi hanya terhadap localhost; butuh Go, DB terjangkau dari host, dan `docker compose exec redis` |
 | `make migrate-up` / `migrate-down` / `migrate-version` | terapkan / mundurkan satu / tampilkan versi migrasi inti (`MIGRATION_DATABASE_URL`) |
 | `make db-seed` | pastikan baris platform ada (idempoten); WAJIB sebelum `make bootstrap-admin` (`make setup`/`make dev` hanya menjalankan migrasi) |
 | `make bootstrap-admin EMAIL=…` | buat Super Admin pertama (idempoten, tidak pernah menimpa password): `NAME=…`, `PASSWORD_STDIN=1` (baca password dari stdin; tanpa itu password acak dicetak SEKALI) |
