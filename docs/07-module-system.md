@@ -254,6 +254,9 @@ If Finance needs to know a user was deactivated, it does **not** query `users` f
 
 # 7. Permission Registration
 
+> **As built (M04, ADR-0022 #35, #51):** `permission.ValidateDeclaration` accepts only `read` and `write` as the action of a field code `<type>.field.<name>.<action>`. The core `Sync` applies it, so a core catalog with a broken declaration fails startup (deterministic, not retried). Module registration (M07) MUST call it as well.
+
+
 Permission codes and the Effective Permission Set model are defined in 06 §5. This section defines how a module's declared permissions enter that catalog.
 
 On `install` or `enable`:

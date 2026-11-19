@@ -212,6 +212,9 @@ A module's own test suite (17 §10) is judged the same way core's is — §4's b
 
 # 7. Test Data & Fixtures
 
+> **As built (M04):** package `testkit` gained `NewGroup`, `AddGroupMember`, `InOrganization`, `AddOrganizationMember` and the role, permission and assignment fixtures. Tests that touch assignment uniqueness MUST use two organizations. Database tests in package `app` live in `app_test` because `app -> testkit -> testpg -> dbmigrate -> app` would be an import cycle.
+
+
 A shared builder pattern, not hand-written `INSERT` statements repeated across every test file:
 
 ```go

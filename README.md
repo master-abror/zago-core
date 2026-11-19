@@ -112,8 +112,12 @@ permissions:
     resource: announcement
     action: publish
 
-events:
-  publishes: [announcements.announcement.published]
+**Otorisasi (M04, ADR-0022):** katalog permission core dan empat role sistem ada di kode dan disinkronkan saat start; setiap rute terlindungi melewati `Authenticate → CSRF → RequireAuth → Scope → Authorize(action)`;
+hak efektif di-cache per versi di Redis (gagal-aman, dicabut seketika lewat invalidasi eksplisit) dan policy hanya membatasi (deny menang, galat evaluasi = tolak); authority ceiling mencegah admin memberi lebih dari yang ia pegang.
+15 rute di `/api/v1` (role, permission, role-assignment, policy, `permissions/simulate`); mencabut assignment platform mencabut semua sesi user itu. Rincian, batas yang diketahui, dan utang (mis. nama definisi OpenAPI) ada di `docs/handover/HANDOVER-M04.md`. Tidak ada jaminan keamanan absolut.
+
+Port host bentrok dengan proyek lain? Jangan edit `.env` manual: `bash scripts/env-ports.sh --force POSTGRES=25000 REDIS=25001 API=25002 WEB=25003 SMTP=25004 MAILUI=25005`
+(ADR-0021; port di dalam jaringan compose tidak berubah).
 
 notifications:
   - event: announcements.announcement.published
@@ -135,46 +139,29 @@ Every route must declare the permission it needs, or registration fails. See the
 
 | Area | Choice |
 |---|---|
-| Language | Go (chi, pgx v5, sqlc, golang-migrate) |
-| Database | PostgreSQL 18 (native `uuidv7()`) |
-| Cache / messaging | Redis 8 (basic commands only, so it stays Valkey-compatible) |
-| Realtime | `coder/websocket` |
-| Frontend | Svelte 5 (runes), Vite, TypeScript strict — SPA |
-| API contract | OpenAPI via swag → generated TypeScript SDK |
-| Observability | `log/slog`, OpenTelemetry, Prometheus |
-| Testing | testify, testcontainers-go (real PostgreSQL and Redis, no database mocks), Vitest, Playwright |
-| Packaging | Docker, Docker Compose, distroless production images |
+| `make verify` | **Gerbang tunggal**: lint + `generate-check` + tes + migrate-roundtrip + build + smoke pada stack Docker sementara. Harus hijau sebelum merge. |
+| `make lint` / `make test` | lint Go + frontend + pemeriksaan struktural / tes backend (`-race`, testcontainers) + frontend |
+| `make generate` / `make generate-check` | regenerasi OpenAPI (`docs/api/swagger.json`), kode sqlc, SDK TS dan registri modul (bertahap per milestone) / gagal bila keluaran generator di disk basi |
+| `make smoke` | semua `scripts/smoke/m*.sh` terhadap stack yang berjalan (`M00`: fondasi; `M02`: kernel lewat endpoint echo; `M03`: login/logout, ganti password, kunci akun; `M04`: otorisasi ujung-ke-ujung dengan fixture `psql`). Membuat user Super Admin smoke, jadi hanya terhadap localhost; butuh Go, DB terjangkau dari host, dan `docker compose exec redis` |
+| `make migrate-up` / `migrate-down` / `migrate-version` | terapkan / mundurkan satu / tampilkan versi migrasi inti (`MIGRATION_DATABASE_URL`) |
+| `make db-seed` | pastikan baris platform ada (idempoten); WAJIB sebelum `make bootstrap-admin` (`make setup`/`make dev` hanya menjalankan migrasi) |
+| `make bootstrap-admin EMAIL=…` | buat Super Admin pertama (idempoten, tidak pernah menimpa password): `NAME=…`, `PASSWORD_STDIN=1` (baca password dari stdin; tanpa itu password acak dicetak SEKALI) |
+| `make migrate-roundtrip` / `make db-test` | up→down→up pada PostgreSQL sementara / tes constraint, trigger, cascade, grant skema (butuh Docker). Skema: [docs/erd.md](docs/erd.md) |
+| `make infra-up` | hanya datastore, untuk pengembangan native |
+| `make clean` | hapus artefak **dan volume data** (destruktif) |
 
-## Quick start
+Endpoint khusus pengembangan (hanya saat `ENVIRONMENT` = `development`/`test`; tidak pernah ada di staging/production): `POST` dan
+`GET /api/v1/_kernel/echo` (+ `/items`) memperagakan envelope, idempotency, rate limit, dan pagination cursor; lihat `scripts/smoke/m02.sh`.
+Metrik Prometheus disajikan di **port terpisah** (bukan port API) bila `METRICS_PORT` (API) / `WORKER_METRICS_PORT` (worker) diisi;
+`.env.example` memakai 9090/9091 dan Compose tidak mem-publish-nya. Kecepatan `make test`: `make test-backend GO_TEST_PARALLEL=N`
+membatasi jumlah paket tes yang menyalakan container bersamaan (bawaan 3).
 
-**Prerequisites:** Docker, Go, and Node.js (LTS).
+`make verify` memakai compose project terpisah (`platform-verify`) sehingga tidak menghapus data pengembanganmu, tetapi
+port host yang dipublikasikan compose (bawaan 5432/6379/8080/5173/1025/8025, atau yang kamu setel di `.env`) harus bebas (hentikan `make dev`/`make docker-up` dulu).
+Di Docker Desktop bermemori kecil, tes integrasi bisa flake (`Reaper handshake failed`, `connection refused`): jalankan paket itu sendirian dan ulangi, jangan ubah kode.
+Build pertama dengan cache dingin butuh beberapa menit; jangan hentikan saat tampak diam di `menunggu: api`.
 
-```bash
-git clone https://github.com/master-abror/zago-core.git
-cd zago-core
-
-make setup     # install tools and dependencies
-make dev       # start PostgreSQL, Redis, Mailpit, API, worker and web with hot reload
-```
-
-Create your first Super Admin:
-
-```bash
-make bootstrap-admin EMAIL=you@example.org
-```
-
-The password is read from stdin or generated once and printed — it is never read from a committed file.
-
-Other useful targets:
-
-```bash
-make verify         # lint + tests + migration round-trip + build + smoke
-make docker-up      # run the full stack in containers
-make migrate-up     # apply database migrations
-make module-create NAME=finance   # scaffold a new module
-```
-
-## Repository layout
+## Struktur
 
 ```text
 backend/       Go: cmd/{api,worker,migrate}, internal/*, pkg/*, migrations

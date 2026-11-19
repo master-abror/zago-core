@@ -1,7 +1,7 @@
 # ERD — Skema Inti (final)
 
 > **Dibangkitkan otomatis** oleh `backend/migrations/erd_test.go` dari skema PostgreSQL yang benar-benar
-> dihasilkan migrasi 001–033. **Jangan sunting manual.** Perbarui: `UPDATE_ERD=1 make db-test`.
+> dihasilkan migrasi 001–034. **Jangan sunting manual.** Perbarui: `UPDATE_ERD=1 make db-test`.
 > Penjelasan desain ada di [04-database-schema.md](04-database-schema.md); konsep di [03-database-erd.md](03-database-erd.md).
 >
 > Label relasi: kolom FK dan aksi `ON DELETE`. Relasi polimorfik tanpa FK (mis. `role_assignments.scope_id`,
@@ -288,6 +288,7 @@ erDiagram
         varchar(30) status
         timestamptz created_at
         timestamptz updated_at
+        text[] actions
     }
     role_assignments {
         uuid id PK

@@ -34,28 +34,28 @@ func TestNewAuthStackAssemblesFromConfigAndRejectsBadInputs(t *testing.T) {
 	good.LoginLockMax = time.Hour
 	good.LoginIPMaxFailures = 30
 
-	stack, err := newAuthStack(&good, nil, rdb, nil, rs, log)
+	stack, err := newAuthStack(&good, nil, rdb, nil, rs, nil, log)
 	require.NoError(t, err)
 	require.NotNil(t, stack.mw)
 	require.NotNil(t, stack.api)
 
 	badCookie := good
 	badCookie.CookieName = "__Host-x"
-	_, err = newAuthStack(&badCookie, nil, rdb, nil, rs, log)
+	_, err = newAuthStack(&badCookie, nil, rdb, nil, rs, nil, log)
 	require.ErrorContains(t, err, "cookie sesi")
 
 	shortSecret := good
 	shortSecret.SessionSecret = "pendek"
-	_, err = newAuthStack(&shortSecret, nil, rdb, nil, rs, log)
+	_, err = newAuthStack(&shortSecret, nil, rdb, nil, rs, nil, log)
 	require.ErrorContains(t, err, "csrf")
 
 	badParams := good
 	badParams.PasswordArgon2MemoryKiB = 0
-	_, err = newAuthStack(&badParams, nil, rdb, nil, rs, log)
+	_, err = newAuthStack(&badParams, nil, rdb, nil, rs, nil, log)
 	require.ErrorContains(t, err, "hasher password")
 
 	badGuard := good
 	badGuard.LoginLockMax = badGuard.LoginLockDuration - time.Second
-	_, err = newAuthStack(&badGuard, nil, rdb, nil, rs, log)
+	_, err = newAuthStack(&badGuard, nil, rdb, nil, rs, nil, log)
 	require.ErrorContains(t, err, "penjaga login", "kebijakan penjaga tak sah (atau tak diisi) menggagalkan perakitan")
 }

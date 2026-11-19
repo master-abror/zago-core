@@ -125,6 +125,9 @@ Boundaries 3 and 4 are **internal** to a single running process and a single dat
 
 ## 4.6 Elevation of Privilege
 
+> **As built (M04):** the authority ceiling is enforced in the service layer, computed from PostgreSQL inside the granting transaction and serialized by an advisory lock per organization (platform lock for platform scope); tests use two organizations in both directions. `Idempotency-Key` replay is scoped per organization or group (ADR-0022 #67) after a control test proved the cross-organization replay. Revoking a platform assignment kills the user's sessions (#76). Accepted limits: a 403 versus success on a restricted field is an oracle for a writer who guesses names (#44; mitigation: rate limit and audit, M15); `simulate` is not rate limited until M15 (#69); the unlock of administrative accounts is deferred to M05. No absolute guarantee.
+
+
 | Threat | Mitigation |
 |---|---|
 | An Admin granting more authority than they hold | Authority-ceiling check inside the granting transaction (06 §5.3); re-checked for invitations at acceptance (05 §13.3) |

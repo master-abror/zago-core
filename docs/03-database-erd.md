@@ -616,12 +616,14 @@ expression        text
 status            varchar(30)
 created_at        timestamptz
 updated_at        timestamptz
+actions           text[]          -- migration 034 (ADR-0022): exact codes or `resource.*`, NOT NULL, never empty
 ```
 
 Constraint:
 
 ```text
 UNIQUE(organization_id, code)
+CHECK policy_actions_valid(actions)   -- 1..50 distinct well-formed elements (migration 034)
 ```
 
 The expression must use a controlled policy language.

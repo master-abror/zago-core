@@ -231,6 +231,9 @@ The last line matters specifically for an open-source project: a maintainer bypa
 
 # 9. Testing Requirements
 
+> **As built (M04):** `make verify` runs `scripts/smoke/m04.sh` after m00, m02 and m03. The CI `docker-smoke` job still has no Go toolchain (M15). Run `bash ./scripts/generate-check.sh` after any change to swag annotations or to the import graph of `main`.
+
+
 ```text
 A PR that fails any required check cannot be merged, verified by attempting
   to merge a deliberately-broken test PR against branch protection

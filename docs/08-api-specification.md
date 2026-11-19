@@ -90,6 +90,9 @@ Identical shape everywhere in the platform — every error code referenced acros
 
 # 4. Pagination
 
+> **As built (M04, ADR-0022 #63, #66):** the authorization lists `GET /roles`, `GET /permissions` and `GET /policies` use offset pagination: `page` 1..10000 and `per_page` (default 25, clamped to 100), answered as `{data: [...], meta: {pagination: {page, per_page, total}}}`; every invalid parameter is reported at once in a `400 validation_failed`. `GET /role-assignments` uses the cursor form, ordered by `(created_at, id)` descending; the cursor is bound to the filters (`status`, `role_id`, `subject_id`) and to the organization (or platform) of the caller, not to the active group.
+
+
 **Cursor-based (keyset)** for anything that can grow large and is usually read in recency order — activities, system logs, notifications, messages:
 
 ```text
@@ -138,6 +141,9 @@ A leading `-` reverses sort direction. Filterable/sortable fields are an explici
 ---
 
 # 6. Idempotency
+
+> **As built (M04, ADR-0022 #67, #73):** the Redis key may carry the caller's scope: `idem:{subject}:{scope}:{method}:{route}:{key}` where scope is `platform`, `org:<uuid>` or `grp:<org>.<grp>`, derived only from `ScopeContext` (a missing or inconsistent scope answers 500, fail closed). Without a scope the key keeps the old form, which replays across organizations for the same user (proved by a control test). Tenant routes therefore use the second kernel instance `TenantIdempotency`; the shared `Idempotency` stays for routes that do not pass the `Scope` middleware. `Idempotency.Require()` runs after `Authorize`. A replay repeats the stored response as it was (24 hour TTL) and is marked `Idempotent-Replayed: true`.
+
 
 Required, via `Idempotency-Key`, on mutating endpoints where a retried network request must not double-apply:
 
@@ -195,6 +201,9 @@ The frontend, not the backend, decides what language to render — which only wo
 ---
 
 # 9. OpenAPI Generation
+
+> **Known debt (M04, ADR-0022 #78e):** since `internal/app` imports `authzhttp`, `swag` names the authorization definitions with the full import path (`backend_internal_authorization_transport_http.X`) instead of `authzhttp.X`. The semantics are identical and the output is deterministic (`generate-check` passes); restore the short names before `packages/ts-sdk` consumes the contract.
+
 
 **Decision: `swaggo/swag` annotations, generated from code, is the single source of truth.** (The project history includes hand-maintained YAML; it is not used.)
 
@@ -328,6 +337,9 @@ Kept as its own endpoint rather than `PATCH /users/{me.id}` because "edit my own
 ---
 
 # 11. Consolidated Error Registry
+
+> **As built (M04, ADR-0022 #62):** added codes: `role_not_found` 404, `permission_not_found` 422, `grant_exceeds_authority` 403, `invalid_scope` 400, `scope_mismatch` 403, `policy_evaluation_failed` 403, `field_permission_denied` 403, and 409 for `role_slug_taken`, `role_immutable`, `role_archived`, `assignment_exists`, `assignment_revoked`, `last_super_admin`, `policy_code_taken`, `policy_limit_reached`. A policy refusal reaches the client as `permission_denied`.
+
 
 One flat namespace, so two different domains never accidentally reuse the same code for different meanings:
 

@@ -117,8 +117,9 @@ func (r *resources) checkers() []health.Checker {
 }
 
 // RunAPI menjalankan cmd/api. ln opsional (untuk tes); bila nil, mendengarkan di :PORT.
-// Urutan: validasi konfigurasi -> buka dependensi -> bind port. Konfigurasi buruk selalu
-// keluar dengan ExitConfig sebelum port di-bind.
+// Urutan: validasi konfigurasi -> buka dependensi -> sinkron katalog otorisasi (bila ada pool)
+// -> bind port. Konfigurasi buruk selalu keluar dengan ExitConfig sebelum port di-bind; galat
+// sinkron keluar dengan ExitFailed sebelum port di-bind.
 func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stderr io.Writer, ln net.Listener) int {
 	cfg, err := config.LoadFrom(config.RoleAPI, env)
 	if err != nil {
@@ -163,6 +164,24 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 		res.add(r)
 	}
 
+	// Katalog permission core dan role sistem disinkronkan dari kode ke database SEKALI saat start,
+	// sebelum autentikasi dirakit (ADR-0022 butir 7). Hanya bila pool nyata ada: di tes dengan fake
+	// tanpa pool, langkah ini dilewati. Kegagalan dependensi diulang terbatas dengan backoff (T4d,
+	// ADR-0022 butir 46). Galat sesudah itu = ExitFailed: API yang berjalan dengan katalog atau
+	// role yang tidak sinkron akan menolak (atau lebih buruk, menerima) request secara keliru.
+	var authz authzStack
+	if appPool != nil {
+		authz, err = newAuthzStack(appPool, rdb, log)
+		if err != nil {
+			log.Error("gagal merakit otorisasi", "error", err)
+			return ExitFailed
+		}
+		if err = syncAuthorizationWithRetry(ctx, appPool, authz.invalidator, log, syncRetryPolicy()); err != nil {
+			log.Error("gagal menyinkronkan katalog otorisasi", "error", err)
+			return ExitFailed
+		}
+	}
+
 	// Dideklarasikan SETELAH res.closeAll, jadi dijalankan SEBELUM pool ditutup (defer LIFO).
 	var auditor modulesdk.AuditRecorder
 	if appPool != nil {
@@ -191,13 +210,27 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 	// Tanpa salah satunya Auth tetap nil: rute yang butuh identitas menolak semua request (401).
 	var auth authStack
 	if appPool != nil && kern != nil {
-		auth, err = newAuthStack(cfg, appPool, rdb, auditor, kern.Responder, log)
+		auth, err = newAuthStack(cfg, appPool, rdb, auditor, kern.Responder, authz.entryChecker(), log)
 		if err != nil {
 			log.Error("gagal merakit autentikasi HTTP", "error", err)
 			return ExitFailed
 		}
 	} else {
 		log.Warn("tanpa PostgreSQL atau Redis: autentikasi HTTP tidak dirakit, rute terlindungi menolak semua request")
+	}
+
+	// HTTP otorisasi (Scope dan Authorize) mengikuti syarat yang sama dengan autentikasi: PostgreSQL
+	// dan toolkit kernel (Redis). Tanpa salah satunya tidak ada rute otorisasi yang terpasang.
+	var authzAPI *httpserver.AuthzAPI
+	if appPool != nil && kern != nil {
+		if auth.sessions != nil {
+			authz = authz.withSessionRevoker(auth.sessions)
+		}
+		authzAPI, err = authz.httpAPI(appPool, auditor, kern, log)
+		if err != nil {
+			log.Error("gagal merakit HTTP otorisasi", "error", err)
+			return ExitFailed
+		}
 	}
 
 	devEndpoints := cfg.DevEndpointsEnabled()
@@ -230,6 +263,7 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 		Kernel:         kern,
 		Auth:           auth.mw,
 		AuthAPI:        auth.api,
+		Authz:          authzAPI,
 		DevEndpoints:   devEndpoints,
 		Metrics:        httpMetrics,
 	})

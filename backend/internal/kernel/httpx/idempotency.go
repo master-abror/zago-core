@@ -18,8 +18,9 @@ import (
 )
 
 // Idempotency (docs/08 §6, errata I-07, ADR-0014): hasil request mutasi disimpan di Redis selama
-// 24 jam di bawah kunci `idem:{subject}:{method}:{route}:{key}`. Request ulang dengan key dan body
-// yang sama mendapat respons asli tanpa dieksekusi lagi; key sama dengan body berbeda → 422
+// 24 jam di bawah kunci `idem:{subject}:{method}:{route}:{key}`, atau `idem:{subject}:{scope}:{method}:
+// {route}:{key}` bila IdempotencyOptions.Scope diisi (ADR-0022 butir 67). Request ulang dengan key dan
+// body yang sama mendapat respons asli tanpa dieksekusi lagi; key sama dengan body berbeda → 422
 // idempotency_key_conflict; duplikat yang datang saat yang pertama masih berjalan → 409
 // idempotency_in_progress. Redis tak tersedia → fail closed (503), tidak pernah mengeksekusi
 // tanpa perlindungan (docs/10 §15).
@@ -76,6 +77,11 @@ type IdempotencyOptions struct {
 	// Subject mengembalikan identitas pemanggil (mis. user id) yang menjadi bagian kunci Redis, sehingga
 	// satu user tak pernah bisa memutar ulang respons user lain. Wajib. ok=false → 401.
 	Subject func(*http.Request) (string, bool)
+	// Scope (opsional) mengembalikan konteks kewenangan request (mis. organisasi dan grup aktif) yang ikut
+	// membentuk kunci Redis setelah subject, sehingga pemanggil yang sama di dua scope berbeda tidak
+	// pernah memutar ulang respons milik scope lain. nil = format kunci tanpa scope. ok=false atau nilai
+	// kosong = 500 internal_error (gagal-tertutup: handler tidak dieksekusi dan tidak ada kunci ditulis).
+	Scope func(*http.Request) (string, bool)
 	// Route mengembalikan pola rute (mis. pola chi) untuk kunci; bawaan: r.URL.Path.
 	Route func(*http.Request) string
 	Log   *slog.Logger
@@ -91,6 +97,7 @@ type Idempotency struct {
 	rdb     redis.UniversalClient
 	rs      *Responder
 	subject func(*http.Request) (string, bool)
+	scope   func(*http.Request) (string, bool)
 	route   func(*http.Request) string
 	log     *slog.Logger
 	ttl     time.Duration
@@ -105,7 +112,7 @@ func NewIdempotency(o IdempotencyOptions) (*Idempotency, error) {
 		return nil, errors.New("httpx: IdempotencyOptions.Redis, Responder, dan Subject wajib diisi")
 	}
 	i := &Idempotency{
-		rdb: o.Redis, rs: o.Responder, subject: o.Subject, route: o.Route, log: o.Log,
+		rdb: o.Redis, rs: o.Responder, subject: o.Subject, scope: o.Scope, route: o.Route, log: o.Log,
 		ttl: o.TTL, inProg: o.InProgressTTL, maxReq: o.MaxRequestBytes, maxResp: o.MaxResponseBytes,
 	}
 	if i.route == nil {
@@ -161,6 +168,15 @@ func (i *Idempotency) serve(w http.ResponseWriter, r *http.Request, next http.Ha
 		i.rs.Error(w, r, AuthenticationRequired.New())
 		return
 	}
+	scopePart := ""
+	if i.scope != nil {
+		sc, ok := i.scope(r)
+		if !ok || sc == "" {
+			i.rs.Error(w, r, InternalError.Wrap(errors.New("idempotency: scope request tidak tersedia")))
+			return
+		}
+		scopePart = sc + ":"
+	}
 
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, i.maxReq))
 	if err != nil {
@@ -171,7 +187,7 @@ func (i *Idempotency) serve(w http.ResponseWriter, r *http.Request, next http.Ha
 
 	route := i.route(r)
 	hash := requestHash(r.Method, route, r.URL.RawQuery, body)
-	redisKey := idemKeyPrefix + ":" + subject + ":" + r.Method + ":" + route + ":" + key
+	redisKey := idemKeyPrefix + ":" + subject + ":" + scopePart + r.Method + ":" + route + ":" + key
 	owner := newOwnerToken()
 	inProgress := mustJSON(idemRecord{Owner: owner, State: idemStateInProgress, Hash: hash})
 

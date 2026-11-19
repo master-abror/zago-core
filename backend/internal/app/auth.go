@@ -21,13 +21,17 @@ import (
 type authStack struct {
 	mw  *authhttp.Middleware
 	api *authhttp.Handlers
+
+	// sessions dipakai perakitan otorisasi untuk mencabut sesi (ADR-0022 butir 76).
+	sessions *service.SessionService
 }
 
 // newAuthStack merakit autentikasi HTTP (docs/05 §3, §8–§9, ADR-0020) dari konfigurasi: cookie
 // sesi, kebijakan Origin, CSRF terikat sesi, hasher Argon2id, SessionService (PostgreSQL
 // otoritatif, Redis sebagai cache), AuthService, dan handler. Hanya merakit objek: tidak ada I/O.
-// audit boleh nil (activity tidak direkam).
-func newAuthStack(cfg *config.Config, pool kernel.Pool, rdb redis.UniversalClient, audit modulesdk.AuditRecorder, rs *httpx.Responder, log *slog.Logger) (authStack, error) {
+// audit dan platform boleh nil (activity tidak direkam; identitas platform tidak dapat memasuki
+// organisasi lewat switch-organization).
+func newAuthStack(cfg *config.Config, pool kernel.Pool, rdb redis.UniversalClient, audit modulesdk.AuditRecorder, rs *httpx.Responder, platform service.PlatformEntryChecker, log *slog.Logger) (authStack, error) {
 	cookie, err := authhttp.NewCookie(cfg.CookieName, cfg.CookieSecure)
 	if err != nil {
 		return authStack{}, fmt.Errorf("cookie sesi: %w", err)
@@ -60,7 +64,8 @@ func newAuthStack(cfg *config.Config, pool kernel.Pool, rdb redis.UniversalClien
 	}
 	authSvc, err := service.NewAuthService(service.AuthDeps{
 		Store: store, Tx: kernel.NewTxManager(pool, log), Sessions: sessions, Hasher: hasher,
-		Policy: cfg.PasswordPolicy(), Bus: kernel.NewBus(pool, log), Audit: audit, Guard: guard, Log: log,
+		Policy: cfg.PasswordPolicy(), Bus: kernel.NewBus(pool, log), Audit: audit, Guard: guard,
+		PlatformEntry: platform, Log: log,
 	})
 	if err != nil {
 		return authStack{}, fmt.Errorf("layanan auth: %w", err)
@@ -85,5 +90,5 @@ func newAuthStack(cfg *config.Config, pool kernel.Pool, rdb redis.UniversalClien
 	if err != nil {
 		return authStack{}, fmt.Errorf("handler auth: %w", err)
 	}
-	return authStack{mw: mw, api: api}, nil
+	return authStack{mw: mw, api: api, sessions: sessions}, nil
 }

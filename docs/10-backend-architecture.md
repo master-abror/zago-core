@@ -71,6 +71,9 @@ One `go.mod` at the **repository root**. `backend/`, `modules/`, and `packages/m
 
 # 3. `internal/` Package Map
 
+> **As built (M04):** added `permission`, `role`, `policy` and `authorization/{domain,application,repository,cache,transport/http}`. `KernelServices` gained `TenantIdempotency` (`httpserver/kernel.go`); `internal/app/authz.go` assembles the authorization stack (`newAuthzStack`, `httpAPI`) and fails at start when the authorizer, audit or kernel toolkit is missing.
+
+
 ```text
 backend/internal/
 ├── kernel/        transactions, outbox, event bus, HTTP toolkit (envelope, errors, pagination,
@@ -403,6 +406,9 @@ Populated once, by the Authentication and Authorization middleware (05 §9), and
 
 # 11. Health & Readiness
 
+> **As built (M04, ADR-0022 #46):** `RunAPI` retries the catalog sync (5 attempts, delays 1/2/4/8 s, 30 s per attempt; about 165 s worst case, about 15 s when the database refuses connections) before `ExitFailed` and before binding the port, so `/health/*` does not answer during the retry and may exceed an orchestrator's startup probe. Splitting bind from sync is deferred to M15. Not retried: `ErrCodeConflict`, `ErrInvalidCode`, `ErrInvalidFieldDeclaration`, a failure to assemble the syncer, context cancellation.
+
+
 ```text
 GET /health        — process is up (no dependency checks; for a load balancer's basic liveness probe)
 GET /health/live    — same as above, Kubernetes-style naming
@@ -479,6 +485,9 @@ Full detail (negative-test catalog, coverage expectations, CI wiring) is 18-test
 ---
 
 # 15. Dependency Failure Behavior
+
+> **As built (M04):** a failed cache bump around the catalog sync is logged and does not stop startup; a revocation that coincides with a Redis failure can lag until the 2 minute TTL; PostgreSQL errors in the engine are errors, never ALLOW; Redis down makes `POST /role-assignments` fail closed with 503 (idempotency, 08 §6). A failure to revoke sessions after a platform assignment is revoked is logged (Error) and audited (`role_assignment.sessions_revoke`, result failed) and does not undo the commit; one attempt with a 10 s limit, no outbox or retry (hardening candidate for M15).
+
 
 | Dependency down | Behavior |
 |---|---|

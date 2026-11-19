@@ -171,6 +171,9 @@ docker-build:    ## Build production images (build context = repository root)
 
 ## 2.7 Smoke tests and verification
 
+> **As built (M04, ADR-0022 #78):** `make smoke` runs every `scripts/smoke/m*.sh` in glob order (m00, m02, m03, m04). `m04.sh` needs fixtures that no API creates until M05: it writes two organizations and their users through `docker compose exec -T postgres psql -U postgres -d platform` (override with `SMOKE_PSQL`), copying one bootstrap user's password hash to the tenant users. It therefore bypasses the `app_user` grants and leaves data behind in a development stack (the `verify` stack is discarded). Login budget: six logins per run.
+
+
 ```makefile
 smoke:           ## Run every milestone smoke script against a running stack (one temporary state dir for all scripts)
 	@dir=$$(mktemp -d); trap 'rm -rf "$$dir"' EXIT; export SMOKE_STATE_DIR="$$dir"; \

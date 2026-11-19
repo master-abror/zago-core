@@ -42,6 +42,12 @@ type Options struct {
 	// AuthAPI adalah handler endpoint /auth/*. Dipasang hanya bila Kernel, Auth, dan AuthAPI semua
 	// ada (rate limit login butuh Redis; rute terlindungi butuh Auth).
 	AuthAPI *authhttp.Handlers
+	// Authz adalah rakitan HTTP Authorization Engine (ADR-0022 butir 25): rute di Authz.Routes
+	// dipasang di grup API dengan urutan Authenticate -> CSRF -> RequireAuth -> Scope ->
+	// Authorize(action) -> handler. Dipasang hanya bila Kernel, Auth, dan Authz.Middleware semua
+	// ada; selain itu tidak ada rute otorisasi yang terpasang (404), tidak pernah terpasang tanpa
+	// penjaga.
+	Authz *AuthzAPI
 }
 
 // NewHandler membangun handler root. Urutan middleware (terluar -> terdalam): RequestID,
@@ -85,6 +91,9 @@ func NewHandler(o Options) http.Handler {
 		}
 		if o.Kernel != nil && o.Auth != nil && o.AuthAPI != nil {
 			mountAuth(api, o.Kernel, o.Auth, o.AuthAPI)
+		}
+		if o.Kernel != nil && o.Auth != nil && o.Authz != nil {
+			mountAuthz(api, o.Auth, o.Authz)
 		}
 		if o.DevEndpoints && o.Kernel != nil {
 			mountEcho(api, o.Kernel, o.Auth)
