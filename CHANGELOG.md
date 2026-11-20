@@ -4,6 +4,11 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ## [Unreleased]
 
+### M05 — Organization, User, Group, Invitation, Email (berjalan; belum selesai)
+
+#### Changed
+- `scripts/smoke/m02.sh`, `m03.sh`, `m04.sh` (M05 partial-1): batas waktu curl dapat diatur lewat `SMOKE_CURL_MAX_TIME` (bawaan 20 dtk; m02 dan m03 sebelumnya 8 dtk) dan pesan `curl gagal` memuat kode keluar dan lama tunggu. Penyebab login lambat pada alur dingin `verify-smoke.sh` tidak terbukti (`docs/handover/HANDOVER-M05-partial-1.md` §3, §8).
+
 ### M04 — Authorization Engine (2026-11-19; tag `m04-done`)
 
 #### Added
