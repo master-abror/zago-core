@@ -1,7 +1,7 @@
 // Perilaku demo F1d: dialog, toast, tooltip, popup minibar. Di SPA Svelte menulis ulang semuanya (lihat DESIGN-HANDOFF.md, F6).
 (() => {
   const tr = (k, p) => ZApp.t(k, p);
-  function toast(tone, msgKey) {
+  function toast(tone, msgKey, p) {
     const box = document.getElementById('z-toasts');
     if (!box) return;
     const urgent = tone === 'danger' || tone === 'warning', el = document.createElement('div');
@@ -9,7 +9,7 @@
     el.setAttribute('role', urgent ? 'alert' : 'status');
     el.innerHTML = '<div class="d-flex"><div class="toast-body"><strong class="me-1"></strong><span></span></div><button type="button" class="btn-close me-2 m-auto" data-toast-close></button></div>';
     el.querySelector('strong').textContent = tr(`ts.l.${tone}`);
-    el.querySelector('span').textContent = tr(msgKey);
+    el.querySelector('span').textContent = tr(msgKey, p);
     el.querySelector('.btn-close').setAttribute('aria-label', tr('ts.close'));
     box.append(el);
     if (urgent) return; // galat/peringatan menetap sampai ditutup (WCAG 2.2.1)
@@ -19,6 +19,7 @@
     ['mouseenter', 'focusin'].forEach(ev => el.addEventListener(ev, () => clearTimeout(timer)));
     arm();
   }
+  window.ZUI = { toast };
   document.addEventListener('click', e => {
     const o = e.target.closest('[data-dialog-open]');
     if (o) { document.getElementById(o.dataset.dialogOpen)?.showModal(); return; }
