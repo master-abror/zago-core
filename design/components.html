@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="id-ID" data-bs-theme="light" data-palette="aurora">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title data-i18n="cmp.title">Komponen dasar</title>
+  <link rel="stylesheet" href="vendor/bootstrap-5.3.9/css/bootstrap.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme-init.js"></script>
+</head>
+<body>
+  <main class="container py-4">
+    <div class="d-flex flex-wrap gap-3 align-items-end justify-content-between mb-4">
+      <h1 class="h3 mb-0" data-i18n="cmp.title">Komponen dasar</h1>
+      <div class="d-flex flex-wrap gap-3">
+        <div><label for="d-mode" class="form-label small mb-1" data-i18n="demo.mode">Mode warna</label>
+          <select id="d-mode" class="form-select form-select-sm" data-pref="mode" data-default="auto">
+            <option value="auto" data-i18n="demo.mode.auto">Otomatis</option>
+            <option value="light" data-i18n="demo.mode.light">Terang</option>
+            <option value="dark" data-i18n="demo.mode.dark">Gelap</option>
+          </select></div>
+        <div><label for="d-pal" class="form-label small mb-1" data-i18n="demo.palette">Tema</label>
+          <select id="d-pal" class="form-select form-select-sm" data-pref="palette" data-default="aurora">
+            <option value="aurora">Aurora</option><option value="lagoon">Lagoon</option><option value="ember">Ember</option>
+          </select></div>
+        <div><label for="d-lang" class="form-label small mb-1" data-i18n="demo.lang">Bahasa</label>
+          <select id="d-lang" class="form-select form-select-sm" data-pref="lang" data-default="id-ID">
+            <option value="id-ID">Indonesia</option><option value="en-US">English (US)</option>
+          </select></div>
+      </div>
+    </div>
+
+    <section class="card mb-4"><div class="card-body">
+      <h2 class="h5" data-i18n="sec.type">Tipografi</h2>
+      <p class="h3 mb-1" data-i18n="type.h">Judul halaman</p>
+      <p class="mb-1" data-i18n="type.body">Teks isi</p>
+      <p class="small text-body-secondary mb-0" data-i18n="type.muted">Teks bantu</p>
+    </div></section>
+
+    <section class="card mb-4"><div class="card-body">
+      <h2 class="h5" data-i18n="sec.buttons">Tombol</h2>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <button type="button" class="btn btn-primary" data-i18n="btn.primary">Simpan</button>
+        <button type="button" class="btn btn-outline-primary" data-i18n="btn.outline">Batal</button>
+        <button type="button" class="btn btn-outline-secondary" data-i18n="btn.neutral">Filter</button>
+        <button type="button" class="btn btn-danger" data-i18n="btn.danger">Arsipkan</button>
+        <button type="button" class="btn btn-outline-danger" data-i18n="btn.danger">Arsipkan</button>
+        <button type="button" class="btn btn-link" data-i18n="btn.link">Pelajari</button>
+        <button type="button" class="btn btn-primary btn-sm" data-i18n="btn.sm">Kecil</button>
+        <button type="button" class="btn btn-primary" disabled aria-busy="true">
+          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> <span data-i18n="btn.loading">Menyimpan…</span></button>
+        <button type="button" class="btn btn-primary" disabled data-i18n="btn.disabled">Nonaktif</button>
+      </div>
+    </div></section>
+
+    <section class="card mb-4"><div class="card-body">
+      <h2 class="h5" data-i18n="sec.forms">Formulir</h2>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label for="f-name" class="form-label" data-i18n="form.name">Nama peran</label>
+          <input id="f-name" class="form-control" value="editor-konten" aria-describedby="f-name-h">
+          <div id="f-name-h" class="form-text" data-i18n="form.name.help">Bantuan</div>
+        </div>
+        <div class="col-md-6">
+          <label for="f-slug" class="form-label" data-i18n="form.slug">Slug</label>
+          <input id="f-slug" class="form-control is-invalid" value="admin" aria-invalid="true" aria-describedby="f-slug-e">
+          <div id="f-slug-e" class="invalid-feedback" data-i18n="form.slug.err">Galat</div>
+        </div>
+        <div class="col-md-6">
+          <label for="f-scope" class="form-label" data-i18n="form.scope">Cakupan</label>
+          <select id="f-scope" class="form-select">
+            <option data-i18n="scope.platform">Platform</option><option data-i18n="scope.org">Organisasi</option><option data-i18n="scope.group">Grup</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label for="f-dis" class="form-label" data-i18n="form.disabled">Kolom nonaktif</label>
+          <input id="f-dis" class="form-control" value="—" disabled>
+        </div>
+        <div class="col-md-6"><div class="form-check">
+          <input id="f-chk" class="form-check-input" type="checkbox" checked>
+          <label for="f-chk" class="form-check-label" data-i18n="form.check">Berlaku sampai dicabut</label></div></div>
+        <div class="col-md-6"><div class="form-check form-switch">
+          <input id="f-sw" class="form-check-input" type="checkbox" role="switch" checked>
+          <label for="f-sw" class="form-check-label" data-i18n="form.switch">Policy aktif</label></div></div>
+      </div>
+    </div></section>
+
+    <section class="card mb-4"><div class="card-body">
+      <h2 class="h5" data-i18n="sec.status">Status dan pesan</h2>
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle" data-i18n="st.success">Aktif</span>
+        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" data-i18n="st.warning">Kedaluwarsa</span>
+        <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle" data-i18n="st.danger">Dicabut</span>
+        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle" data-i18n="st.info">Sistem</span>
+        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle" data-i18n="st.primary">Baru</span>
+      </div>
+      <div class="alert alert-success" role="status" data-i18n="al.success">Tersimpan.</div>
+      <div class="alert alert-warning" role="status" data-i18n="al.warning">Peringatan.</div>
+      <div class="alert alert-danger" role="alert" data-i18n="al.danger">Galat.</div>
+      <div class="alert alert-info mb-0" role="status" data-i18n="al.info">Info.</div>
+    </div></section>
+
+    <section class="card mb-4"><div class="card-body">
+      <h2 class="h5" data-i18n="sec.table">Tabel dan paginasi</h2>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-3">
+          <caption class="visually-hidden" data-i18n="tb.caption">Contoh daftar peran</caption>
+          <thead><tr><th scope="col" data-i18n="tb.name">Nama</th><th scope="col" data-i18n="tb.status">Status</th><th scope="col" class="text-end" data-i18n="tb.perm">Izin</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">org-admin</th><td><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle" data-i18n="st.info">Sistem</span></td><td class="text-end">12</td></tr>
+            <tr><th scope="row">editor-konten</th><td><span class="badge bg-success-subtle text-success-emphasis border border-success-subtle" data-i18n="st.success">Aktif</span></td><td class="text-end">5</td></tr>
+            <tr><th scope="row">auditor</th><td><span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle" data-i18n="st.danger">Dicabut</span></td><td class="text-end">3</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <nav data-i18n-attr="aria-label:pg.label" aria-label="Navigasi halaman">
+        <ul class="pagination mb-0">
+          <li class="page-item disabled"><span class="page-link" data-i18n="pg.prev">Sebelumnya</span></li>
+          <li class="page-item active" aria-current="page"><span class="page-link">1</span></li>
+          <li class="page-item"><a class="page-link" href="#">2</a></li>
+          <li class="page-item"><a class="page-link" href="#" data-i18n="pg.next">Berikutnya</a></li>
+        </ul>
+      </nav>
+    </div></section>
+  </main>
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
