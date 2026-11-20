@@ -6,6 +6,11 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/); versi mengikut
 
 ### M05 — Organization, User, Group, Invitation, Email (berjalan; belum selesai)
 
+#### Added
+- `internal/organization/application` (T1a-2, ADR-0023 butir 5–8): `Service` (`Create`, `Get`, `List`, `Update`, `Archive`) dengan `Caller{UserID, Scope}`; `Archive` mengambil kunci advisory organisasi sebagai langkah pertama transaksi, menaikkan cache otorisasi di dalam transaksi sebelum audit dan event, dan menolak pemanggil tenant yang menunjuk organisasi lain sebelum transaksi; `Update` tanpa perubahan nilai tidak menulis, tidak mencatat audit, dan tidak menerbitkan event; audit dan event memuat nama bidang saja. Audit `organization.create|update|archive`, event `organization.created|updated|archived`. Tes: 20 unit (urutan panggilan lintas komponen) dan 6 ber-DB (kunci ditahan transaksi lain, dua arsip serentak tepat satu lolos, rollback bila invalidasi gagal, isolasi tenant ujung-ke-ujung).
+- `internal/organization/domain` dan `internal/organization/repository` (T1a-1, ADR-0023 butir 1–4): `Access` (platform atau tenant; nilai nol ditolak), `Record`, masukan berpenormalan (slug ASCII, name, legal_name, locale, timezone IANA dengan `time/tzdata` tertanam), status dengan `archived` terminal, filter daftar (`open`, `all`, status) dan `Window` 50/100; `Organizations` (`Get`, `ForUpdate`, `List`, `Insert`, `Update`, `SetStatus`) yang menyaring `o.id` dengan `Access` di setiap kueri. Tes: 18 domain dan 19 ber-DB (lintas-organisasi DUA ARAH, keunikan slug dengan dua organisasi, pesan galat identik antara "milik organisasi lain" dan "tidak ada", rollback transaksi).
+- `docs/adr/0023-m05-organization-user-group-design.md` (bagian 1, butir 1–10).
+
 #### Changed
 - `scripts/smoke/m02.sh`, `m03.sh`, `m04.sh` (M05 partial-1): batas waktu curl dapat diatur lewat `SMOKE_CURL_MAX_TIME` (bawaan 20 dtk; m02 dan m03 sebelumnya 8 dtk) dan pesan `curl gagal` memuat kode keluar dan lama tunggu. Penyebab login lambat pada alur dingin `verify-smoke.sh` tidak terbukti (`docs/handover/HANDOVER-M05-partial-1.md` §3, §8).
 

@@ -1,10 +1,10 @@
 # STATUS
 
-**Terakhir diperbarui:** 2026-11-19 oleh sesi M05 partial-1 (checkpoint dini: baseline dan dua patch smoke, tanpa kode M05)
-**Milestone aktif:** M05 — Organization · User · Group · Invite · Email — IN PROGRESS (partial-1: baseline dan dua patch smoke; T1a belum dimulai). **M04 — Authorization Engine — DONE** (tag `m04-done` = `6a14f87`, merge PR #7, ada di origin). M03 DONE (tag `m03-done` = `883487d`).
+**Terakhir diperbarui:** 2026-11-20 oleh sesi M05 partial-2 (T1a-1 dan T1a-2 selesai: paket `internal/organization` domain, repository, service; checkpoint sebelum T1a-3)
+**Milestone aktif:** M05 — Organization · User · Group · Invite · Email — IN PROGRESS (partial-2: T1a-1 dan T1a-2 selesai; anggota organisasi, handler, dan T1b–T6 belum). **M04 — Authorization Engine — DONE** (tag `m04-done` = `6a14f87`, merge PR #7, ada di origin). M03 DONE (tag `m03-done` = `883487d`).
 **Branch:** `milestone/m05-organization` (dari tag `m04-done`; ada di origin).
-**Handover terbaru:** `docs/handover/HANDOVER-M05-partial-1.md` (juga `HANDOVER-M04.md` final dan riwayat `HANDOVER-M04-partial-2` sampai `-19`; `partial-1` M04 TIDAK ADA di repo). Prompt sesi berikutnya: `docs/handover/PROMPT-M05-partial-1.md`. Keputusan: `docs/adr/0022-m04-authorization-design.md` (bagian 1–23, butir 1–78); ADR-0023 belum ditulis.
-**Kesehatan `make verify` (laptop WSL2, Go 1.26.5):** pada kode M04 (sesi M05 partial-1, 2026-11-19) run utuh `exit=2`, BUKAN hijau: lint, generate-check, test (30 `ok`, 0 FAIL, 6 paket tanpa tes), migrate-roundtrip, dan build lolos; `verify-smoke.sh` (alur dingin) gagal di `POST /auth/login` pada tiga run (penyebab TIDAK terbukti; I/O VM Docker lambat teramati). `make smoke` pada stack hangat dengan `SMOKE_CURL_MAX_TIME=90` `exit=0` (m00, m02, m03, m04 OK). Rincian: `HANDOVER-M05-partial-1.md` §3 dan §8. Hijau penuh sebelumnya: M04 partial-19 (`exit=0`).
+**Handover terbaru:** `docs/handover/HANDOVER-M05-partial-2.md` (juga `HANDOVER-M05-partial-1.md`, `HANDOVER-M04.md` final dan riwayat `HANDOVER-M04-partial-2` sampai `-19`; `partial-1` M04 TIDAK ADA di repo). Prompt sesi berikutnya: `docs/handover/PROMPT-M05-partial-2.md`. Keputusan: `docs/adr/0022-m04-authorization-design.md` (bagian 1–23, butir 1–78) dan `docs/adr/0023-m05-organization-user-group-design.md` (bagian 1, butir 1–10).
+**Kesehatan `make verify` (laptop WSL2, Go 1.26.5):** sesi M05 partial-2 (2026-11-20): run utuh pada kode M04 (sebelum kode M05) `exit=0` (smoke m00, m02, m03, m04 OK pada alur dingin; hanya saringan grep ditempel). Pada kode M05 run utuh BELUM dijalankan; tes tiga paket `internal/organization/{domain,repository,application}` hijau di laptop dengan `gofmt` kosong, `go vet` exit 0, `golangci-lint` `0 issues.`. Partial-1 mencatat run utuh `exit=2` (smoke alur dingin gagal di login, penyebab TIDAK terbukti; `HANDOVER-M05-partial-1.md` §3 dan §8). Hijau penuh sebelumnya: M04 partial-19 (`exit=0`).
 
 **Ringkasan M04:** katalog permission core (41 kode) dan empat role sistem di kode; `ScopeContext`; hak efektif dengan cache versi di Redis; `Authorizer.Can`; middleware `Scope` dan `Authorize`; policy yang hanya membatasi; `FieldGuard` dan `authzhttp.FieldHelper`; authority ceiling; jalur tulis dan baca role, assignment, policy; `simulate`; 15 rute di `/api/v1`; pencabutan sesi saat assignment platform dicabut; migrasi 034 dan 035 (berikutnya 036); `scripts/smoke/m04.sh`. Utang dan batas: `HANDOVER-M04.md` §8 (terutama nama definisi OpenAPI panjang, scope `resource`/`own` belum dievaluasi, `FieldGuard` belum dipakai handler produksi). Kewajiban untuk M05: `HANDOVER-M04.md` §10.
 
@@ -15,7 +15,7 @@
 | M02 | Kernel (tx, outbox, audit, HTTP toolkit) | DONE | m02-done | handover/HANDOVER-M02.md |
 | M03 | Authentication | DONE | m03-done | handover/HANDOVER-M03.md |
 | M04 | Authorization | DONE | m04-done (dibuat setelah merge) | handover/HANDOVER-M04.md |
-| M05 | Organization · User · Group · Invite · Email | IN PROGRESS (partial-1) | – | handover/HANDOVER-M05-partial-1.md |
+| M05 | Organization · User · Group · Invite · Email | IN PROGRESS (partial-2) | – | handover/HANDOVER-M05-partial-2.md |
 | M06 | Audit & System Log | TODO | – | – |
 | M07 | Module System (backend) | TODO | – | – |
 | M08 | Realtime: WebSocket · Notification · Inbox | TODO | – | – |
