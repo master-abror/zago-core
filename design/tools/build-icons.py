@@ -3,7 +3,7 @@
 Pakai: python3 design/tools/build-icons.py /tmp/bootstrap-icons-1.13.2.tgz"""
 import pathlib, re, sys, tarfile
 
-NAMES = 'house-door key shield-lock sun moon-stars box-arrow-right list chevron-down building layout-sidebar-inset check-lg plus-lg'.split()
+NAMES = 'house-door key shield-lock sun moon-stars box-arrow-right list chevron-down building layout-sidebar-inset check-lg plus-lg inbox exclamation-triangle arrow-clockwise person-check sliders play-circle'.split()
 out = pathlib.Path(__file__).resolve().parent.parent / 'assets'
 out.mkdir(exist_ok=True)
 tf = tarfile.open(sys.argv[1])

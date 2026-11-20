@@ -7,6 +7,7 @@
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="vendor/bootstrap-5.3.9/css/bootstrap.min.css">
   <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="components.css">
   <script src="theme-init.js"></script>
 </head>
 <body>
@@ -123,8 +124,43 @@
         </ul>
       </nav>
     </div></section>
+    <section class="mb-5" aria-labelledby="s-dlg"><h2 class="h5 mb-3" id="s-dlg" data-i18n="sec.dlg"></h2>
+      <button class="btn btn-outline-danger" type="button" data-dialog-open="dlg-revoke" data-i18n="dlg.open"></button>
+      <dialog class="z-dlg" id="dlg-revoke" aria-labelledby="dlg-revoke-t" aria-describedby="dlg-revoke-d"><div class="z-dlg-in">
+        <h3 class="h5" id="dlg-revoke-t" data-i18n="dlg.title"></h3>
+        <p class="mb-0 text-body-secondary" id="dlg-revoke-d" data-i18n="dlg.body"></p>
+        <form method="dialog" class="z-dlg-ft"><button class="btn btn-outline-secondary" value="cancel" autofocus data-i18n="dlg.cancel"></button><button class="btn btn-danger" value="confirm" data-i18n="dlg.confirm"></button></form>
+      </div></dialog></section>
+    <section class="mb-5" aria-labelledby="s-toast"><h2 class="h5 mb-3" id="s-toast" data-i18n="sec.toast"></h2>
+      <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-outline-secondary" type="button" data-toast="success:al.success" data-i18n="ts.btn.success"></button>
+        <button class="btn btn-outline-secondary" type="button" data-toast="info:al.info" data-i18n="ts.btn.info"></button>
+        <button class="btn btn-outline-secondary" type="button" data-toast="danger:al.danger" data-i18n="ts.btn.danger"></button>
+      </div></section>
+    <section class="mb-5" aria-labelledby="s-tip"><h2 class="h5 mb-3" id="s-tip" data-i18n="sec.tip"></h2>
+      <span class="z-tip"><button class="btn btn-link p-0" type="button" aria-describedby="tip-scope" data-i18n="tip.btn"></button><span class="z-tip-b" id="tip-scope" role="tooltip" data-i18n="tip.text"></span></span></section>
+    <section class="mb-5" aria-labelledby="s-skel"><h2 class="h5 mb-3" id="s-skel" data-i18n="sec.skel"></h2>
+      <div class="card" aria-busy="true"><div class="card-body"><p class="visually-hidden" role="status" data-i18n="sk.loading"></p>
+        <table class="table mb-0" aria-hidden="true"><tbody class="placeholder-glow"><tr><td><span class="placeholder col-6"></span></td><td><span class="placeholder col-3"></span></td><td><span class="placeholder col-2"></span></td></tr><tr><td><span class="placeholder col-8"></span></td><td><span class="placeholder col-4"></span></td><td><span class="placeholder col-2"></span></td></tr><tr><td><span class="placeholder col-5"></span></td><td><span class="placeholder col-3"></span></td><td><span class="placeholder col-2"></span></td></tr></tbody></table></div></div></section>
+    <section class="mb-5" aria-labelledby="s-st"><h2 class="h5 mb-3" id="s-st" data-i18n="sec.states"></h2>
+      <div class="row row-cols-1 row-cols-md-2 g-3">
+        <div class="col"><div class="card h-100"><div class="z-state z-state--primary"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#inbox"/></svg></span><h3 class="h6 mb-0" data-i18n="sx.empty.t"></h3><p data-i18n="sx.empty.m"></p></div></div></div>
+        <div class="col"><div class="card h-100"><div class="z-state z-state--danger" role="alert"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#exclamation-triangle"/></svg></span><h3 class="h6 mb-0" data-i18n="sx.error.t"></h3><p data-i18n="sx.error.m"></p><button class="btn btn-outline-secondary mt-2 d-inline-flex align-items-center gap-2" type="button"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#arrow-clockwise"/></svg><span data-i18n="sx.retry"></span></button></div></div></div>
+        <div class="col"><div class="card h-100"><div class="z-state z-state--info"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#shield-lock"/></svg></span><h3 class="h6 mb-0" data-i18n="sx.forbidden.t"></h3><p data-i18n="sx.forbidden.m"></p><button class="btn btn-outline-secondary mt-2 d-inline-flex align-items-center gap-2" type="button"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#house-door"/></svg><span data-i18n="sx.home"></span></button></div></div></div>
+        <div class="col"><div class="card h-100"><div class="z-state z-state--warning"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#building"/></svg></span><h3 class="h6 mb-0" data-i18n="sx.scope.t"></h3><p data-i18n="sx.scope.m"></p><button class="btn btn-primary mt-2 d-inline-flex align-items-center gap-2" type="button"><span data-i18n="sx.scope.cta"></span></button></div></div></div>
+      </div></section>
+    <section class="mb-5" aria-labelledby="s-pm"><h2 class="h5 mb-3" id="s-pm" data-i18n="sec.perm"></h2>
+      <p class="text-body-secondary mb-1" data-i18n="pm.hide"></p>
+      <p class="text-body-secondary" data-i18n="pm.disable"></p>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <button class="btn btn-outline-danger disabled" type="button" aria-disabled="true" aria-describedby="pm-h1" data-i18n="btn.danger"></button>
+        <span class="small text-body-secondary" id="pm-h1" data-i18n="pm.hint"></span></div>
+      <div class="alert alert-danger mb-2" role="alert" data-i18n="pm.403"></div>
+      <div class="alert alert-danger mb-0" role="alert" data-i18n="pm.grant"></div></section>
+    <div class="z-toasts" id="z-toasts" role="region" aria-label="Notifikasi" data-i18n-attr="aria-label:ts.region"></div>
   </main>
   <script src="i18n.js"></script>
   <script src="app.js"></script>
+  <script src="ui.js"></script>
 </body>
 </html>

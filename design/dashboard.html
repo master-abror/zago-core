@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="id-ID" data-bs-theme="light" data-palette="aurora" data-nav="side">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title data-i18n="dash.title">Dashboard</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/bootstrap-5.3.9/css/bootstrap.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="theme-init.js"></script>
+</head>
+<body data-states="normal,loading,error,forbidden">
+  <a class="visually-hidden-focusable" href="#main" data-i18n="a11y.skip">Lewati ke konten</a>
+  <div class="z-app">
+    <nav class="z-nav" id="z-nav" aria-label="Menu utama" data-i18n-attr="aria-label:nav.label">
+      <a class="z-brand" href="#"><span class="z-logo" aria-hidden="true"></span><span class="z-brand-t" data-i18n="app.name">Zago</span></a>
+    <div class="z-grp">
+      <a class="z-it is-active" href="#" aria-current="page"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#house-door"/></svg><span class="z-lb" data-i18n="nav.dashboard"></span></a>
+      <div class="z-pop z-pop--solo" aria-hidden="true"><span class="z-pop-t" data-i18n="nav.dashboard"></span></div>
+    </div>
+    <div class="z-grp">
+      <a class="z-it" href="#"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#key"/></svg><span class="z-lb" data-i18n="nav.authz"></span></a>
+      <div class="z-pop"><span class="z-pop-t" data-i18n="nav.authz"></span>
+        <a class="z-sl" href="#" data-i18n="nav.roles"></a>
+        <a class="z-sl" href="#" data-i18n="nav.assignments"></a>
+        <a class="z-sl" href="#" data-i18n="nav.policies"></a>
+        <a class="z-sl" href="#" data-i18n="nav.simulator"></a>
+      </div>
+    </div>
+    <div class="z-grp">
+      <a class="z-it" href="#"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#shield-lock"/></svg><span class="z-lb" data-i18n="nav.security"></span></a>
+      <div class="z-pop"><span class="z-pop-t" data-i18n="nav.security"></span>
+        <a class="z-sl" href="#" data-i18n="nav.sessions"></a>
+        <a class="z-sl" href="#" data-i18n="nav.events"></a>
+        <a class="z-sl" href="#" data-i18n="nav.password"></a>
+      </div>
+    </div>
+    </nav>
+    <div class="z-scrim" data-action="toggle-drawer"></div>
+    <div>
+      <header class="z-top">
+        <button class="z-icon-btn z-drawer-btn" type="button" data-action="toggle-drawer" aria-controls="z-nav" aria-expanded="false" aria-label="Buka menu" data-i18n-attr="aria-label:top.menu"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#list"/></svg></button>
+        <button class="z-icon-btn z-navmode-btn" type="button" data-action="toggle-nav" aria-label="Ganti tampilan menu" data-i18n-attr="aria-label:top.navmode"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#layout-sidebar-inset"/></svg></button>
+        <div class="ms-auto d-flex align-items-center gap-2">
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-sm dropdown-toggle d-inline-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#building"/></svg><span data-i18n="org.platform">Platform</span></button>
+            <ul class="dropdown-menu">
+              <li><h6 class="dropdown-header" data-i18n="org.switch">Organisasi</h6></li>
+              <li><a class="dropdown-item active" href="#" data-i18n="org.platform">Platform</a></li>
+              <li><a class="dropdown-item" href="#">Acme Corp</a></li>
+              <li><a class="dropdown-item" href="#">Nusantara Labs</a></li>
+            </ul>
+          </div>
+          <button class="z-icon-btn" type="button" data-action="toggle-mode" aria-label="Ganti mode" data-i18n-attr="aria-label:top.mode"><svg class="z-ic z-i-moon" aria-hidden="true"><use href="assets/icons.svg#moon-stars"/></svg><svg class="z-ic z-i-sun" aria-hidden="true"><use href="assets/icons.svg#sun"/></svg></button>
+          <div class="dropdown">
+            <button class="z-avatar" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu pengguna" data-i18n-attr="aria-label:top.usermenu">AB</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li class="px-3 py-2"><div class="fw-semibold">Abror</div><div class="small text-body-secondary">abror@contoh.com</div></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><h6 class="dropdown-header" data-i18n="user.theme">Tema</h6></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="palette:aurora"><span class="z-dot" data-p="aurora"></span>Aurora<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="palette:lagoon"><span class="z-dot" data-p="lagoon"></span>Lagoon<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="palette:ember"><span class="z-dot" data-p="ember"></span>Ember<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><h6 class="dropdown-header" data-i18n="user.lang">Bahasa</h6></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="lang:id-ID">Indonesia<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="lang:en-US">English (US)<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item d-flex align-items-center gap-2" href="#"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#box-arrow-right"/></svg><span data-i18n="user.signout">Keluar</span></a></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <main class="z-main" id="main">
+        <div class="mb-4"><h1 class="h3 mb-1" data-i18n="dash.title"></h1><p class="text-body-secondary mb-0" data-i18n="dash.sub"></p></div>
+        <div data-when="normal">
+          <section class="card mb-4" aria-labelledby="d-ctx"><div class="card-body d-flex gap-3 align-items-start"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#building"/></svg></span>
+            <div><h2 class="h6 mb-1" id="d-ctx" data-i18n="dash.ctx.t"></h2><p class="mb-0 text-body-secondary" data-i18n="dash.ctx.platform"></p></div></div></section>
+          <section aria-labelledby="d-start"><h2 class="h5 mb-3" id="d-start" data-i18n="dash.start"></h2>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3"><div class="col"><a class="card h-100 z-link-card" href="#"><div class="card-body d-flex gap-3"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#key"/></svg></span><div><h3 class="h6 mb-1" data-i18n="nav.roles"></h3><p class="small text-body-secondary mb-0" data-i18n="dash.roles.m"></p></div></div></a></div><div class="col"><a class="card h-100 z-link-card" href="#"><div class="card-body d-flex gap-3"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#person-check"/></svg></span><div><h3 class="h6 mb-1" data-i18n="nav.assignments"></h3><p class="small text-body-secondary mb-0" data-i18n="dash.assign.m"></p></div></div></a></div><div class="col"><a class="card h-100 z-link-card" href="#"><div class="card-body d-flex gap-3"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#sliders"/></svg></span><div><h3 class="h6 mb-1" data-i18n="nav.policies"></h3><p class="small text-body-secondary mb-0" data-i18n="dash.pol.m"></p></div></div></a></div><div class="col"><a class="card h-100 z-link-card" href="#"><div class="card-body d-flex gap-3"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#play-circle"/></svg></span><div><h3 class="h6 mb-1" data-i18n="nav.simulator"></h3><p class="small text-body-secondary mb-0" data-i18n="dash.sim.m"></p></div></div></a></div><div class="col"><a class="card h-100 z-link-card" href="#"><div class="card-body d-flex gap-3"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#shield-lock"/></svg></span><div><h3 class="h6 mb-1" data-i18n="nav.security"></h3><p class="small text-body-secondary mb-0" data-i18n="dash.sec.m"></p></div></div></a></div></div></section>
+          <p class="small text-body-secondary mt-4 mb-0" data-i18n="dash.empty"></p>
+        </div>
+        <div data-when="loading" aria-busy="true"><p class="visually-hidden" role="status" data-i18n="sk.loading"></p>
+          <div class="mb-4"><div class="card"><div class="card-body placeholder-glow"><span class="placeholder col-4 d-block mb-3"></span><span class="placeholder col-9 d-block mb-2"></span><span class="placeholder col-7 d-block"></span></div></div></div><div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3"><div class="col"><div class="card"><div class="card-body placeholder-glow"><span class="placeholder col-4 d-block mb-3"></span><span class="placeholder col-9 d-block mb-2"></span><span class="placeholder col-7 d-block"></span></div></div></div><div class="col"><div class="card"><div class="card-body placeholder-glow"><span class="placeholder col-4 d-block mb-3"></span><span class="placeholder col-9 d-block mb-2"></span><span class="placeholder col-7 d-block"></span></div></div></div><div class="col"><div class="card"><div class="card-body placeholder-glow"><span class="placeholder col-4 d-block mb-3"></span><span class="placeholder col-9 d-block mb-2"></span><span class="placeholder col-7 d-block"></span></div></div></div></div></div>
+        <div data-when="error"><div class="card"><div class="z-state z-state--danger" role="alert"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#exclamation-triangle"/></svg></span>
+          <h2 class="h6 mb-0" data-i18n="sx.error.t"></h2><p data-i18n="sx.error.m"></p><button class="btn btn-outline-secondary mt-2 d-inline-flex align-items-center gap-2" type="button"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#arrow-clockwise"/></svg><span data-i18n="sx.retry"></span></button></div></div></div>
+        <div data-when="forbidden"><div class="card"><div class="z-state z-state--info"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#shield-lock"/></svg></span>
+          <h2 class="h6 mb-0" data-i18n="sx.forbidden.t"></h2><p data-i18n="sx.forbidden.m"></p><button class="btn btn-outline-secondary mt-2 d-inline-flex align-items-center gap-2" type="button"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#house-door"/></svg><span data-i18n="sx.home"></span></button></div></div></div>
+      </main>
+    </div>
+  </div>
+  <script src="vendor/bootstrap-5.3.9/js/bootstrap.bundle.min.js"></script>
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+  <script src="ui.js"></script>
+  <script src="states.js"></script>
+</body>
+</html>

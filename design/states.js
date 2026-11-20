@@ -6,6 +6,7 @@
   if (!list.length) return;
   const cur = new URLSearchParams(location.search).get('state') || list[0];
   document.body.dataset.state = cur;
+document.querySelectorAll('[data-when]').forEach(e => { e.hidden = !e.dataset.when.split(' ').includes(cur); });
   const nav = document.createElement('nav');
   nav.className = 'z-states';
   nav.setAttribute('aria-label', 'Pengalih state (demo)');
