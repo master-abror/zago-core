@@ -20,7 +20,21 @@ window.ZI18N = {
     'nav.sessions': 'Sesi', 'nav.events': 'Aktivitas keamanan', 'nav.password': 'Ganti password',
     'top.menu': 'Buka menu', 'top.navmode': 'Ganti tampilan menu (minibar atau sidebar)', 'top.mode': 'Ganti mode terang atau gelap', 'top.usermenu': 'Menu pengguna',
     'org.platform': 'Platform', 'org.switch': 'Organisasi', 'user.theme': 'Tema', 'user.lang': 'Bahasa', 'user.signout': 'Keluar',
-    'page.roles.title': 'Peran', 'page.roles.sub': 'Kelola peran dan izin dalam cakupan Anda.', 'page.roles.new': 'Buat peran', 'page.sample': 'Konten halaman muncul di sini.'
+    'page.roles.title': 'Peran', 'page.roles.sub': 'Kelola peran dan izin dalam cakupan Anda.', 'page.roles.new': 'Buat peran', 'page.sample': 'Konten halaman muncul di sini.',
+    'lg.title': 'Masuk', 'lg.sub': 'Gunakan email dan password akun Anda.', 'lg.email': 'Email', 'lg.password': 'Password',
+    'lg.show': 'Tampilkan', 'lg.hide': 'Sembunyikan', 'lg.forgot': 'Lupa password?', 'lg.submit': 'Masuk', 'lg.submitting': 'Memproses…',
+    'lg.invite': 'Akses hanya melalui undangan. Hubungi administrator organisasi Anda.', 'lg.footer': 'Zago · Sumber terbuka',
+    'lg.banner.h': 'Platform modular, aman sejak awal.', 'lg.banner.p': 'Kelola peran, izin, dan kebijakan dalam satu tempat.',
+    'lg.email.bad': 'Masukkan alamat email yang valid.', 'lg.password.req': 'Masukkan password.',
+    'al.validation.t': 'Periksa isian Anda', 'al.validation.m': 'Satu atau lebih kolom perlu diperbaiki.',
+    'al.invalid.t': 'Tidak dapat masuk', 'al.invalid.m': 'Email atau password salah. Periksa lalu coba lagi.',
+    'al.suspended.t': 'Akun ditangguhkan', 'al.suspended.m': 'Akun ini tidak dapat digunakan saat ini. Hubungi administrator Anda.',
+    'al.locked.t': 'Akun dikunci', 'al.locked.m': 'Akun ini dikunci oleh administrator. Hubungi administrator untuk membukanya.',
+    'al.rate.t': 'Terlalu banyak percobaan', 'al.rate.m': 'Demi keamanan, tunggu sebentar sebelum mencoba lagi.', 'al.rate.c': 'Coba lagi dalam {s} detik',
+    'al.rate.done.t': 'Silakan coba lagi', 'al.rate.done.m': 'Anda dapat mencoba masuk lagi.',
+    'al.expired.t': 'Sesi berakhir', 'al.expired.m': 'Sesi Anda berakhir atau dicabut. Masuk kembali untuk melanjutkan.',
+    'al.error.t': 'Terjadi gangguan', 'al.error.m': 'Kami tidak dapat memproses permintaan Anda. Coba lagi beberapa saat lagi.',
+    'al.ok.t': 'Berhasil masuk', 'al.ok.m': 'Mengalihkan ke dashboard…'
   },
   'en-US': {
     'app.name': 'Zago', 'cmp.title': 'Core components',
@@ -42,6 +56,20 @@ window.ZI18N = {
     'nav.sessions': 'Sessions', 'nav.events': 'Security activity', 'nav.password': 'Change password',
     'top.menu': 'Open menu', 'top.navmode': 'Switch menu style (minibar or sidebar)', 'top.mode': 'Switch light or dark mode', 'top.usermenu': 'User menu',
     'org.platform': 'Platform', 'org.switch': 'Organization', 'user.theme': 'Theme', 'user.lang': 'Language', 'user.signout': 'Sign out',
-    'page.roles.title': 'Roles', 'page.roles.sub': 'Manage roles and permissions within your scope.', 'page.roles.new': 'Create role', 'page.sample': 'Page content appears here.'
+    'page.roles.title': 'Roles', 'page.roles.sub': 'Manage roles and permissions within your scope.', 'page.roles.new': 'Create role', 'page.sample': 'Page content appears here.',
+    'lg.title': 'Sign in', 'lg.sub': 'Use your account email and password.', 'lg.email': 'Email', 'lg.password': 'Password',
+    'lg.show': 'Show', 'lg.hide': 'Hide', 'lg.forgot': 'Forgot password?', 'lg.submit': 'Sign in', 'lg.submitting': 'Working…',
+    'lg.invite': 'Access is by invitation only. Contact your organization administrator.', 'lg.footer': 'Zago · Open source',
+    'lg.banner.h': 'A modular platform, secure from the start.', 'lg.banner.p': 'Manage roles, permissions, and policies in one place.',
+    'lg.email.bad': 'Enter a valid email address.', 'lg.password.req': 'Enter your password.',
+    'al.validation.t': 'Check your entries', 'al.validation.m': 'One or more fields need attention.',
+    'al.invalid.t': 'Unable to sign in', 'al.invalid.m': 'The email or password is incorrect. Check and try again.',
+    'al.suspended.t': 'Account suspended', 'al.suspended.m': 'This account cannot be used right now. Contact your administrator.',
+    'al.locked.t': 'Account locked', 'al.locked.m': 'This account was locked by an administrator. Contact them to unlock it.',
+    'al.rate.t': 'Too many attempts', 'al.rate.m': 'For your security, wait a moment before trying again.', 'al.rate.c': 'Try again in {s} seconds',
+    'al.rate.done.t': 'You can try again', 'al.rate.done.m': 'You can attempt to sign in again.',
+    'al.expired.t': 'Session ended', 'al.expired.m': 'Your session ended or was revoked. Sign in again to continue.',
+    'al.error.t': 'Something went wrong', 'al.error.m': 'We could not process your request. Please try again in a moment.',
+    'al.ok.t': 'Signed in', 'al.ok.m': 'Redirecting to the dashboard…'
   }
 };

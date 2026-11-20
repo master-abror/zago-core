@@ -45,3 +45,26 @@
   .z-scrim.is-open { display: block; position: fixed; inset: 0; z-index: 1025; background: color-mix(in srgb, var(--z-text) 45%, transparent); }
   .z-navmode-btn { display: none; }
 }
+/* Halaman auth: banner kiri, form kanan */
+.z-auth { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 100vh; padding-bottom: 3rem; }
+.z-banner { display: flex; flex-direction: column; justify-content: space-between; gap: 2rem; padding: 1.25rem 1.5rem; color: var(--z-on-banner);
+  background: radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--z-on-banner) 24%, transparent), transparent 46%),
+    radial-gradient(circle at 90% 95%, color-mix(in srgb, var(--z-on-banner) 16%, transparent), transparent 42%),
+    linear-gradient(140deg, var(--z-banner-1), var(--z-banner-2)); }
+.z-banner .z-brand { margin: 0; padding: 0; color: inherit; }
+.z-banner .z-logo { background: var(--z-on-banner); }
+.z-banner-body { display: none; max-width: 30rem; }
+.z-auth-pane { display: flex; flex-direction: column; padding: 1rem 1.5rem; }
+.z-auth-top { display: flex; align-items: center; justify-content: flex-end; gap: .5rem; }
+.z-auth-form { width: 100%; max-width: 24rem; margin: auto; padding: 2rem 0; }
+@media (min-width: 992px) {
+  .z-auth { grid-template-columns: minmax(0, 5fr) minmax(0, 4fr); }
+  .z-banner { padding: 3rem; }
+  .z-banner-body { display: block; }
+}
+/* Pengalih state demo */
+.z-states { position: fixed; inset: auto 0 0 0; z-index: 1050; display: flex; gap: .25rem; overflow-x: auto; padding: .5rem; font-size: .8125rem;
+  background: var(--z-surface); border-top: 1px solid var(--z-border); }
+.z-states a { flex: none; padding: .25rem .625rem; border-radius: var(--z-radius-sm); color: var(--z-muted); text-decoration: none; }
+.z-states a:hover { background: var(--z-surface-2); color: var(--z-text); }
+.z-states a[aria-current] { background: var(--z-primary-subtle); color: var(--z-link); font-weight: 600; }

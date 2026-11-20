@@ -145,6 +145,7 @@ HEAD = """/* theme.css: DIHASILKAN oleh design/tools/gen-theme.py (ubah nilai di
 :root {
   --z-radius-sm: .375rem; --z-radius: .5rem; --z-radius-lg: .75rem;
   --z-shadow-sm: 0 1px 2px rgb(16 24 40 / .06); --z-shadow-md: 0 8px 24px rgb(16 24 40 / .14);
+  --z-on-banner: #ffffff;
   --z-dur: 150ms; --z-ease: cubic-bezier(.2, 0, 0, 1);
 }
 """
