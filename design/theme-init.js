@@ -6,5 +6,6 @@
   if (m === 'auto') m = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   d.setAttribute('data-bs-theme', m);
   d.setAttribute('data-palette', g('z-palette', 'aurora'));
+  d.setAttribute('data-nav', g('z-nav', 'side'));
   d.lang = g('z-lang', 'id-ID');
 })();

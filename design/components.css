@@ -1,0 +1,47 @@
+/* components.css: komponen kustom (shell) — hanya memakai token --z-* dan --bs-*; tanpa warna mentah. */
+.z-app { --z-nav-w: 16rem; display: grid; grid-template-columns: var(--z-nav-w) minmax(0, 1fr); min-height: 100vh; }
+.z-nav { position: sticky; top: 0; height: 100vh; z-index: 1030; display: flex; flex-direction: column; gap: .25rem; padding: .75rem;
+  background: var(--z-surface); border-right: 1px solid var(--z-border); overflow-y: auto; overflow-x: hidden; }
+.z-brand { display: flex; align-items: center; gap: .625rem; min-height: 2.5rem; margin-bottom: .5rem; padding: 0 .5rem; color: var(--z-text); font-weight: 700; text-decoration: none; }
+.z-logo { flex: none; width: 1.75rem; height: 1.75rem; border-radius: var(--z-radius); background: linear-gradient(140deg, var(--z-banner-1), var(--z-banner-2)); }
+.z-grp { position: relative; }
+.z-it { display: flex; align-items: center; gap: .75rem; min-height: 2.5rem; padding: 0 .75rem; border-radius: var(--z-radius); color: var(--z-muted); font-weight: 600; text-decoration: none; transition: background var(--z-dur) var(--z-ease), color var(--z-dur) var(--z-ease); }
+.z-it:hover { background: var(--z-surface-2); color: var(--z-text); }
+.z-it.is-active { background: var(--z-primary-subtle); color: var(--z-link); }
+.z-ic { flex: none; width: 1.25rem; height: 1.25rem; fill: currentColor; }
+.z-pop { display: flex; flex-direction: column; gap: .125rem; margin: .125rem 0 .5rem 1.5rem; padding-left: .75rem; border-left: 1px solid var(--z-border); }
+.z-pop--solo, .z-pop-t { display: none; }
+.z-sl { padding: .375rem .75rem; border-radius: var(--z-radius-sm); color: var(--z-muted); font-size: .875rem; text-decoration: none; }
+.z-sl:hover { background: var(--z-surface-2); color: var(--z-text); }
+.z-sl.is-active { color: var(--z-link); font-weight: 600; }
+.z-top { position: sticky; top: 0; z-index: 1020; display: flex; align-items: center; gap: .5rem; height: 3.5rem; padding: 0 1rem;
+  background: color-mix(in srgb, var(--z-bg) 85%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--z-border); }
+.z-main { padding: 1.5rem; }
+.z-icon-btn { display: inline-grid; place-items: center; width: 2.25rem; height: 2.25rem; border: 0; border-radius: var(--z-radius); background: none; color: var(--z-muted); }
+.z-icon-btn:hover { background: var(--z-surface-2); color: var(--z-text); }
+.z-avatar { display: inline-grid; place-items: center; width: 2.25rem; height: 2.25rem; border: 0; border-radius: 50%; background: var(--z-primary); color: var(--z-on-primary); font-size: .8125rem; font-weight: 700; }
+.z-dot { display: inline-block; flex: none; width: .875rem; height: .875rem; border-radius: 50%; }
+.z-ck { display: none; }
+.dropdown-item.active { background: var(--z-primary-subtle); color: var(--z-link); }
+.dropdown-item.active .z-ck { display: block; }
+:root[data-bs-theme="dark"] .z-i-moon, :root[data-bs-theme="light"] .z-i-sun { display: none; }
+.z-scrim { display: none; }
+@media (min-width: 992px) {
+  :root[data-nav="min"] .z-app { --z-nav-w: 4.25rem; }
+  :root[data-nav="min"] .z-nav { padding: .75rem .625rem; overflow: visible; }
+  :root[data-nav="min"] .z-lb, :root[data-nav="min"] .z-brand-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  :root[data-nav="min"] .z-it, :root[data-nav="min"] .z-brand { justify-content: center; padding: 0; }
+  :root[data-nav="min"] .z-pop, :root[data-nav="min"] .z-pop--solo { display: none; position: absolute; left: 100%; top: 0; z-index: 1; min-width: 11rem; margin: 0 0 0 .5rem; padding: .5rem;
+    border: 1px solid var(--z-border); border-radius: var(--z-radius-lg); background: var(--z-surface); box-shadow: var(--z-shadow-md); }
+  :root[data-nav="min"] .z-pop::before { content: ""; position: absolute; top: 0; bottom: 0; left: -.5rem; width: .5rem; }
+  :root[data-nav="min"] .z-grp:hover > .z-pop, :root[data-nav="min"] .z-grp:focus-within > .z-pop { display: flex; }
+  :root[data-nav="min"] .z-pop-t { display: block; padding: .25rem .75rem; font-size: .875rem; font-weight: 700; }
+  .z-drawer-btn { display: none; }
+}
+@media (max-width: 991.98px) {
+  .z-app { grid-template-columns: minmax(0, 1fr); }
+  .z-nav { position: fixed; inset: 0 auto 0 0; width: 16rem; transform: translateX(-100%); transition: transform var(--z-dur) var(--z-ease); }
+  .z-nav.is-open { transform: none; box-shadow: var(--z-shadow-md); }
+  .z-scrim.is-open { display: block; position: fixed; inset: 0; z-index: 1025; background: color-mix(in srgb, var(--z-text) 45%, transparent); }
+  .z-navmode-btn { display: none; }
+}

@@ -138,6 +138,7 @@ COMP = f"""
 a:focus-visible, summary:focus-visible, [tabindex]:focus-visible {{ outline: 2px solid var(--z-primary); outline-offset: 2px; }}
 @media (prefers-reduced-motion: reduce) {{ *, *::before, *::after {{ animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }} }}
 """
+DOTS = '\n'.join(f'.z-dot[data-p="{n}"] {{ background: linear-gradient(140deg, {L["b1"]}, {L["b2"]}); }}' for n, (L, D) in P.items()) + '\n'
 HEAD = """/* theme.css: DIHASILKAN oleh design/tools/gen-theme.py (ubah nilai di sana, lalu jalankan ulang).
  * Dimuat SESUDAH CSS Bootstrap 5.3.9. Mode warna: data-bs-theme=light|dark; palet: data-palette=aurora|lagoon|ember.
  * Token --z-* adalah sumber; --bs-* hanya jembatan (komentar = padanan variabel Sass untuk SPA). */
@@ -147,7 +148,7 @@ HEAD = """/* theme.css: DIHASILKAN oleh design/tools/gen-theme.py (ubah nilai di
   --z-dur: 150ms; --z-ease: cubic-bezier(.2, 0, 0, 1);
 }
 """
-pathlib.Path(__file__).resolve().parent.parent.joinpath('theme.css').write_text(HEAD + '\n' + '\n\n'.join(blocks) + '\n\n' + bridge_css + '\n' + COMP, encoding='utf-8')
+pathlib.Path(__file__).resolve().parent.parent.joinpath('theme.css').write_text(HEAD + '\n' + '\n\n'.join(blocks) + '\n\n' + bridge_css + '\n' + COMP + DOTS, encoding='utf-8')
 w = max(len(r[0]) for r in rows)
 for l, v, n in rows: print(f'{l:<{w}}  {v:6.2f}  (min {n})  {"OK" if v >= n else "GAGAL"}')
 print(f'{len(rows)} pasangan, {len(fails)} gagal'); sys.exit(1 if fails else 0)

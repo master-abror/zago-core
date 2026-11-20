@@ -14,7 +14,13 @@ window.ZI18N = {
     'al.success': 'Perubahan tersimpan.', 'al.warning': 'Assignment ini akan kedaluwarsa dalam 3 hari.',
     'al.danger': 'Terjadi galat. Coba lagi beberapa saat lagi.', 'al.info': 'Peran sistem hanya dapat dibaca.',
     'tb.name': 'Nama', 'tb.status': 'Status', 'tb.perm': 'Izin', 'tb.caption': 'Contoh daftar peran',
-    'pg.label': 'Navigasi halaman', 'pg.prev': 'Sebelumnya', 'pg.next': 'Berikutnya'
+    'pg.label': 'Navigasi halaman', 'pg.prev': 'Sebelumnya', 'pg.next': 'Berikutnya',
+    'a11y.skip': 'Lewati ke konten', 'nav.label': 'Menu utama', 'nav.dashboard': 'Dashboard', 'nav.authz': 'Otorisasi', 'nav.roles': 'Peran',
+    'nav.assignments': 'Assignment', 'nav.policies': 'Policy', 'nav.simulator': 'Simulator', 'nav.security': 'Keamanan',
+    'nav.sessions': 'Sesi', 'nav.events': 'Aktivitas keamanan', 'nav.password': 'Ganti password',
+    'top.menu': 'Buka menu', 'top.navmode': 'Ganti tampilan menu (minibar atau sidebar)', 'top.mode': 'Ganti mode terang atau gelap', 'top.usermenu': 'Menu pengguna',
+    'org.platform': 'Platform', 'org.switch': 'Organisasi', 'user.theme': 'Tema', 'user.lang': 'Bahasa', 'user.signout': 'Keluar',
+    'page.roles.title': 'Peran', 'page.roles.sub': 'Kelola peran dan izin dalam cakupan Anda.', 'page.roles.new': 'Buat peran', 'page.sample': 'Konten halaman muncul di sini.'
   },
   'en-US': {
     'app.name': 'Zago', 'cmp.title': 'Core components',
@@ -30,6 +36,12 @@ window.ZI18N = {
     'al.success': 'Changes saved.', 'al.warning': 'This assignment expires in 3 days.',
     'al.danger': 'Something went wrong. Please try again in a moment.', 'al.info': 'System roles are read-only.',
     'tb.name': 'Name', 'tb.status': 'Status', 'tb.perm': 'Permissions', 'tb.caption': 'Sample role list',
-    'pg.label': 'Page navigation', 'pg.prev': 'Previous', 'pg.next': 'Next'
+    'pg.label': 'Page navigation', 'pg.prev': 'Previous', 'pg.next': 'Next',
+    'a11y.skip': 'Skip to content', 'nav.label': 'Main menu', 'nav.dashboard': 'Dashboard', 'nav.authz': 'Authorization', 'nav.roles': 'Roles',
+    'nav.assignments': 'Assignments', 'nav.policies': 'Policies', 'nav.simulator': 'Simulator', 'nav.security': 'Security',
+    'nav.sessions': 'Sessions', 'nav.events': 'Security activity', 'nav.password': 'Change password',
+    'top.menu': 'Open menu', 'top.navmode': 'Switch menu style (minibar or sidebar)', 'top.mode': 'Switch light or dark mode', 'top.usermenu': 'User menu',
+    'org.platform': 'Platform', 'org.switch': 'Organization', 'user.theme': 'Theme', 'user.lang': 'Language', 'user.signout': 'Sign out',
+    'page.roles.title': 'Roles', 'page.roles.sub': 'Manage roles and permissions within your scope.', 'page.roles.new': 'Create role', 'page.sample': 'Page content appears here.'
   }
 };
