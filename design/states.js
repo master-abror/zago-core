@@ -3,7 +3,8 @@
   const L = { normal: 'Normal', loading: 'Memuat', empty: 'Kosong', error: 'Galat umum', forbidden: 'Terlarang (403)', expired: 'Sesi habis', validation: 'Galat validasi',
     success: 'Sukses', csrf: '403 CSRF', paged: 'Halaman 2', archived: 'Terarsip', platform: 'Konteks Platform', viewer: 'Tanpa role.manage', slugtaken: '409 slug dipakai',
     invscope: '400 scope tidak valid', permnf: '422 permission tidak ada', grant: '403 melebihi wewenang', scope: '403 scope_mismatch', alone: 'Tanpa sesi lain', short: 'Terlalu pendek', long: 'Terlalu panjang', same: 'Sama dengan lama',
-    wrongpw: 'Password lama salah', more: 'Memuat lagi', moreerr: 'Galat muat lagi', end: 'Akhir daftar', invalid: '401 kredensial', suspended: '403 ditangguhkan', locked: '423 dikunci', rate: '429 batas laju' };
+    wrongpw: 'Password lama salah', more: 'Memuat lagi', moreerr: 'Galat muat lagi', end: 'Akhir daftar', invalid: '401 kredensial', suspended: '403 ditangguhkan', locked: '423 dikunci', rate: '429 batas laju',
+    notfound: '404 peran tidak ada', system: 'Peran sistem', saveerr: 'Galat simpan' };
   const list = (document.body.dataset.states || '').split(',').filter(Boolean);
   if (!list.length) return;
   const cur = new URLSearchParams(location.search).get('state') || list[0];

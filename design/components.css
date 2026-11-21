@@ -97,3 +97,8 @@ body[data-states] .z-main { padding-bottom: 4rem; }
 /* F3a: editor permission */
 .z-perm code { color: var(--z-text); }
 .z-perm summary { cursor: pointer; }
+/* F3b: bilah simpan lengket (detail peran) */
+.z-savebar { position: sticky; bottom: 1rem; z-index: 1010; margin-top: 1.5rem; padding: .75rem 1rem; border: 1px solid var(--z-border-strong); border-radius: var(--z-radius-lg); background: var(--z-surface); box-shadow: var(--z-shadow-md); }
+.z-savebar-in { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+body[data-states] .z-savebar { bottom: 3.5rem; }
+html:has(.z-savebar:not([hidden])) { scroll-padding-bottom: 9rem; } /* WCAG 2.4.11: fokus tidak tertutup bilah */

@@ -38,6 +38,63 @@
     sync();
   }
 
+  // Detail peran (F3b). Di SPA: PATCH detail dan PUT permission adalah dua permintaan terpisah; bilah simpan hanya untuk permission.
+  const rdf = $('rd-form');
+  if (rdf) {
+    const R = { system: ['Organization Admin', 'organization-admin', 'system', 'active', 'Mengelola satu organisasi.'], archived: ['Kasir', 'kasir', 'org', 'archived', 'Peran lama, sudah diarsipkan.'] }[st]
+      || ['Keuangan', 'keuangan', 'org', 'active', 'Mengelola data keuangan.'];
+    const RO = ['system', 'archived', 'viewer'].includes(st);
+    const BADGE = { system: 'bg-info-subtle text-info-emphasis border border-info-subtle', org: 'bg-primary-subtle text-primary-emphasis border border-primary-subtle',
+      active: 'bg-success-subtle text-success-emphasis border border-success-subtle', archived: 'bg-body-secondary text-body border' };
+    $('rd-title').textContent = R[0]; $('rd-slug').textContent = R[1]; $('rd-name').value = R[0]; $('rd-desc').value = R[4];
+    const bc = $('rd-bc'); bc.textContent = R[0]; bc.removeAttribute('data-i18n');
+    [['rd-b-type', R[2], 'rl.type.'], ['rd-b-st', R[3], 'rl.st.']].forEach(([id, v, p]) => { const el = $(id); el.className = `badge ${BADGE[v]}`; el.dataset.i18n = p + v; });
+    const boxes = [...ed.querySelectorAll('[data-perm]')];
+    const keep = { system: c => !c.startsWith('announcements.'), archived: c => ['organization.read', 'user.read'].includes(c) }[st] || (c => ['organization.read', 'user.read', 'role.read'].includes(c));
+    boxes.forEach(x => { x.checked = keep(x.value); }); sync();
+    const base = () => boxes.filter(x => x.checked).map(x => x.value).sort().join();
+    let b0 = base();
+    if (RO) { boxes.forEach(x => { x.disabled = true; }); ed.querySelectorAll('[data-perm-all-mod]').forEach(x => { x.disabled = true; }); $('rd-fs').disabled = true; }
+    const bar = $('rd-bar'), live = $('rd-live'); let was = false;
+    const upd = () => {
+      const on = !RO && base() !== b0; bar.hidden = !on;
+      if (on !== was) { live.textContent = on ? T('rd.dirty') : ''; was = on; }
+    };
+    ed.addEventListener('change', upd);
+    const save = () => {
+      $('rd-save').disabled = true; $('rd-spin').hidden = false; $('rd-save-l').dataset.i18n = 'btn.loading'; ZApp.apply();
+      setTimeout(() => {
+        b0 = base(); $('rd-spin').hidden = true; $('rd-save').disabled = false; $('rd-save-l').dataset.i18n = 'rd.save';
+        upd(); ZUI.toast('success', 'rd.saved'); ZApp.apply(); $('rd-h-perms').focus(); // bilah hilang: fokus ke judul bagian
+      }, 700);
+    };
+    document.addEventListener('click', e => {
+      const a = e.target.closest('[data-action]')?.dataset.action;
+      if (a === 'rd-cancel') { const was0 = b0.split(','); boxes.forEach(x => { x.checked = was0.includes(x.value); }); sync(); upd(); $('rd-h-perms').focus(); }
+      if (a === 'rd-save') { if (boxes.some(x => x.checked)) save(); else $('dlg-empty').showModal(); }
+    });
+    $('dlg-empty').addEventListener('close', e => { if (e.target.returnValue === 'confirm') save(); e.target.returnValue = ''; });
+    $('dlg-archive').addEventListener('close', e => { const ok = e.target.returnValue === 'confirm'; e.target.returnValue = ''; if (ok) location.search = '?state=archived'; });
+    const nameErr = on => {
+      const el = $('rd-name'); el.classList.toggle('is-invalid', on); if (on) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid');
+      el.setAttribute('aria-describedby', on ? 'rd-name-h rd-name-e' : 'rd-name-h'); if (on) { $('rd-name-e').dataset.i18n = 'rn.name.req'; ZApp.apply(); el.focus(); }
+    };
+    rdf.addEventListener('submit', e => { e.preventDefault(); if (!$('rd-name').value.trim()) nameErr(true); else { nameErr(false); ZUI.toast('success', 'rd.saved.d'); } });
+    const box = $('rd-alert');
+    const TONE = { validation: ['danger', 'al.validation.t', 'al.validation.m'], grant: ['danger', 'al.grant.t', 'rd.grant.m'], permnf: ['danger', 'al.permnf.t', 'al.permnf.m'],
+      csrf: ['danger', 'al.csrf.t', 'al.csrf.m'], saveerr: ['danger', 'al.error.t', 'al.error.m'], success: ['success', 'al.rdok.t', 'al.rdok.m'] };
+    if (['grant', 'permnf', 'csrf', 'saveerr'].includes(st)) { $('p-role.manage').checked = true; sync(); upd(); } // percobaan simpan yang ditolak: perubahan tetap ada
+    if (st === 'validation') { $('rd-name').value = ''; }
+    if (TONE[st]) {
+      const [tone, tk, mk] = TONE[st];
+      box.className = `alert alert-${tone}`; box.setAttribute('role', tone === 'success' ? 'status' : 'alert'); box.hidden = false;
+      $('ra-t').dataset.i18n = tk; $('ra-m').dataset.i18n = mk; box.tabIndex = -1;
+    }
+    if (st === 'csrf') $('rd-reload').hidden = false;
+    ZApp.apply();
+    if (st === 'validation') nameErr(true); else if (TONE[st]) box.focus();
+  }
+
   // Form buat peran.
   const form = $('rn-form');
   if (!form) return;
