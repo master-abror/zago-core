@@ -94,3 +94,6 @@
 .z-link-card { color: inherit; text-decoration: none; transition: border-color var(--z-dur) var(--z-ease); }
 .z-link-card:hover { border-color: var(--z-primary); }
 body[data-states] .z-main { padding-bottom: 4rem; }
+/* F3a: editor permission */
+.z-perm code { color: var(--z-text); }
+.z-perm summary { cursor: pointer; }
