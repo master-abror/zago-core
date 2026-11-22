@@ -104,6 +104,14 @@ func assignPlatform(t *testing.T, db *testpg.DB, userID uuid.UUID) testkit.Assig
 	return testkit.AssignRole(t, db, spec)
 }
 
+// newOperator membuat user sungguhan sebagai pemanggil platform. Add menulis invited_by yang
+// berkunci asing ke users, jadi pemanggil untuk Add harus user yang ada (di produksi pemanggil
+// selalu user yang sudah terautentikasi).
+func newOperator(t *testing.T, db *testpg.DB) application.Caller {
+	t.Helper()
+	return application.Caller{UserID: testkit.NewUser(t, db).ID}
+}
+
 // holdOrganizationLock menahan kunci advisory organisasi di transaksi lain sampai release
 // dipanggil (tepat sekali). holderDone menerima hasil transaksi penahan.
 func holdOrganizationLock(t *testing.T, db *testpg.DB, organizationID uuid.UUID) (func(), <-chan error) {
@@ -196,7 +204,7 @@ func TestMemberServiceKeepsTenantsApartEndToEnd(t *testing.T) {
 	_, err = svc.Remove(bg, callerB, orgB.ID, userA.ID)
 	require.ErrorIs(t, err, domain.ErrMemberNotFound, "user A bukan anggota B")
 	_, err = svc.Get(bg, callerA, orgB.ID, userB.ID)
-	require.ErrorIs(t, err, domain.ErrOrganizationNotFound)
+	require.ErrorIs(t, err, domain.ErrMemberNotFound, "Get lintas organisasi menjadi anggota-tidak-ada (repository Get)")
 	_, err = svc.List(bg, callerB, orgA.ID, domain.MemberListQuery{})
 	require.ErrorIs(t, err, domain.ErrOrganizationNotFound)
 	_, err = svc.Add(bg, callerA, orgA.ID, outsider.ID)
@@ -256,12 +264,13 @@ func TestMemberAddWaitsForTheOrganizationAdvisoryLock(t *testing.T) {
 	db := testkit.NewDB(t)
 	org := testkit.NewOrganization(t, db)
 	user := testkit.NewUser(t, db)
+	operator := newOperator(t, db)
 	svc, _, _ := newMemberDBService(t, db, nil)
 	release, holderDone := holdOrganizationLock(t, db, org.ID)
 
 	done := make(chan error, 1)
 	go func() {
-		_, err := svc.Add(bg, platformCaller(), org.ID, user.ID)
+		_, err := svc.Add(bg, operator, org.ID, user.ID)
 		done <- err
 	}()
 	select {
@@ -335,12 +344,13 @@ func TestMemberConcurrentAddsSucceedExactlyOnce(t *testing.T) {
 	db := testkit.NewDB(t)
 	org := testkit.NewOrganization(t, db)
 	user := testkit.NewUser(t, db)
+	operator := newOperator(t, db)
 	svc, au, ev := newMemberDBService(t, db, nil)
 
 	results := make(chan error, 2)
 	for i := 0; i < 2; i++ {
 		go func() {
-			_, err := svc.Add(bg, platformCaller(), org.ID, user.ID)
+			_, err := svc.Add(bg, operator, org.ID, user.ID)
 			results <- err
 		}()
 	}
@@ -389,10 +399,11 @@ func TestMemberAddRollsBackWhenInvalidationFails(t *testing.T) {
 	db := testkit.NewDB(t)
 	org := testkit.NewOrganization(t, db)
 	user := testkit.NewUser(t, db)
+	operator := newOperator(t, db)
 	inv := &fakeInvalidator{trace: &trace{}, err: errors.New("redis mati")}
 	svc, au, ev := newMemberDBService(t, db, inv)
 
-	_, err := svc.Add(bg, platformCaller(), org.ID, user.ID)
+	_, err := svc.Add(bg, operator, org.ID, user.ID)
 	require.ErrorIs(t, err, inv.err)
 	require.Equal(t, 0, memberRowCount(t, db, org.ID, user.ID), "baris keanggotaan tidak tertinggal")
 	require.Equal(t, 0, au.count())
@@ -408,7 +419,7 @@ func TestMemberAddRulesEndToEnd(t *testing.T) {
 	_, err := db.Migrator.Exec(bg, `UPDATE users SET status = 'suspended' WHERE id = $1`, suspended.ID.String())
 	require.NoError(t, err)
 	svc, au, ev := newMemberDBService(t, db, nil)
-	plat := platformCaller()
+	plat := newOperator(t, db)
 
 	got, err := svc.Add(bg, plat, org.ID, user.ID)
 	require.NoError(t, err)
@@ -443,10 +454,11 @@ func TestMemberReAddAfterRemoveReusesTheRowAndDoesNotResurrectAccess(t *testing.
 	orgWide := assignInOrg(t, db, user.ID, org, "organization", nil)
 	groupWide := assignInOrg(t, db, user.ID, org, "group", &groupID)
 	svc, _, _ := newMemberDBService(t, db, nil)
+	operator := newOperator(t, db)
 
 	_, err := svc.Remove(bg, platformCaller(), org.ID, user.ID)
 	require.NoError(t, err)
-	got, err := svc.Add(bg, platformCaller(), org.ID, user.ID)
+	got, err := svc.Add(bg, operator, org.ID, user.ID)
 	require.NoError(t, err)
 	require.Equal(t, domain.MemberActive, got.Status)
 
