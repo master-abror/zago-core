@@ -48,6 +48,10 @@ var (
 
 	// ErrInvalidCursor menandai cursor daftar anggota yang rusak.
 	ErrInvalidCursor = errors.New("organization: cursor tidak sah")
+
+	// ErrCannotRemoveSelf menandai pemanggil tenant yang mencoba menghapus keanggotaannya
+	// sendiri lewat endpoint anggota (ADR-0023 butir 17). Operator platform tidak dibatasi.
+	ErrCannotRemoveSelf = errors.New("organization: tidak dapat menghapus keanggotaan sendiri")
 )
 
 // Member adalah satu keanggotaan organisasi beserta identitas ringkas penggunanya. Alamat email
