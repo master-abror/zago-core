@@ -52,7 +52,7 @@ var fieldRules = []fieldRule{
 	{domain.ErrInvalidSlug, "slug", "invalid", "The slug is invalid."},
 	{domain.ErrInvalidLocale, "default_locale", "invalid", "The default locale is invalid."},
 	{domain.ErrInvalidTimezone, "default_timezone", "invalid", "The default timezone is invalid."},
-	{domain.ErrInvalidFilter, "filter", "invalid", "The filter is not recognized."},
+	{domain.ErrInvalidFilter, "status", "invalid", "The status filter is not recognized."},
 	{domain.ErrInvalidCursor, "cursor", "invalid_cursor", "The cursor is invalid."},
 	{domain.ErrNothingToUpdate, "", "empty_patch", "The request changes nothing."},
 }

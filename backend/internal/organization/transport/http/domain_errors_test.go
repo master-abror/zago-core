@@ -189,7 +189,7 @@ func TestDomainErrorFieldRulesNameTheirField(t *testing.T) {
 		{domain.ErrInvalidSlug, "slug", "invalid"},
 		{domain.ErrInvalidLocale, "default_locale", "invalid"},
 		{domain.ErrInvalidTimezone, "default_timezone", "invalid"},
-		{domain.ErrInvalidFilter, "filter", "invalid"},
+		{domain.ErrInvalidFilter, "status", "invalid"},
 		{domain.ErrInvalidCursor, "cursor", "invalid_cursor"},
 		{domain.ErrNothingToUpdate, "", "empty_patch"},
 	}
