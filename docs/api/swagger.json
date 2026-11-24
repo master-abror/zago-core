@@ -257,6 +257,568 @@
                 }
             }
         },
+        "/api/v1/organizations": {
+            "get": {
+                "description": "Scope platform melihat semua organisasi; pemanggil tenant hanya melihat organisasinya sendiri. Bawaan: organisasi aktif dan ditangguhkan (open).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organization"
+                ],
+                "summary": "Daftar organisasi yang terlihat bagi pemanggil",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "open (bawaan), all, active, suspended, atau archived",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Nomor halaman (mulai 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Ukuran halaman (bawaan 50, maksimum 100)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_organization_transport_http_OrganizationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Hanya pemanggil scope platform. Pemanggil tenant selalu mendapat 403 permission_denied. Slug unik dan tidak dapat diubah.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organization"
+                ],
+                "summary": "Buat organisasi (hanya platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Organisasi baru",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_organization_transport_http.CreateOrganizationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_organization_transport_http_OrganizationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "organization_slug_taken",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/organizations/{id}": {
+            "get": {
+                "description": "Organisasi milik tenant lain dan organisasi yang tidak ada sama-sama 404 organization_not_found.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organization"
+                ],
+                "summary": "Detail satu organisasi",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID organisasi",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_organization_transport_http_OrganizationResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "organization_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Soft delete: status menjadi archived dan bersifat terminal. Sesi anggota dicabut pada task T5.",
+                "tags": [
+                    "organization"
+                ],
+                "summary": "Arsipkan organisasi",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID organisasi",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "organization_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "organization_archived, invalid_status_transition",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "description": "Hanya field yang dikirim yang berubah; slug dan status tidak dapat diubah di sini (field itu ditolak). Organisasi terarsip tidak dapat diubah.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organization"
+                ],
+                "summary": "Ubah organisasi",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID organisasi",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Perubahan",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_organization_transport_http.UpdateOrganizationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_organization_transport_http_OrganizationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "organization_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "organization_archived",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/organizations/{id}/members": {
+            "get": {
+                "description": "Paginasi cursor (urutan created_at, id). Bawaan: anggota yang belum dihapus (open). Alamat email tidak ditampilkan.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organization"
+                ],
+                "summary": "Daftar anggota satu organisasi",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID organisasi",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "open (bawaan), all, invited, active, suspended, atau removed",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Ukuran halaman (bawaan 50, maksimum 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor halaman berikutnya dari meta.pagination.next_cursor",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_organization_transport_http_MemberResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "organization_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Hanya pemanggil scope platform; pengguna harus aktif. Tenant memakai undangan. Pengguna yang pernah dihapus diaktifkan kembali pada baris yang sama.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organization"
+                ],
+                "summary": "Tambah anggota ke organisasi (hanya platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID organisasi",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Pengguna yang ditambahkan",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_organization_transport_http.AddMemberRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_organization_transport_http_MemberResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validation_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "organization_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "member_exists, organization_archived",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "user_not_eligible",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/organizations/{id}/members/{user_id}": {
+            "get": {
+                "description": "Anggota organisasi lain, anggota yang tidak ada, dan anggota yang sudah dihapus sama-sama 404 member_not_found.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organization"
+                ],
+                "summary": "Detail satu anggota",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID organisasi",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID pengguna",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_organization_transport_http_MemberResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "organization_not_found, member_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Penghapusan logis: keanggotaan menjadi removed, keanggotaan grup dan role assignment ber-scope organisasi dicabut, cache hak diinvalidasi. Pemanggil tenant tidak dapat menghapus dirinya sendiri. Sesi tidak dicabut sampai task T5.",
+                "tags": [
+                    "organization"
+                ],
+                "summary": "Hapus anggota dari organisasi",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID organisasi",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID pengguna",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Token CSRF sesi",
+                        "name": "X-CSRF-Token",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "authentication_required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "permission_denied, csrf_failed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "organization_not_found, member_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "cannot_remove_self",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/permissions": {
             "get": {
                 "description": "Katalog bersifat global (core dan modul), terurut menurut kode.",
@@ -2217,6 +2779,147 @@
                 }
             }
         },
+        "backend_internal_organization_transport_http.AddMemberRequest": {
+            "type": "object",
+            "properties": {
+                "user_id": {
+                    "description": "UserID adalah pengguna yang akan ditambahkan; wajib.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_organization_transport_http.CreateOrganizationRequest": {
+            "type": "object",
+            "properties": {
+                "default_locale": {
+                    "description": "DefaultLocale opsional; kosong berarti en-US.",
+                    "type": "string"
+                },
+                "default_timezone": {
+                    "description": "DefaultTimezone opsional; kosong berarti UTC.",
+                    "type": "string"
+                },
+                "legal_name": {
+                    "description": "LegalName opsional; null atau string kosong berarti tidak diisi.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan.",
+                    "type": "string"
+                },
+                "slug": {
+                    "description": "Slug adalah pengenal organisasi, unik, tidak dapat diubah.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_organization_transport_http.MemberResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "description": "CreatedAt adalah waktu pembuatan baris (UTC).",
+                    "type": "string"
+                },
+                "display_name": {
+                    "description": "DisplayName adalah nama tampilan pengguna.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID adalah id baris keanggotaan.",
+                    "type": "string"
+                },
+                "invited_by": {
+                    "description": "InvitedBy adalah pengguna yang menambahkan atau mengundang; null bila tidak diketahui.",
+                    "type": "string"
+                },
+                "joined_at": {
+                    "description": "JoinedAt adalah waktu bergabung (UTC); null selama belum pernah aktif.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah invited, active, suspended, atau removed.",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "UpdatedAt adalah waktu perubahan terakhir (UTC).",
+                    "type": "string"
+                },
+                "user_id": {
+                    "description": "UserID adalah pengguna yang menjadi anggota.",
+                    "type": "string"
+                },
+                "user_status": {
+                    "description": "UserStatus adalah status akun pengguna, terpisah dari status keanggotaan.",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_organization_transport_http.OrganizationResponse": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "description": "ArchivedAt adalah waktu pengarsipan (UTC); null selama belum diarsipkan.",
+                    "type": "string"
+                },
+                "created_at": {
+                    "description": "CreatedAt adalah waktu pembuatan (UTC).",
+                    "type": "string"
+                },
+                "default_locale": {
+                    "description": "DefaultLocale adalah locale bawaan organisasi.",
+                    "type": "string"
+                },
+                "default_timezone": {
+                    "description": "DefaultTimezone adalah zona waktu IANA bawaan organisasi.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID adalah id organisasi.",
+                    "type": "string"
+                },
+                "legal_name": {
+                    "description": "LegalName adalah nama hukum; null bila tidak diisi.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan.",
+                    "type": "string"
+                },
+                "slug": {
+                    "description": "Slug adalah pengenal unik organisasi.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status adalah active, suspended, atau archived.",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "UpdatedAt adalah waktu perubahan terakhir (UTC).",
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_organization_transport_http.UpdateOrganizationRequest": {
+            "type": "object",
+            "properties": {
+                "default_locale": {
+                    "description": "DefaultLocale adalah locale baru; tidak boleh kosong.",
+                    "type": "string"
+                },
+                "default_timezone": {
+                    "description": "DefaultTimezone adalah zona waktu IANA baru; tidak boleh kosong.",
+                    "type": "string"
+                },
+                "legal_name": {
+                    "description": "LegalName adalah nama hukum baru; string kosong menghapusnya.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name adalah nama tampilan baru; tidak boleh kosong.",
+                    "type": "string"
+                }
+            }
+        },
         "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_auth_transport_http_SecurityEventView": {
             "type": "object",
             "properties": {
@@ -2280,6 +2983,34 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/backend_internal_authorization_transport_http.RoleResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_organization_transport_http_MemberResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/backend_internal_organization_transport_http.MemberResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-array_backend_internal_organization_transport_http_OrganizationResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/backend_internal_organization_transport_http.OrganizationResponse"
                     }
                 },
                 "meta": {
@@ -2424,6 +3155,28 @@
             "properties": {
                 "data": {
                     "$ref": "#/definitions/backend_internal_authorization_transport_http.SimulateResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_organization_transport_http_MemberResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_organization_transport_http.MemberResponse"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
+                }
+            }
+        },
+        "github_com_master-abror_zago-core_backend_internal_kernel_httpx.Envelope-backend_internal_organization_transport_http_OrganizationResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/backend_internal_organization_transport_http.OrganizationResponse"
                 },
                 "meta": {
                     "$ref": "#/definitions/github_com_master-abror_zago-core_backend_internal_kernel_httpx.Meta"
