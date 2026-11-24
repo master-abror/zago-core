@@ -231,6 +231,15 @@ func RunAPI(ctx context.Context, env map[string]string, deps Dependencies, stder
 			log.Error("gagal merakit HTTP otorisasi", "error", err)
 			return ExitFailed
 		}
+		// Rute organisasi dan anggota (M05, ADR-0023 butir 20) memakai middleware yang sama dan
+		// ditambahkan di sini, bukan di httpAPI, supaya tabel rute otorisasi M04 tetap utuh.
+		var orgRoutes httpserver.AuthzMounter
+		orgRoutes, err = authz.organizationRoutes(appPool, auditor, kern.Responder, log)
+		if err != nil {
+			log.Error("gagal merakit HTTP organisasi", "error", err)
+			return ExitFailed
+		}
+		authzAPI.Routes = append(authzAPI.Routes, orgRoutes)
 	}
 
 	devEndpoints := cfg.DevEndpointsEnabled()
