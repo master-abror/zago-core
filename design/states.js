@@ -8,7 +8,8 @@
     revoked: 'Dicabut', lapsed: 'Kedaluwarsa', all: 'Semua status', badcursor: '400 cursor tidak valid', badfilter: '400 filter tidak valid', nofilter: 'Tanpa hasil filter',
     revlast: '409 super-admin terakhir', revgone: '404/409 sudah dicabut', revgrant: '403 cabut melebihi wewenang', revcsrf: '403 CSRF (cabut)', reverr: 'Galat cabut',
     subjnf: '400 user tidak ada', grpnf: '400 grup tidak ada', expinv: '400 kedaluwarsa tidak valid', exists: '409 sudah ada', rolearch: '409 role terarsip',
-    rolenf: '404 role tidak ada', idem: '409 masih diproses', idemconf: '422 kunci bentrok' };
+    rolenf: '404 role tidak ada', idem: '409 masih diproses', idemconf: '422 kunci bentrok',
+    active: 'Hanya aktif', disabled: 'Hanya nonaktif', edit: 'Ubah policy', platedit: 'Ubah global (Platform)', exprsyntax: '400 ekspresi tidak valid', exprcomplex: '400 ekspresi terlalu kompleks', actprot: '400 aksi dilindungi', actunk: '400 aksi tidak ada', codetaken: '409 kode dipakai', limit: '409 batas 50 policy', emptypatch: '400 tanpa perubahan', globalro: 'Global (baca-saja)', pviewer: 'Tanpa policy.manage', pnotfound: '404 policy tidak ada', saved: 'Perubahan tersimpan', tglimit: '409 batas (aktifkan)', tggone: '404 tidak ada (ubah status)', tgcsrf: '403 CSRF (ubah status)', tgerr: 'Galat ubah status', tgscope: '403 scope_mismatch (grup)' };
   const list = (document.body.dataset.states || '').split(',').filter(Boolean);
   if (!list.length) return;
   const cur = new URLSearchParams(location.search).get('state') || list[0];

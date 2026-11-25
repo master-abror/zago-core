@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="id-ID" data-bs-theme="light" data-palette="aurora" data-nav="side">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title data-i18n="pf.title.new"></title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/bootstrap-5.3.9/css/bootstrap.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="theme-init.js"></script>
+</head>
+<body data-states="normal,edit,platform,platedit,loading,validation,exprsyntax,exprcomplex,actprot,actunk,codetaken,limit,emptypatch,globalro,pviewer,scope,csrf,error,forbidden,pnotfound,success,saved">
+  <a class="visually-hidden-focusable" href="#main" data-i18n="a11y.skip">Lewati ke konten</a>
+  <div class="z-app">
+    <nav class="z-nav" id="z-nav" aria-label="Menu utama" data-i18n-attr="aria-label:nav.label">
+      <a class="z-brand" href="#"><span class="z-logo" aria-hidden="true"></span><span class="z-brand-t" data-i18n="app.name">Zago</span></a>
+    <div class="z-grp">
+      <a class="z-it" href="#"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#house-door"/></svg><span class="z-lb" data-i18n="nav.dashboard"></span></a>
+      <div class="z-pop z-pop--solo" aria-hidden="true"><span class="z-pop-t" data-i18n="nav.dashboard"></span></div>
+    </div>
+    <div class="z-grp">
+      <a class="z-it is-active" href="#"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#key"/></svg><span class="z-lb" data-i18n="nav.authz"></span></a>
+      <div class="z-pop"><span class="z-pop-t" data-i18n="nav.authz"></span>
+        <a class="z-sl" href="roles.html" data-i18n="nav.roles"></a>
+        <a class="z-sl" href="role-assignments.html" data-i18n="nav.assignments"></a>
+        <a class="z-sl is-active" href="policies.html" aria-current="page" data-i18n="nav.policies"></a>
+        <a class="z-sl" href="#" data-i18n="nav.simulator"></a>
+      </div>
+    </div>
+    <div class="z-grp">
+      <a class="z-it" href="#"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#shield-lock"/></svg><span class="z-lb" data-i18n="nav.security"></span></a>
+      <div class="z-pop"><span class="z-pop-t" data-i18n="nav.security"></span>
+        <a class="z-sl" href="#" data-i18n="nav.sessions"></a>
+        <a class="z-sl" href="#" data-i18n="nav.events"></a>
+        <a class="z-sl" href="#" data-i18n="nav.password"></a>
+      </div>
+    </div>
+    </nav>
+    <div class="z-scrim" data-action="toggle-drawer"></div>
+    <div>
+      <header class="z-top">
+        <button class="z-icon-btn z-drawer-btn" type="button" data-action="toggle-drawer" aria-controls="z-nav" aria-expanded="false" aria-label="Buka menu" data-i18n-attr="aria-label:top.menu"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#list"/></svg></button>
+        <button class="z-icon-btn z-navmode-btn" type="button" data-action="toggle-nav" aria-label="Ganti tampilan menu" data-i18n-attr="aria-label:top.navmode"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#layout-sidebar-inset"/></svg></button>
+        <div class="ms-auto d-flex align-items-center gap-2">
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-sm dropdown-toggle d-inline-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#building"/></svg><span data-i18n="org.platform">Platform</span></button>
+            <ul class="dropdown-menu">
+              <li><h6 class="dropdown-header" data-i18n="org.switch">Organisasi</h6></li>
+              <li><a class="dropdown-item active" href="#" data-i18n="org.platform">Platform</a></li>
+              <li><a class="dropdown-item" href="#">Acme Corp</a></li>
+              <li><a class="dropdown-item" href="#">Nusantara Labs</a></li>
+            </ul>
+          </div>
+          <button class="z-icon-btn" type="button" data-action="toggle-mode" aria-label="Ganti mode" data-i18n-attr="aria-label:top.mode"><svg class="z-ic z-i-moon" aria-hidden="true"><use href="assets/icons.svg#moon-stars"/></svg><svg class="z-ic z-i-sun" aria-hidden="true"><use href="assets/icons.svg#sun"/></svg></button>
+          <div class="dropdown">
+            <button class="z-avatar" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu pengguna" data-i18n-attr="aria-label:top.usermenu">AB</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li class="px-3 py-2"><div class="fw-semibold">Abror</div><div class="small text-body-secondary">abror@contoh.com</div></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><h6 class="dropdown-header" data-i18n="user.theme">Tema</h6></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="palette:aurora"><span class="z-dot" data-p="aurora"></span>Aurora<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="palette:lagoon"><span class="z-dot" data-p="lagoon"></span>Lagoon<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="palette:ember"><span class="z-dot" data-p="ember"></span>Ember<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><h6 class="dropdown-header" data-i18n="user.lang">Bahasa</h6></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="lang:id-ID">Indonesia<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="lang:en-US">English (US)<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item d-flex align-items-center gap-2" href="#"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#box-arrow-right"/></svg><span data-i18n="user.signout">Keluar</span></a></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <main class="z-main" id="main">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+<div><h1 class="h3 mb-1" id="pf-h1" tabindex="-1" data-i18n="pf.title.new"></h1><p class="text-body-secondary mb-0" id="pf-sub" data-i18n="pf.sub"></p></div></div>
+<p class="small text-body-secondary" data-i18n="sx.sample"></p>
+
+<div data-when="forbidden"><div class="card"><div class="z-state z-state--info"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#shield-lock"/></svg></span><h2 class="h6 mb-0" data-i18n="sx.forbidden.t"></h2><p data-i18n="sx.forbidden.m"></p><a class="btn btn-outline-secondary mt-2" href="policies.html" data-i18n="pf.link"></a></div></div></div>
+
+<div data-when="pnotfound"><div class="card"><div class="z-state z-state--warning"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#inbox"/></svg></span><h2 class="h6 mb-0" data-i18n="pf.nf.t"></h2><p data-i18n="pf.nf.m"></p><a class="btn btn-outline-secondary mt-2" href="policies.html" data-i18n="pf.link"></a></div></div></div>
+<div class="row" data-when="normal edit platform platedit loading validation exprsyntax exprcomplex actprot actunk codetaken limit emptypatch globalro pviewer scope csrf error success saved"><div class="col-xl-9">
+<div class="alert alert-warning" data-when="platform platedit" role="status"><div class="fw-semibold" data-i18n="pf.glob.t"></div><div data-i18n="pf.glob.m"></div></div>
+<div class="alert alert-info" data-when="globalro" role="status" data-i18n="pf.ro.global"></div>
+<div class="alert alert-info" data-when="pviewer" role="status" data-i18n="pf.ro.viewer"></div>
+<div class="alert" id="pf-alert" hidden><div class="fw-semibold" id="pf-at"></div><div id="pf-am"></div><button class="btn btn-outline-secondary mt-2" type="button" id="pf-reload" data-action="reload" hidden data-i18n="sx.reload"></button><a class="btn btn-outline-secondary mt-2" id="pf-link" href="policies.html" hidden data-i18n="pf.link"></a></div>
+<form id="pf-form" novalidate><fieldset id="pf-fs">
+<div class="mb-3"><label class="form-label" for="pf-code" data-i18n="pf.code"></label><input class="form-control font-monospace" id="pf-code" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="150" required aria-describedby="pf-code-h"><div class="form-text" id="pf-code-h" data-i18n="pf.code.h"></div><div class="invalid-feedback" id="pf-code-e"></div></div>
+<div class="mb-3"><label class="form-label" for="pf-name" data-i18n="pf.name"></label><input class="form-control" id="pf-name" type="text" autocomplete="off" maxlength="150" required><div class="invalid-feedback" id="pf-name-e"></div></div>
+<div class="mb-3"><label class="form-label" for="pf-desc" data-i18n="pf.desc"></label><textarea class="form-control" id="pf-desc" rows="3" aria-describedby="pf-desc-h"></textarea><div class="form-text" id="pf-desc-h" data-i18n="pf.desc.h"></div><div class="invalid-feedback" id="pf-desc-e"></div></div>
+<fieldset class="mb-3" id="pf-effect" aria-describedby="pf-effect-h"><legend class="form-label fs-6" data-i18n="pf.effect"></legend>
+<div class="form-check"><input class="form-check-input" type="radio" name="pf-eff" id="pf-eff-deny" value="deny" checked><label class="form-check-label" for="pf-eff-deny"><span data-i18n="pf.eff.deny"></span> <code class="small">deny</code></label><div class="form-text mt-0" data-i18n="pf.eff.deny.h"></div></div>
+<div class="form-check mt-2"><input class="form-check-input" type="radio" name="pf-eff" id="pf-eff-allow" value="allow"><label class="form-check-label" for="pf-eff-allow"><span data-i18n="pf.eff.allow"></span> <code class="small">allow</code></label><div class="form-text mt-0" data-i18n="pf.eff.allow.h"></div></div>
+<div class="form-text" id="pf-effect-h" hidden></div></fieldset>
+<div class="mb-3"><label class="form-label" for="pf-expr" data-i18n="pf.expr"></label>
+<textarea class="form-control font-monospace" id="pf-expr" rows="5" autocomplete="off" autocapitalize="none" spellcheck="false" required aria-describedby="pf-expr-h pf-expr-n"></textarea>
+<div class="form-text" id="pf-expr-h" data-i18n="pf.expr.h"></div>
+<div class="d-flex justify-content-end small text-body-secondary"><span id="pf-expr-n" aria-hidden="false"></span><span class="visually-hidden" id="pf-expr-sr" role="status"></span></div>
+<div class="invalid-feedback" id="pf-expr-e"></div><details class="mt-2 mb-1" id="pf-guide"><summary class="small fw-semibold" data-i18n="pf.guide"></summary><div class="small text-body-secondary mt-2"><p class="mb-2" data-i18n="pf.g.roots"></p><p class="mb-2" data-i18n="pf.g.ops"></p><p class="mb-2" data-i18n="pf.g.fn"></p><p class="mb-2" data-i18n="pf.g.lit"></p><p class="mb-2" data-i18n="pf.g.types"></p><p class="mb-2" data-i18n="pf.g.defer"></p><p class="mb-2" data-i18n="pf.g.lim"></p><p class="mb-1 fw-semibold" data-i18n="pf.g.ex"></p><ul class="mb-0 ps-3"><li><code class="text-break">resource.owner_id == current_user.id</code></li><li><code class="text-break">resource.status in [&quot;draft&quot;, &quot;open&quot;] &amp;&amp; !(current_user.id == resource.owner_id)</code></li><li><code class="text-break">lower(resource.status) != &quot;locked&quot;</code></li></ul></div></details></div>
+<fieldset class="mb-3" id="pf-actions" aria-describedby="pf-actions-h"><legend class="form-label fs-6" data-i18n="pf.actions"></legend>
+<p class="form-text mt-0" id="pf-actions-h" data-i18n="pf.actions.h"></p>
+<div class="small text-danger-emphasis mb-2" id="pf-actions-e" hidden></div>
+<div class="z-perm" data-perm-editor><div data-perm-tools><div class="d-flex flex-wrap align-items-center gap-3 mb-3"><div class="flex-grow-1"><label class="visually-hidden" for="pa-q" data-i18n="pe.search"></label><input class="form-control" id="pa-q" type="search" data-perm-q data-i18n-attr="placeholder:pe.search"></div><p class="mb-0 small text-body-secondary" role="status" data-perm-count></p></div></div>
+<details class="card mb-3" open data-perm-mod><summary class="card-header d-flex justify-content-between align-items-center fw-semibold"><span data-i18n="mod.core"></span><span class="small text-body-secondary fw-normal" data-perm-modcount></span></summary><div class="card-body"><div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="pa-all-0" data-perm-all-mod><label class="form-check-label" for="pa-all-0" data-i18n="pe.all.mod"></label></div>
+<fieldset class="mb-3" data-perm-res><legend class="h6">organization</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-organization" value="organization.*" data-perm aria-describedby="pad-w-organization"><label class="form-check-label" for="pa-w-organization"><code>organization.*</code></label><div class="form-text mt-0" id="pad-w-organization"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-organization.read" value="organization.read" data-perm aria-describedby="pad-organization.read"><label class="form-check-label" for="pa-organization.read"><code>organization.read</code></label><div class="form-text mt-0" id="pad-organization.read">Melihat data organisasi.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-organization.create" value="organization.create" data-perm aria-describedby="pad-organization.create"><label class="form-check-label" for="pa-organization.create"><code>organization.create</code></label><div class="form-text mt-0" id="pad-organization.create">Membuat organisasi.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-organization.update" value="organization.update" data-perm aria-describedby="pad-organization.update"><label class="form-check-label" for="pa-organization.update"><code>organization.update</code></label><div class="form-text mt-0" id="pad-organization.update">Mengubah data organisasi.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-organization.archive" value="organization.archive" data-perm aria-describedby="pad-organization.archive"><label class="form-check-label" for="pa-organization.archive"><code>organization.archive</code></label><div class="form-text mt-0" id="pad-organization.archive">Mengarsipkan organisasi.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">organization.member</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-organization.member" value="organization.member.*" data-perm aria-describedby="pad-w-organization.member"><label class="form-check-label" for="pa-w-organization.member"><code>organization.member.*</code></label><div class="form-text mt-0" id="pad-w-organization.member"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-organization.member.manage" value="organization.member.manage" data-perm aria-describedby="pad-organization.member.manage"><label class="form-check-label" for="pa-organization.member.manage"><code>organization.member.manage</code></label><div class="form-text mt-0" id="pad-organization.member.manage">Mengelola anggota organisasi.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">user</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-user" value="user.*" data-perm aria-describedby="pad-w-user"><label class="form-check-label" for="pa-w-user"><code>user.*</code></label><div class="form-text mt-0" id="pad-w-user"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-user.read" value="user.read" data-perm aria-describedby="pad-user.read"><label class="form-check-label" for="pa-user.read"><code>user.read</code></label><div class="form-text mt-0" id="pad-user.read">Melihat pengguna.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-user.create" value="user.create" data-perm aria-describedby="pad-user.create"><label class="form-check-label" for="pa-user.create"><code>user.create</code></label><div class="form-text mt-0" id="pad-user.create">Membuat pengguna.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-user.update" value="user.update" data-perm aria-describedby="pad-user.update"><label class="form-check-label" for="pa-user.update"><code>user.update</code></label><div class="form-text mt-0" id="pad-user.update">Mengubah pengguna.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-user.delete" value="user.delete" data-perm aria-describedby="pad-user.delete"><label class="form-check-label" for="pa-user.delete"><code>user.delete</code></label><div class="form-text mt-0" id="pad-user.delete">Menghapus pengguna.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">profile</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-profile" value="profile.*" data-perm aria-describedby="pad-w-profile"><label class="form-check-label" for="pa-w-profile"><code>profile.*</code></label><div class="form-text mt-0" id="pad-w-profile"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-profile.read" value="profile.read" data-perm aria-describedby="pad-profile.read"><label class="form-check-label" for="pa-profile.read"><code>profile.read</code></label><div class="form-text mt-0" id="pad-profile.read">Melihat profil sendiri.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-profile.update" value="profile.update" data-perm aria-describedby="pad-profile.update"><label class="form-check-label" for="pa-profile.update"><code>profile.update</code></label><div class="form-text mt-0" id="pad-profile.update">Mengubah profil sendiri.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">group</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-group" value="group.*" data-perm aria-describedby="pad-w-group"><label class="form-check-label" for="pa-w-group"><code>group.*</code></label><div class="form-text mt-0" id="pad-w-group"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-group.read" value="group.read" data-perm aria-describedby="pad-group.read"><label class="form-check-label" for="pa-group.read"><code>group.read</code></label><div class="form-text mt-0" id="pad-group.read">Melihat grup.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-group.create" value="group.create" data-perm aria-describedby="pad-group.create"><label class="form-check-label" for="pa-group.create"><code>group.create</code></label><div class="form-text mt-0" id="pad-group.create">Membuat grup.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-group.update" value="group.update" data-perm aria-describedby="pad-group.update"><label class="form-check-label" for="pa-group.update"><code>group.update</code></label><div class="form-text mt-0" id="pad-group.update">Mengubah grup.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-group.delete" value="group.delete" data-perm aria-describedby="pad-group.delete"><label class="form-check-label" for="pa-group.delete"><code>group.delete</code></label><div class="form-text mt-0" id="pad-group.delete">Menghapus grup.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-group.manage_members" value="group.manage_members" data-perm aria-describedby="pad-group.manage_members"><label class="form-check-label" for="pa-group.manage_members"><code>group.manage_members</code></label><div class="form-text mt-0" id="pad-group.manage_members">Mengelola anggota grup.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">role</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-role" value="role.*" data-perm aria-describedby="pad-w-role"><label class="form-check-label" for="pa-w-role"><code>role.*</code></label><div class="form-text mt-0" id="pad-w-role"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-role.read" value="role.read" data-perm aria-describedby="pad-role.read"><label class="form-check-label" for="pa-role.read"><code>role.read</code></label><div class="form-text mt-0" id="pad-role.read">Melihat peran.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-role.manage" value="role.manage" data-perm aria-describedby="pad-role.manage"><label class="form-check-label" for="pa-role.manage"><code>role.manage</code></label><div class="form-text mt-0" id="pad-role.manage">Membuat, mengubah, dan mengarsipkan peran.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-role.assign" value="role.assign" data-perm aria-describedby="pad-role.assign"><label class="form-check-label" for="pa-role.assign"><code>role.assign</code></label><div class="form-text mt-0" id="pad-role.assign">Memberikan dan mencabut peran.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">permission</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-permission" value="permission.*" data-perm aria-describedby="pad-w-permission"><label class="form-check-label" for="pa-w-permission"><code>permission.*</code></label><div class="form-text mt-0" id="pad-w-permission"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-permission.read" value="permission.read" data-perm aria-describedby="pad-permission.read"><label class="form-check-label" for="pa-permission.read"><code>permission.read</code></label><div class="form-text mt-0" id="pad-permission.read">Melihat katalog permission.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-permission.assign" value="permission.assign" data-perm aria-describedby="pad-permission.assign"><label class="form-check-label" for="pa-permission.assign"><code>permission.assign</code></label><div class="form-text mt-0" id="pad-permission.assign">Mengubah permission pada peran.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-permission.simulate" value="permission.simulate" data-perm aria-describedby="pad-permission.simulate"><label class="form-check-label" for="pa-permission.simulate"><code>permission.simulate</code></label><div class="form-text mt-0" id="pad-permission.simulate">Menjalankan simulator permission.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">module</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-module" value="module.*" data-perm aria-describedby="pad-w-module"><label class="form-check-label" for="pa-w-module"><code>module.*</code></label><div class="form-text mt-0" id="pad-w-module"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-module.read" value="module.read" data-perm aria-describedby="pad-module.read"><label class="form-check-label" for="pa-module.read"><code>module.read</code></label><div class="form-text mt-0" id="pad-module.read">Melihat modul.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-module.manage" value="module.manage" data-perm aria-describedby="pad-module.manage"><label class="form-check-label" for="pa-module.manage"><code>module.manage</code></label><div class="form-text mt-0" id="pad-module.manage">Mengelola modul.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-module.enable" value="module.enable" data-perm aria-describedby="pad-module.enable"><label class="form-check-label" for="pa-module.enable"><code>module.enable</code></label><div class="form-text mt-0" id="pad-module.enable">Mengaktifkan modul.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">settings</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-settings" value="settings.*" data-perm aria-describedby="pad-w-settings"><label class="form-check-label" for="pa-w-settings"><code>settings.*</code></label><div class="form-text mt-0" id="pad-w-settings"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-settings.read" value="settings.read" data-perm aria-describedby="pad-settings.read"><label class="form-check-label" for="pa-settings.read"><code>settings.read</code></label><div class="form-text mt-0" id="pad-settings.read">Melihat pengaturan.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-settings.update" value="settings.update" data-perm aria-describedby="pad-settings.update"><label class="form-check-label" for="pa-settings.update"><code>settings.update</code></label><div class="form-text mt-0" id="pad-settings.update">Mengubah pengaturan.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">activity</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-activity" value="activity.*" data-perm aria-describedby="pad-w-activity"><label class="form-check-label" for="pa-w-activity"><code>activity.*</code></label><div class="form-text mt-0" id="pad-w-activity"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-activity.read_own" value="activity.read_own" data-perm aria-describedby="pad-activity.read_own"><label class="form-check-label" for="pa-activity.read_own"><code>activity.read_own</code></label><div class="form-text mt-0" id="pad-activity.read_own">Melihat aktivitas sendiri.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-activity.read_group" value="activity.read_group" data-perm aria-describedby="pad-activity.read_group"><label class="form-check-label" for="pa-activity.read_group"><code>activity.read_group</code></label><div class="form-text mt-0" id="pad-activity.read_group">Melihat aktivitas grup.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-activity.read_all" value="activity.read_all" data-perm aria-describedby="pad-activity.read_all"><label class="form-check-label" for="pa-activity.read_all"><code>activity.read_all</code></label><div class="form-text mt-0" id="pad-activity.read_all">Melihat semua aktivitas.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-activity.export" value="activity.export" data-perm aria-describedby="pad-activity.export"><label class="form-check-label" for="pa-activity.export"><code>activity.export</code></label><div class="form-text mt-0" id="pad-activity.export">Mengekspor aktivitas.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">system_log</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-system_log" value="system_log.*" data-perm aria-describedby="pad-w-system_log"><label class="form-check-label" for="pa-w-system_log"><code>system_log.*</code></label><div class="form-text mt-0" id="pad-w-system_log"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-system_log.read" value="system_log.read" data-perm aria-describedby="pad-system_log.read"><label class="form-check-label" for="pa-system_log.read"><code>system_log.read</code></label><div class="form-text mt-0" id="pad-system_log.read">Melihat log sistem.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">notification</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-notification" value="notification.*" data-perm aria-describedby="pad-w-notification"><label class="form-check-label" for="pa-w-notification"><code>notification.*</code></label><div class="form-text mt-0" id="pad-w-notification"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-notification.read" value="notification.read" data-perm aria-describedby="pad-notification.read"><label class="form-check-label" for="pa-notification.read"><code>notification.read</code></label><div class="form-text mt-0" id="pad-notification.read">Melihat notifikasi.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">inbox</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-inbox" value="inbox.*" data-perm aria-describedby="pad-w-inbox"><label class="form-check-label" for="pa-w-inbox"><code>inbox.*</code></label><div class="form-text mt-0" id="pad-w-inbox"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-inbox.read" value="inbox.read" data-perm aria-describedby="pad-inbox.read"><label class="form-check-label" for="pa-inbox.read"><code>inbox.read</code></label><div class="form-text mt-0" id="pad-inbox.read">Melihat kotak masuk.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">conversation</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-conversation" value="conversation.*" data-perm aria-describedby="pad-w-conversation"><label class="form-check-label" for="pa-w-conversation"><code>conversation.*</code></label><div class="form-text mt-0" id="pad-w-conversation"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-conversation.read" value="conversation.read" data-perm aria-describedby="pad-conversation.read"><label class="form-check-label" for="pa-conversation.read"><code>conversation.read</code></label><div class="form-text mt-0" id="pad-conversation.read">Melihat percakapan.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-conversation.create" value="conversation.create" data-perm aria-describedby="pad-conversation.create"><label class="form-check-label" for="pa-conversation.create"><code>conversation.create</code></label><div class="form-text mt-0" id="pad-conversation.create">Membuat percakapan.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-conversation.manage" value="conversation.manage" data-perm aria-describedby="pad-conversation.manage"><label class="form-check-label" for="pa-conversation.manage"><code>conversation.manage</code></label><div class="form-text mt-0" id="pad-conversation.manage">Mengelola percakapan.</div></div></fieldset>
+<fieldset class="mb-3" data-perm-res><legend class="h6">message</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-message" value="message.*" data-perm aria-describedby="pad-w-message"><label class="form-check-label" for="pa-w-message"><code>message.*</code></label><div class="form-text mt-0" id="pad-w-message"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-message.send" value="message.send" data-perm aria-describedby="pad-message.send"><label class="form-check-label" for="pa-message.send"><code>message.send</code></label><div class="form-text mt-0" id="pad-message.send">Mengirim pesan.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-message.moderate" value="message.moderate" data-perm aria-describedby="pad-message.moderate"><label class="form-check-label" for="pa-message.moderate"><code>message.moderate</code></label><div class="form-text mt-0" id="pad-message.moderate">Memoderasi pesan.</div></div></fieldset></div></details>
+<details class="card mb-3" data-perm-mod><summary class="card-header d-flex justify-content-between align-items-center fw-semibold"><span data-i18n="mod.announcements"></span><span class="small text-body-secondary fw-normal" data-perm-modcount></span></summary><div class="card-body"><div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="pa-all-1" data-perm-all-mod><label class="form-check-label" for="pa-all-1" data-i18n="pe.all.mod"></label></div>
+<fieldset class="mb-3" data-perm-res><legend class="h6">announcements.announcement</legend>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-w-announcements.announcement" value="announcements.announcement.*" data-perm aria-describedby="pad-w-announcements.announcement"><label class="form-check-label" for="pa-w-announcements.announcement"><code>announcements.announcement.*</code></label><div class="form-text mt-0" id="pad-w-announcements.announcement"><span data-i18n="pf.wild"></span></div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-announcements.announcement.read" value="announcements.announcement.read" data-perm aria-describedby="pad-announcements.announcement.read"><label class="form-check-label" for="pa-announcements.announcement.read"><code>announcements.announcement.read</code></label><div class="form-text mt-0" id="pad-announcements.announcement.read">Melihat pengumuman.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-announcements.announcement.create" value="announcements.announcement.create" data-perm aria-describedby="pad-announcements.announcement.create"><label class="form-check-label" for="pa-announcements.announcement.create"><code>announcements.announcement.create</code></label><div class="form-text mt-0" id="pad-announcements.announcement.create">Membuat pengumuman.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-announcements.announcement.update" value="announcements.announcement.update" data-perm aria-describedby="pad-announcements.announcement.update"><label class="form-check-label" for="pa-announcements.announcement.update"><code>announcements.announcement.update</code></label><div class="form-text mt-0" id="pad-announcements.announcement.update">Mengubah pengumuman.</div></div>
+<div class="form-check mb-2" data-perm-row><input class="form-check-input" type="checkbox" id="pa-announcements.announcement.delete" value="announcements.announcement.delete" data-perm aria-describedby="pad-announcements.announcement.delete"><label class="form-check-label" for="pa-announcements.announcement.delete"><code>announcements.announcement.delete</code></label><div class="form-text mt-0" id="pad-announcements.announcement.delete">Menghapus pengumuman.</div></div></fieldset></div></details><p class="text-body-secondary" data-perm-none hidden data-i18n="pe.none"></p></div></fieldset>
+<div class="mb-4 form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="pf-active" checked aria-describedby="pf-active-h"><label class="form-check-label" for="pf-active" data-i18n="pf.status"></label><div class="form-text" id="pf-active-h" data-i18n="pf.status.h"></div></div>
+</fieldset>
+<div id="pf-btns"><div class="d-flex flex-wrap gap-2"><button class="btn btn-primary d-inline-flex align-items-center gap-2" type="submit" id="pf-save"><span class="spinner-border spinner-border-sm" id="pf-spin" aria-hidden="true" hidden></span><span id="pf-label" data-i18n="pf.create"></span></button><a class="btn btn-outline-secondary" href="policies.html" id="pf-cancel" data-i18n="dlg.cancel"></a></div></div>
+</form>
+<a class="btn btn-outline-secondary mt-3" href="policies.html" id="pf-back" hidden data-i18n="pf.link"></a>
+</div></div>
+<div class="z-toasts" id="z-toasts" role="region" aria-label="Notifikasi" data-i18n-attr="aria-label:ts.region"></div>
+    </main>
+    </div>
+  </div>
+  <script src="vendor/bootstrap-5.3.9/js/bootstrap.bundle.min.js"></script>
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+  <script src="ui.js"></script>
+  <script src="states.js"></script>
+  <script src="policies.js"></script>
+</body>
+</html>
