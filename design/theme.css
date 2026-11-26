@@ -27,6 +27,7 @@
   --z-border-strong: #8a91ad;
   --z-banner-1: #4338ca;
   --z-banner-2: #7c3aed;
+  --z-code: #362f9a;
   --z-bg-rgb: 245, 246, 251;
   --z-surface-rgb: 255, 255, 255;
   --z-text-rgb: 23, 26, 43;
@@ -79,6 +80,7 @@
   --z-border-strong: #6a7195;
   --z-banner-1: #2a2780;
   --z-banner-2: #5b21b6;
+  --z-code: #b2b0fd;
   --z-bg-rgb: 14, 17, 32;
   --z-surface-rgb: 22, 26, 46;
   --z-text-rgb: 233, 235, 248;
@@ -130,6 +132,7 @@
   --z-border-strong: #7e9996;
   --z-banner-1: #0f766e;
   --z-banner-2: #0e7490;
+  --z-code: #0f5c56;
   --z-bg-rgb: 242, 248, 247;
   --z-surface-rgb: 255, 255, 255;
   --z-text-rgb: 15, 31, 30;
@@ -181,6 +184,7 @@
   --z-border-strong: #5f8581;
   --z-banner-1: #0b4f4a;
   --z-banner-2: #0c5568;
+  --z-code: #63ddcd;
   --z-bg-rgb: 10, 21, 20;
   --z-surface-rgb: 16, 34, 32;
   --z-text-rgb: 226, 241, 239;
@@ -232,6 +236,7 @@
   --z-border-strong: #9a8a7b;
   --z-banner-1: #b7410e;
   --z-banner-2: #be123c;
+  --z-code: #8a3510;
   --z-bg-rgb: 250, 247, 243;
   --z-surface-rgb: 255, 255, 255;
   --z-text-rgb: 33, 26, 20;
@@ -283,6 +288,7 @@
   --z-border-strong: #86735f;
   --z-banner-1: #7c2d12;
   --z-banner-2: #881337;
+  --z-code: #f9ad6e;
   --z-bg-rgb: 22, 17, 13;
   --z-surface-rgb: 32, 24, 19;
   --z-text-rgb: 244, 235, 226;
@@ -328,6 +334,7 @@
   --bs-secondary-bg: var(--z-surface-2); /* $body-secondary-bg */
   --bs-tertiary-bg: var(--z-bg); /* $body-tertiary-bg */
   --bs-border-color: var(--z-border); /* $border-color */
+  --bs-code-color: var(--z-code); /* $code-color */
   --bs-link-color: var(--z-link); /* $link-color */
   --bs-link-color-rgb: var(--z-link-rgb); /* (turunan) */
   --bs-link-hover-color: var(--z-link-hover); /* $link-hover-color */

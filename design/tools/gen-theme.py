@@ -39,7 +39,8 @@ def tokens(m, c):
     t = {'bg': c['bg'], 'surface': c['surface'], 'surface-2': mix(c['surface'], c['text'], .96), 'text': c['text'], 'muted': c['muted'],
          'primary': c['primary'], 'on-primary': c['onp'], 'primary-subtle': sub, 'primary-border': mix(c['primary'], c['surface'], .35),
          'link': c['primary'], 'link-hover': mix(c['primary'], c['text'], .8), 'border': c['border'], 'border-strong': c['strong'],
-         'banner-1': c['b1'], 'banner-2': c['b2']}
+         'banner-1': c['b1'], 'banner-2': c['b2'],
+         'code': mix(c['primary'], c['text'], .7)}
     out = [f'  --z-{k}: {v};' for k, v in t.items()]
     for k in ('bg', 'surface', 'text', 'muted', 'primary', 'link', 'link-hover'): out.append(f'  --z-{k}-rgb: {trip(t[k])};')
     for n, (sol, on, tx, sb, bd) in S[m].items():
@@ -54,6 +55,7 @@ for name, (L, D) in P.items():
         check(f'{tag} redup/permukaan', c['muted'], c['surface'], 4.5); check(f'{tag} tautan/latar', c['primary'], c['bg'], 4.5)
         check(f'{tag} tautan/permukaan', c['primary'], c['surface'], 4.5); check(f'{tag} on-primer/primer', c['onp'], c['primary'], 4.5)
         check(f'{tag} primer/subtle', c['primary'], t['primary-subtle'], 4.5); check(f'{tag} tepi input/permukaan', c['strong'], c['surface'], 3)
+        for sf, sv in (('latar', c['bg']), ('permukaan', c['surface']), ('permukaan-2', t['surface-2'])): check(f'{tag} kode/{sf}', t['code'], sv, 4.5)
         check(f'{tag} putih/banner-1', '#ffffff', c['b1'], 4.5); check(f'{tag} putih/banner-2', '#ffffff', c['b2'], 4.5)
         mode = 'light' if m == 'L' else 'dark'
         sel = f':root[data-palette="{name}"][data-bs-theme="{mode}"]'
@@ -69,6 +71,7 @@ def bridge():  # (variabel Bootstrap, nilai, padanan Sass)
          ('emphasis-color-rgb','var(--z-text-rgb)','(turunan)'),('secondary-color','var(--z-muted)','$body-secondary-color'),
          ('secondary-color-rgb','var(--z-muted-rgb)','(turunan)'),('secondary-bg','var(--z-surface-2)','$body-secondary-bg'),
          ('tertiary-bg','var(--z-bg)','$body-tertiary-bg'),('border-color','var(--z-border)','$border-color'),
+         ('code-color','var(--z-code)','$code-color'),
          ('link-color','var(--z-link)','$link-color'),('link-color-rgb','var(--z-link-rgb)','(turunan)'),
          ('link-hover-color','var(--z-link-hover)','$link-hover-color'),('link-hover-color-rgb','var(--z-link-hover-rgb)','(turunan)'),
          ('focus-ring-color','rgba(var(--z-primary-rgb), .35)','$focus-ring-color'),

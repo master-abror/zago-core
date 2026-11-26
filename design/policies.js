@@ -26,6 +26,7 @@
     const visible = () => table.querySelectorAll('tbody tr:not([hidden])').length;
     const renderRange = () => {
       const n = visible(), off = st === 'paged' ? 20 : 0;
+      $('po-wrap').hidden = n === 0; $('po-none').hidden = n > 0; // filtrasi terakhir menghilangkan baris: tampilkan state "tidak ada yang cocok"
       $('po-range').textContent = T('po.range', { a: n ? off + 1 : 0, b: off + n, n: off + n });
       table.querySelectorAll('[data-i18n-more]').forEach(el => { el.textContent = T('po.more', { n: el.dataset.n }); });
     };
