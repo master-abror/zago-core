@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="id-ID" data-bs-theme="light" data-palette="aurora" data-nav="side">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title data-i18n="page.sim.title">Simulator permission</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/bootstrap-5.3.9/css/bootstrap.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="theme-init.js"></script>
+</head>
+<body data-states="normal,loading,allow,noperm,scopemis,policy,polfail,nopolread,deferred,usernf,attrres,attrbad,platform,grpscope,validation,forbidden,csrf,error">
+  <a class="visually-hidden-focusable" href="#main" data-i18n="a11y.skip">Lewati ke konten</a>
+  <div class="z-app">
+    <nav class="z-nav" id="z-nav" aria-label="Menu utama" data-i18n-attr="aria-label:nav.label">
+      <a class="z-brand" href="#"><span class="z-logo" aria-hidden="true"></span><span class="z-brand-t" data-i18n="app.name">Zago</span></a>
+    <div class="z-grp">
+      <a class="z-it" href="#"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#house-door"/></svg><span class="z-lb" data-i18n="nav.dashboard"></span></a>
+      <div class="z-pop z-pop--solo" aria-hidden="true"><span class="z-pop-t" data-i18n="nav.dashboard"></span></div>
+    </div>
+    <div class="z-grp">
+      <a class="z-it is-active" href="#"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#key"/></svg><span class="z-lb" data-i18n="nav.authz"></span></a>
+      <div class="z-pop"><span class="z-pop-t" data-i18n="nav.authz"></span>
+        <a class="z-sl" href="roles.html" data-i18n="nav.roles"></a>
+        <a class="z-sl" href="role-assignments.html" data-i18n="nav.assignments"></a>
+        <a class="z-sl" href="policies.html" data-i18n="nav.policies"></a>
+        <a class="z-sl is-active" href="simulator.html" aria-current="page" data-i18n="nav.simulator"></a>
+      </div>
+    </div>
+    <div class="z-grp">
+      <a class="z-it" href="#"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#shield-lock"/></svg><span class="z-lb" data-i18n="nav.security"></span></a>
+      <div class="z-pop"><span class="z-pop-t" data-i18n="nav.security"></span>
+        <a class="z-sl" href="#" data-i18n="nav.sessions"></a>
+        <a class="z-sl" href="#" data-i18n="nav.events"></a>
+        <a class="z-sl" href="#" data-i18n="nav.password"></a>
+      </div>
+    </div>
+    </nav>
+    <div class="z-scrim" data-action="toggle-drawer"></div>
+    <div>
+      <header class="z-top">
+        <button class="z-icon-btn z-drawer-btn" type="button" data-action="toggle-drawer" aria-controls="z-nav" aria-expanded="false" aria-label="Buka menu" data-i18n-attr="aria-label:top.menu"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#list"/></svg></button>
+        <button class="z-icon-btn z-navmode-btn" type="button" data-action="toggle-nav" aria-label="Ganti tampilan menu" data-i18n-attr="aria-label:top.navmode"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#layout-sidebar-inset"/></svg></button>
+        <div class="ms-auto d-flex align-items-center gap-2">
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-sm dropdown-toggle d-inline-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#building"/></svg><span data-i18n="org.platform">Platform</span></button>
+            <ul class="dropdown-menu">
+              <li><h6 class="dropdown-header" data-i18n="org.switch">Organisasi</h6></li>
+              <li><a class="dropdown-item active" href="#" data-i18n="org.platform">Platform</a></li>
+              <li><a class="dropdown-item" href="#">Acme Corp</a></li>
+              <li><a class="dropdown-item" href="#">Nusantara Labs</a></li>
+            </ul>
+          </div>
+          <button class="z-icon-btn" type="button" data-action="toggle-mode" aria-label="Ganti mode" data-i18n-attr="aria-label:top.mode"><svg class="z-ic z-i-moon" aria-hidden="true"><use href="assets/icons.svg#moon-stars"/></svg><svg class="z-ic z-i-sun" aria-hidden="true"><use href="assets/icons.svg#sun"/></svg></button>
+          <div class="dropdown">
+            <button class="z-avatar" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu pengguna" data-i18n-attr="aria-label:top.usermenu">AB</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li class="px-3 py-2"><div class="fw-semibold">Abror</div><div class="small text-body-secondary">abror@contoh.com</div></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><h6 class="dropdown-header" data-i18n="user.theme">Tema</h6></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="palette:aurora"><span class="z-dot" data-p="aurora"></span>Aurora<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="palette:lagoon"><span class="z-dot" data-p="lagoon"></span>Lagoon<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="palette:ember"><span class="z-dot" data-p="ember"></span>Ember<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><h6 class="dropdown-header" data-i18n="user.lang">Bahasa</h6></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="lang:id-ID">Indonesia<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+          <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" data-set="lang:en-US">English (US)<svg class="z-ic z-ck ms-auto" aria-hidden="true"><use href="assets/icons.svg#check-lg"/></svg></button></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item d-flex align-items-center gap-2" href="#"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#box-arrow-right"/></svg><span data-i18n="user.signout">Keluar</span></a></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <main class="z-main" id="main">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+<div><h1 class="h3 mb-1" id="sm-h1" tabindex="-1" data-i18n="sm.title"></h1><p class="text-body-secondary mb-0" data-i18n="sm.sub"></p></div></div>
+<p class="small text-body-secondary" data-i18n="sx.sample"></p>
+<div data-when="forbidden"><div class="card"><div class="z-state z-state--info"><span class="z-state-ic" aria-hidden="true"><svg class="z-ic" aria-hidden="true"><use href="assets/icons.svg#shield-lock"/></svg></span><h2 class="h6 mb-0" data-i18n="sx.forbidden.t"></h2><p data-i18n="sx.forbidden.m"></p></div></div></div>
+<div class="row g-4" data-when="normal loading allow noperm scopemis policy polfail nopolread deferred usernf attrres attrbad platform grpscope validation csrf error"><div class="col-lg-6">
+<div class="alert" id="sm-alert" hidden><div class="fw-semibold" id="sm-at"></div><div id="sm-am"></div><button class="btn btn-outline-secondary mt-2" type="button" id="sm-reload" data-action="reload" hidden data-i18n="sx.reload"></button><button class="btn btn-outline-secondary mt-2" type="button" id="sm-cta" data-action="open-org" hidden data-i18n="sm.plat.cta"></button></div>
+<form id="sm-form" novalidate><fieldset id="sm-fs">
+<div class="mb-3"><label class="form-label" for="sm-user" data-i18n="sm.user"></label><input class="form-control font-monospace" id="sm-user" type="text" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="36" aria-describedby="sm-user-h"><div class="form-text" id="sm-user-h" data-i18n="sm.user.h"></div><div class="invalid-feedback" id="sm-user-e"></div></div>
+<div class="mb-3"><label class="form-label" for="sm-action" data-i18n="sm.action"></label><select class="form-select" id="sm-action" aria-describedby="sm-action-h"><option value="" data-i18n="sm.action.ph"></option><optgroup data-i18n-attr="label:mod.core"><option value="organization.read">organization.read</option><option value="organization.create">organization.create</option><option value="organization.update">organization.update</option><option value="organization.archive">organization.archive</option><option value="organization.member.manage">organization.member.manage</option><option value="user.read">user.read</option><option value="user.create">user.create</option><option value="user.update">user.update</option><option value="user.delete">user.delete</option><option value="profile.read">profile.read</option><option value="profile.update">profile.update</option><option value="group.read">group.read</option><option value="group.create">group.create</option><option value="group.update">group.update</option><option value="group.delete">group.delete</option><option value="group.manage_members">group.manage_members</option><option value="role.read">role.read</option><option value="role.manage">role.manage</option><option value="role.assign">role.assign</option><option value="permission.read">permission.read</option><option value="permission.assign">permission.assign</option><option value="permission.simulate">permission.simulate</option><option value="module.read">module.read</option><option value="module.manage">module.manage</option><option value="module.enable">module.enable</option><option value="settings.read">settings.read</option><option value="settings.update">settings.update</option><option value="activity.read_own">activity.read_own</option><option value="activity.read_group">activity.read_group</option><option value="activity.read_all">activity.read_all</option><option value="activity.export">activity.export</option><option value="system_log.read">system_log.read</option><option value="notification.read">notification.read</option><option value="inbox.read">inbox.read</option><option value="conversation.read">conversation.read</option><option value="conversation.create">conversation.create</option><option value="conversation.manage">conversation.manage</option><option value="message.send">message.send</option><option value="message.moderate">message.moderate</option></optgroup><optgroup data-i18n-attr="label:mod.announcements"><option value="announcements.announcement.read">announcements.announcement.read</option><option value="announcements.announcement.create">announcements.announcement.create</option><option value="announcements.announcement.update">announcements.announcement.update</option><option value="announcements.announcement.delete">announcements.announcement.delete</option></optgroup></select><div class="form-text" id="sm-action-h" data-i18n="sm.action.h"></div><div class="invalid-feedback" id="sm-action-e"></div></div>
+<div class="mb-3"><label class="form-label" for="sm-group" data-i18n="sm.group"></label><input class="form-control font-monospace" id="sm-group" type="text" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="36" aria-describedby="sm-group-h"><div class="form-text" id="sm-group-h" data-i18n="sm.group.h"></div><div class="invalid-feedback" id="sm-group-e"></div></div>
+<details class="card mb-3" id="sm-res"><summary class="card-header fw-semibold" data-i18n="sm.res"></summary><div class="card-body"><p class="form-text mt-0" data-i18n="sm.res.h"></p>
+<div class="mb-3"><label class="form-label" for="sm-rtype" data-i18n="sm.rtype"></label><input class="form-control font-monospace" id="sm-rtype" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="100" aria-describedby="sm-rtype-h"><div class="form-text" id="sm-rtype-h" data-i18n="sm.rtype.h"></div><div class="invalid-feedback" id="sm-rtype-e"></div></div>
+<div class="mb-3"><label class="form-label" for="sm-rid" data-i18n="sm.rid"></label><input class="form-control font-monospace" id="sm-rid" type="text" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="36"><div class="invalid-feedback" id="sm-rid-e"></div></div><div class="mb-3"><label class="form-label" for="sm-rowner" data-i18n="sm.rowner"></label><input class="form-control font-monospace" id="sm-rowner" type="text" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="36"><div class="invalid-feedback" id="sm-rowner-e"></div></div><div class="mb-3"><label class="form-label" for="sm-rgroup" data-i18n="sm.rgroup"></label><input class="form-control font-monospace" id="sm-rgroup" type="text" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="36"><div class="invalid-feedback" id="sm-rgroup-e"></div></div>
+<fieldset id="sm-attrs" aria-describedby="sm-attrs-h"><legend class="form-label fs-6" data-i18n="sm.attrs"></legend><p class="form-text mt-0" id="sm-attrs-h" data-i18n="sm.attrs.h"></p><div class="small text-danger-emphasis mb-2" id="sm-attrs-e" hidden></div><div id="sm-rows"></div>
+<button class="btn btn-outline-secondary btn-sm" type="button" id="sm-attr-add" data-i18n="sm.attr.add"></button></fieldset></div></details>
+<button class="btn btn-primary d-inline-flex align-items-center gap-2" type="submit" id="sm-run"><span class="spinner-border spinner-border-sm" id="sm-spin" aria-hidden="true" hidden></span><span id="sm-label" data-i18n="sm.run"></span></button>
+</fieldset></form><template id="sm-row-t"><div class="row g-2 mb-2 align-items-start" data-attr-row><div class="col-12 col-sm-4"><input class="form-control form-control-sm font-monospace" data-attr-name type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="64" data-i18n-attr="aria-label:sm.attr.name"></div><div class="col-6 col-sm-3"><select class="form-select form-select-sm" data-attr-type data-i18n-attr="aria-label:sm.attr.type"><option value="str" data-i18n="sm.t.str"></option><option value="num" data-i18n="sm.t.num"></option><option value="yes" data-i18n="sm.t.yes"></option><option value="no" data-i18n="sm.t.no"></option><option value="list" data-i18n="sm.t.list"></option></select></div><div class="col-6 col-sm-3"><input class="form-control form-control-sm" data-attr-val type="text" autocomplete="off" data-i18n-attr="aria-label:sm.attr.val"></div><div class="col-12 col-sm-2"><button class="btn btn-outline-secondary btn-sm" type="button" data-attr-rm data-i18n="sm.attr.rm"></button></div></div></template></div>
+<div class="col-lg-6"><section aria-labelledby="sm-out-h"><h2 class="h5" id="sm-out-h" data-i18n="sm.out"></h2><div id="sm-out" role="status" aria-live="polite" aria-busy="false"></div><p class="small text-body-secondary mt-3 mb-0" data-i18n="sm.note"></p></section></div></div>
+</main>
+    </div>
+  </div>
+  <script src="vendor/bootstrap-5.3.9/js/bootstrap.bundle.min.js"></script>
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+  <script src="ui.js"></script>
+  <script src="states.js"></script>
+  <script src="simulator.js"></script>
+</body>
+</html>
