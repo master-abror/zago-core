@@ -1,8 +1,8 @@
-// Perilaku demo halaman pemulihan akun per state (?state=): lupa password (F5b-1), atur ulang password (F5b-2); terima undangan menyusul (F5b-3).
+// Perilaku demo halaman pemulihan akun per state (?state=): lupa password (F5b-1), atur ulang password (F5b-2), terima undangan (F5b-3).
 // Contract-first: tidak ada request. Di SPA Svelte menggantikan seluruhnya; lihat DESIGN-HANDOFF.md (F6).
 (() => {
   const $ = id => document.getElementById(id), st = document.body.dataset.state, T = (k, p) => ZApp.t(k, p);
-  const P = { forgot: 'fp', reset: 'rp' }[document.body.dataset.rec];
+  const P = { forgot: 'fp', reset: 'rp', accept: 'ai' }[document.body.dataset.rec];
   if (!P) return;
   const form = $(`${P}-form`), fs = $(`${P}-fs`), box = $(`${P}-alert`), btn = $(`${P}-submit`);
   const TONE = { validation: ['danger', 'validation'], error: ['danger', 'error'], rate: ['warning', 'rate'] };
@@ -60,6 +60,22 @@
     if (st === 'rate') countdown('rpdone', pw);
     if (st === 'token') $('rp-token-h').focus(); // invalid_reset_token: satu pesan untuk tak sah/terpakai/kedaluwarsa; form diganti panel
     if (st === 'success') $('rp-ok-h').focus();  // semua sesi dicabut; tidak ada masuk otomatis
+  }
+
+  if (P === 'ai') {
+    const nm = $('ai-name'), pw = $('ai-pw'), NAME = 'Sari Wulandari'; // nama contoh fiktif
+    const bad = (el, errId, key, val, desc) => { // galat per field (validation_failed): pesan di bawah field; fokus ke field pertama yang galat
+      $(errId).dataset.i18n = key; el.value = val; el.classList.add('is-invalid'); el.setAttribute('aria-invalid', 'true'); el.setAttribute('aria-describedby', desc);
+    };
+    if (st === 'validation') { bad(nm, 'ai-name-e', 'ai.name.req', '', 'ai-name-e'); bad(pw, 'ai-pw-e', 'pw.new.req', '', 'ai-pw-h ai-pw-e'); nm.focus(); }
+    if (st === 'short') { nm.value = NAME; bad(pw, 'ai-pw-e', 'pw.e.short', 'pendek123', 'ai-pw-h ai-pw-e'); pw.focus(); }
+    if (st === 'long') { nm.value = NAME; bad(pw, 'ai-pw-e', 'pw.e.long', 'x'.repeat(300), 'ai-pw-h ai-pw-e'); pw.focus(); }
+    if (st === 'loading' || st === 'rate' || st === 'error') { nm.value = NAME; pw.value = 'frasa-sandi-yang-panjang'; } // isian dipertahankan saat galat
+    if (st === 'loading') busy(true, 'btn.loading');
+    if (st === 'error') pw.focus();
+    if (st === 'rate') countdown('aidone', pw);
+    if (st === 'token') $('ai-token-h').focus(); // invalid_invitation: satu pesan; tanpa CTA minta tautan (undangan diterbitkan administrator)
+    if (st === 'success') $('ai-ok-h').focus();  // tidak ada masuk otomatis; respons sukses belum terdokumentasi
   }
   ZApp.apply();
 })();

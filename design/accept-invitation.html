@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="id-ID" data-bs-theme="light" data-palette="aurora" data-nav="side">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title data-i18n="ai.title">Terima undangan</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/bootstrap-5.3.9/css/bootstrap.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="theme-init.js"></script>
+</head>
+<body data-rec="accept" data-states="normal,loading,validation,short,long,token,success,rate,error">
+  <div class="z-auth">
+    <aside class="z-banner">
+      <a class="z-brand" href="#"><span class="z-logo" aria-hidden="true"></span><span class="z-brand-t" data-i18n="app.name">Zago</span></a>
+      <div class="z-banner-body">
+        <h2 class="display-6 fw-semibold" data-i18n="lg.banner.h">Platform modular, aman sejak awal.</h2>
+        <p class="lead mb-0" data-i18n="lg.banner.p">Kelola peran, izin, dan kebijakan.</p>
+      </div>
+      <p class="small mb-0 d-none d-lg-block" data-i18n="lg.footer">Zago</p>
+    </aside>
+    <div class="z-auth-pane">
+      <div class="z-auth-top">
+        <label class="visually-hidden" for="lg-lang" data-i18n="user.lang">Bahasa</label>
+        <select id="lg-lang" class="form-select form-select-sm w-auto" data-pref="lang" data-default="id-ID">
+          <option value="id-ID">Indonesia</option><option value="en-US">English (US)</option>
+        </select>
+        <button class="z-icon-btn" type="button" data-action="toggle-mode" aria-label="Ganti mode" data-i18n-attr="aria-label:top.mode">
+          <svg class="z-ic z-i-moon" aria-hidden="true"><use href="assets/icons.svg#moon-stars"/></svg><svg class="z-ic z-i-sun" aria-hidden="true"><use href="assets/icons.svg#sun"/></svg>
+        </button>
+      </div>
+      <main class="z-auth-form" id="main">
+        <p class="alert alert-secondary small py-2 mb-3" role="note"><strong data-i18n="cf.t">Contract-first</strong> · <span data-i18n="cf.m">Endpoint halaman ini belum ada (direncanakan M05). Isian belum terhubung ke server.</span></p>
+        <div data-when="normal loading validation short long rate error">
+          <h1 class="h3 mb-1" data-i18n="ai.title">Terima undangan</h1>
+          <p class="text-body-secondary mb-4" data-i18n="ai.sub">Lengkapi nama dan password untuk menerima undangan dan mengaktifkan akun Anda.</p>
+          <div id="ai-alert" class="alert" hidden>
+            <strong id="ai-at" class="d-block"></strong><span id="ai-am"></span>
+            <div id="ai-ac" class="fw-semibold mt-1" aria-hidden="true" hidden></div>
+          </div>
+          <form id="ai-form" novalidate>
+            <fieldset id="ai-fs" class="border-0 p-0 m-0">
+              <div class="mb-3">
+                <label for="ai-name" class="form-label" data-i18n="ai.name">Nama tampilan</label>
+                <input id="ai-name" name="display_name" type="text" class="form-control" autocomplete="name" required>
+                <div id="ai-name-e" class="invalid-feedback"></div>
+              </div>
+              <div class="mb-3">
+                <label for="ai-pw" class="form-label" data-i18n="pw.new">Password baru</label>
+                <input id="ai-pw" name="password" type="password" class="form-control" autocomplete="new-password" required aria-describedby="ai-pw-h">
+                <div id="ai-pw-h" class="form-text" data-i18n="pw.help">Minimal 12 karakter. Tidak ada aturan huruf besar atau angka; frasa panjang lebih aman.</div>
+                <div id="ai-pw-e" class="invalid-feedback"></div>
+              </div>
+              <div class="form-check mb-4">
+                <input id="ai-show" class="form-check-input" type="checkbox">
+                <label for="ai-show" class="form-check-label" data-i18n="pw.show">Tampilkan password</label>
+              </div>
+              <button id="ai-submit" type="submit" class="btn btn-primary w-100 d-inline-flex justify-content-center align-items-center gap-2">
+                <span id="ai-spin" class="spinner-border spinner-border-sm" aria-hidden="true" hidden></span><span id="ai-label" data-i18n="ai.submit">Terima undangan</span>
+              </button>
+            </fieldset>
+          </form>
+          <p class="text-center mt-3 mb-0"><a class="d-inline-block py-2" href="login.html" data-i18n="fp.back">Kembali ke Masuk</a></p>
+        </div>
+        <div data-when="token">
+          <h1 id="ai-token-h" class="h3 mb-2" tabindex="-1" data-i18n="ai.token.t">Undangan tidak berlaku</h1>
+          <p class="mb-4" data-i18n="ai.token.m">Undangan ini tidak sah, sudah dipakai, atau sudah kedaluwarsa. Minta administrator organisasi Anda mengirim undangan baru.</p>
+          <a class="btn btn-primary w-100" href="login.html" data-i18n="fp.back">Kembali ke Masuk</a>
+        </div>
+        <div data-when="success">
+          <h1 id="ai-ok-h" class="h3 mb-2" tabindex="-1" data-i18n="ai.ok.t">Undangan diterima</h1>
+          <p class="mb-4" data-i18n="ai.ok.m">Akun Anda siap. Masuk dengan email yang menerima undangan dan password yang baru Anda buat.</p>
+          <a class="btn btn-primary w-100" href="login.html" data-i18n="ai.ok.cta">Masuk</a>
+        </div>
+      </main>
+    </div>
+  </div>
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+  <script src="states.js"></script>
+  <script src="recovery.js"></script>
+</body>
+</html>
