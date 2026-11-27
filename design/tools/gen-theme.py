@@ -139,6 +139,8 @@ COMP = f"""
 .progress {{ --bs-progress-bar-bg: var(--z-primary); }}
 .list-group {{ --bs-list-group-bg: var(--z-surface); --bs-list-group-border-color: var(--z-border); --bs-list-group-active-bg: var(--z-primary); --bs-list-group-active-border-color: var(--z-primary); --bs-list-group-active-color: var(--z-on-primary); }}
 a:focus-visible, summary:focus-visible, [tabindex]:focus-visible {{ outline: 2px solid var(--z-primary); outline-offset: 2px; }}
+/* h1[tabindex=-1] hanya menerima fokus lewat skrip (perpindahan rute/state) dan bukan kontrol: tanpa cincin. Elemen tabindex=-1 lain (alert, hasil) tetap bercincin. */
+h1[tabindex="-1"]:focus-visible {{ outline: 0; }}
 @media (prefers-reduced-motion: reduce) {{ *, *::before, *::after {{ animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }} }}
 """
 DOTS = '\n'.join(f'.z-dot[data-p="{n}"] {{ background: linear-gradient(140deg, {L["b1"]}, {L["b2"]}); }}' for n, (L, D) in P.items()) + '\n'
