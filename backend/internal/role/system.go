@@ -45,6 +45,7 @@ func SystemRoles() []SystemRole {
 			Permissions: union([]string{
 				permission.OrganizationRead, permission.OrganizationUpdate, permission.OrganizationMemberManage,
 				permission.UserRead, permission.UserCreate, permission.UserUpdate, permission.UserDelete,
+				permission.UserFieldPhoneRead,
 				permission.GroupRead, permission.GroupCreate, permission.GroupUpdate, permission.GroupDelete, permission.GroupManageMembers,
 				permission.RoleRead, permission.RoleManage, permission.RoleAssign,
 				permission.PermissionRead, permission.PermissionAssign, permission.PermissionSimulate,
@@ -78,6 +79,7 @@ func SystemRoles() []SystemRole {
 func memberSet() []string {
 	return []string{
 		permission.ProfileRead, permission.ProfileUpdate,
+		permission.ProfileFieldPhoneRead, permission.ProfileFieldPhoneWrite,
 		permission.NotificationRead, permission.InboxRead,
 		permission.ConversationRead, permission.ConversationCreate,
 		permission.MessageSend, permission.ActivityReadOwn,

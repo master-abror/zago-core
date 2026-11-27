@@ -16,11 +16,12 @@ import (
 var specMember = []string{
 	"profile.read", "profile.update", "notification.read", "inbox.read",
 	"conversation.read", "conversation.create", "message.send", "activity.read_own",
+	"profile.field.phone.read", "profile.field.phone.write",
 }
 
 var specOrgAdminExtra = []string{
 	"organization.read", "organization.update", "organization.member.manage",
-	"user.read", "user.create", "user.update", "user.delete",
+	"user.read", "user.create", "user.update", "user.delete", "user.field.phone.read",
 	"group.read", "group.create", "group.update", "group.delete", "group.manage_members",
 	"role.read", "role.manage", "role.assign",
 	"permission.read", "permission.assign", "permission.simulate",
@@ -163,4 +164,32 @@ func TestSystemRolesReturnsIndependentCopies(t *testing.T) {
 			require.NotEqual(t, "hacked.code", code)
 		}
 	}
+}
+
+// Distribusi kode field phone (ADR-0023 butir 24c): phone menjadi field terbatas begitu kodenya
+// terdaftar, jadi siapa yang memegang apa harus eksplisit dan teruji, termasuk yang TIDAK boleh.
+func TestPhoneFieldCodesAreDistributedAsDecided(t *testing.T) {
+	roles := bySlug(t)
+	holds := func(slug, code string) bool {
+		for _, c := range roles[slug].Permissions {
+			if c == code {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, slug := range []string{role.SlugMember, role.SlugOrgAdmin, role.SlugGroupAdmin} {
+		require.True(t, holds(slug, "profile.field.phone.read"), "%s membaca phone profilnya sendiri", slug)
+		require.True(t, holds(slug, "profile.field.phone.write"), "%s mengubah phone profilnya sendiri", slug)
+	}
+	require.True(t, holds(role.SlugOrgAdmin, "user.field.phone.read"), "Organization Admin melihat phone user")
+
+	for _, slug := range []string{role.SlugMember, role.SlugGroupAdmin} {
+		require.False(t, holds(slug, "user.field.phone.read"), "%s tidak melihat phone user lain", slug)
+	}
+	for _, slug := range []string{role.SlugMember, role.SlugOrgAdmin, role.SlugGroupAdmin} {
+		require.False(t, holds(slug, "user.field.phone.write"), "%s tidak mengubah phone user lain (PATCH /users/{id} hanya platform)", slug)
+	}
+	require.True(t, roles[role.SlugSuperAdmin].AllSystemPermissions, "Super Admin memegang kode baru lewat AllSystemPermissions")
 }

@@ -108,6 +108,22 @@ const (
 	MessageModerate    = "message.moderate"
 )
 
+// Field permission core (ADR-0022 butir 35, ADR-0023 butir 24c). Kode berbentuk
+// <tipe>.field.<nama>.<read|write>: begitu terdaftar, field itu terbatas dan hanya terlihat atau
+// dapat ditulis oleh pemegang kodenya.
+
+// ProfileFieldPhoneRead mengizinkan membaca phone pada profil.
+const ProfileFieldPhoneRead = "profile.field.phone.read"
+
+// ProfileFieldPhoneWrite mengizinkan menulis phone pada profil.
+const ProfileFieldPhoneWrite = "profile.field.phone.write"
+
+// UserFieldPhoneRead mengizinkan membaca phone user lain.
+const UserFieldPhoneRead = "user.field.phone.read"
+
+// UserFieldPhoneWrite mengizinkan menulis phone user lain.
+const UserFieldPhoneWrite = "user.field.phone.write"
+
 // catalog adalah katalog core dalam urutan deklarasi (urutan dipakai sinkron dan tes).
 var catalog = []Def{
 	{OrganizationRead, "Melihat organisasi"},
@@ -151,6 +167,10 @@ var catalog = []Def{
 	{ConversationManage, "Mengelola percakapan"},
 	{MessageSend, "Mengirim pesan"},
 	{MessageModerate, "Memoderasi pesan"},
+	{ProfileFieldPhoneRead, "Melihat nomor telepon pada profil"},
+	{ProfileFieldPhoneWrite, "Mengubah nomor telepon pada profil"},
+	{UserFieldPhoneRead, "Melihat nomor telepon pengguna"},
+	{UserFieldPhoneWrite, "Mengubah nomor telepon pengguna"},
 }
 
 // Catalog mengembalikan salinan katalog permission core.

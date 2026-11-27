@@ -9,7 +9,7 @@ import (
 	"github.com/master-abror/zago-core/backend/internal/permission"
 )
 
-// specCodes menyematkan katalog docs/06 §5.4 (41 kode) sebagai sumber kebenaran kedua. Menambah
+// specCodes menyematkan katalog docs/06 §5.4 (41 kode) ditambah 4 kode field phone (ADR-0023 butir 24c; 45 kode) sebagai sumber kebenaran kedua. Menambah
 // atau menghapus kode core adalah keputusan sadar: ubah daftar ini bersama catalog.go dan ADR.
 var specCodes = []string{
 	"organization.read", "organization.create", "organization.update", "organization.archive", "organization.member.manage",
@@ -27,6 +27,7 @@ var specCodes = []string{
 	"inbox.read",
 	"conversation.read", "conversation.create", "conversation.manage",
 	"message.send", "message.moderate",
+	"profile.field.phone.read", "profile.field.phone.write", "user.field.phone.read", "user.field.phone.write",
 }
 
 func TestCatalogMatchesTheSpecExactly(t *testing.T) {
@@ -37,7 +38,7 @@ func TestCatalogMatchesTheSpecExactly(t *testing.T) {
 	want := append([]string(nil), specCodes...)
 	sort.Strings(got)
 	sort.Strings(want)
-	require.Len(t, want, 41)
+	require.Len(t, want, 45)
 	require.Equal(t, want, got)
 }
 
@@ -74,6 +75,8 @@ func TestConstantsAreInTheCatalog(t *testing.T) {
 		permission.GroupManageMembers, permission.RoleAssign, permission.PermissionSimulate,
 		permission.PolicyManage, permission.ModuleEnable, permission.SettingsUpdate,
 		permission.ActivityReadAll, permission.SystemLogRead, permission.InboxRead, permission.MessageModerate,
+		permission.ProfileFieldPhoneRead, permission.ProfileFieldPhoneWrite,
+		permission.UserFieldPhoneRead, permission.UserFieldPhoneWrite,
 	} {
 		require.True(t, in[code], "konstanta %q tidak ada di katalog", code)
 	}
