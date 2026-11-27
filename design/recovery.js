@@ -1,8 +1,8 @@
-// Perilaku demo halaman pemulihan akun per state (?state=): lupa password (F5b-1); atur ulang password dan terima undangan menyusul (F5b-2, F5b-3).
+// Perilaku demo halaman pemulihan akun per state (?state=): lupa password (F5b-1), atur ulang password (F5b-2); terima undangan menyusul (F5b-3).
 // Contract-first: tidak ada request. Di SPA Svelte menggantikan seluruhnya; lihat DESIGN-HANDOFF.md (F6).
 (() => {
   const $ = id => document.getElementById(id), st = document.body.dataset.state, T = (k, p) => ZApp.t(k, p);
-  const P = { forgot: 'fp' }[document.body.dataset.rec];
+  const P = { forgot: 'fp', reset: 'rp' }[document.body.dataset.rec];
   if (!P) return;
   const form = $(`${P}-form`), fs = $(`${P}-fs`), box = $(`${P}-alert`), btn = $(`${P}-submit`);
   const TONE = { validation: ['danger', 'validation'], error: ['danger', 'error'], rate: ['warning', 'rate'] };
@@ -29,6 +29,9 @@
     };
     btn.disabled = true; if (focusEl) focusEl.focus(); tick(); if (n > 0) h = setInterval(tick, 1000);
   }
+  // Tampilkan password: kotak centang dengan label tetap (bukan tombol yang labelnya berganti); di SPA ubah type input, jangan simpan nilainya.
+  const sh = $(`${P}-show`), pwEl = $(`${P}-pw`);
+  if (sh && pwEl) sh.addEventListener('change', () => { pwEl.type = sh.checked ? 'text' : 'password'; });
   form.addEventListener('submit', e => e.preventDefault()); // demo: tidak ada request
   if (TONE[st]) show(...TONE[st]);
 
@@ -41,4 +44,22 @@
     if (st === 'rate') countdown('fpdone', email);
     if (st === 'sent') $('fp-sent-h').focus(); // form diganti panel jawaban generik; fokus ke judul baru
   }
+
+  if (P === 'rp') {
+    const pw = $('rp-pw');
+    const bad = (key, val) => { // galat per field dari server (validation_failed) atau klien: pesan di bawah field, fokus ke field
+      $('rp-pw-e').dataset.i18n = key; pw.value = val; pw.classList.add('is-invalid'); pw.setAttribute('aria-invalid', 'true');
+      pw.setAttribute('aria-describedby', 'rp-pw-h rp-pw-e'); pw.focus();
+    };
+    if (st === 'validation') bad('pw.new.req', '');
+    if (st === 'short') bad('pw.e.short', 'pendek123');
+    if (st === 'long') bad('pw.e.long', 'x'.repeat(300));
+    if (st === 'loading' || st === 'rate' || st === 'error') pw.value = 'frasa-sandi-yang-panjang'; // isian dipertahankan saat galat
+    if (st === 'loading') busy(true, 'btn.loading');
+    if (st === 'error') pw.focus();
+    if (st === 'rate') countdown('rpdone', pw);
+    if (st === 'token') $('rp-token-h').focus(); // invalid_reset_token: satu pesan untuk tak sah/terpakai/kedaluwarsa; form diganti panel
+    if (st === 'success') $('rp-ok-h').focus();  // semua sesi dicabut; tidak ada masuk otomatis
+  }
+  ZApp.apply();
 })();
