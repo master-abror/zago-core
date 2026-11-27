@@ -86,6 +86,12 @@
 :root[data-nav="min"] .z-grp.is-dismissed > .z-pop { display: none !important; }
 .z-state { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3rem 1.5rem; text-align: center; }
 .z-state p { max-width: 28rem; margin: 0; color: var(--z-muted); }
+/* Halaman sistem mandiri (tanpa shell): offline dan error boundary tidak boleh bergantung pada shell yang mungkin gagal. */
+.z-solo { display: flex; flex-direction: column; min-height: 100vh; padding: 1rem 1.5rem 4rem; }
+.z-solo-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.z-solo-top .z-brand { margin: 0; }
+.z-solo-main { width: 100%; max-width: 32rem; margin: auto; padding: 2rem 0; }
+@media (min-width: 992px) { :root[data-nav="min"] .z-solo .z-brand-t { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; } :root[data-nav="min"] .z-solo .z-brand { justify-content: flex-start; } }
 /* Tabel daftar di layar sempit: padding sel dikecilkan agar kolom tindakan tidak melebihi kartu (policy di 360 px). */
 @media (max-width: 575.98px) { .z-tbl-tight > :not(caption) > * > * { padding-inline: .375rem; } }
 .z-state-ic { display: grid; flex: none; place-items: center; width: 3rem; height: 3rem; border-radius: 50%; background: var(--z-primary-subtle); color: var(--z-link); }
