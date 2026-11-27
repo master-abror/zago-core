@@ -346,7 +346,8 @@ window.ZI18N = {
     'pf.save': 'Simpan perubahan', 'pf.ok.t': 'Policy dibuat', 'pf.ok.m': 'Policy baru tersimpan. Bila aktif, ia berlaku pada permintaan berikutnya.',
     'pf.saved.t': 'Perubahan tersimpan', 'pf.saved.m': 'Perubahan berlaku pada permintaan berikutnya.', 'pf.nochange.t': 'Tidak ada perubahan',
     'pf.nochange.m': 'Anda belum mengubah apa pun, jadi tidak ada yang disimpan.', 'pf.taken.t': 'Kode sudah dipakai', 'pf.taken.m': 'Ganti kode policy, lalu simpan lagi.',
-    'pf.nf.t': 'Policy tidak ditemukan', 'pf.nf.m': 'Policy ini tidak ada atau tidak dapat diubah dari konteks Anda.'
+    'pf.nf.t': 'Policy tidak ditemukan', 'pf.nf.m': 'Policy ini tidak ada atau tidak dapat diubah dari konteks Anda.',
+    'cf.t': 'Contract-first', 'cf.m': 'Endpoint halaman ini belum ada (direncanakan M05). Isian belum terhubung ke server.', 'fp.title': 'Lupa password', 'fp.sub': 'Masukkan email akun Anda. Jika akun tersebut ada, kami mengirim tautan untuk mengatur ulang password.', 'fp.submit': 'Kirim tautan', 'fp.back': 'Kembali ke Masuk', 'fp.sent.t': 'Periksa email Anda', 'fp.sent.m': 'Jika ada akun dengan email tersebut, kami telah mengirim tautan untuk mengatur ulang password. Tautan berlaku singkat dan hanya dapat dipakai sekali.', 'fp.sent.h': 'Belum menerima email? Periksa folder spam dan tunggu beberapa menit.', 'fp.again': 'Gunakan email lain', 'al.fpdone.t': 'Silakan coba lagi', 'al.fpdone.m': 'Anda dapat meminta tautan lagi.'
   },
   'en-US': {
     'app.name': 'Zago', 'cmp.title': 'Core components',
@@ -694,6 +695,7 @@ window.ZI18N = {
     'pf.save': 'Save changes', 'pf.ok.t': 'Policy created', 'pf.ok.m': 'The new policy is saved. If it is active, it applies from the next request.',
     'pf.saved.t': 'Changes saved', 'pf.saved.m': 'The changes apply from the next request.', 'pf.nochange.t': 'No changes',
     'pf.nochange.m': 'You have not changed anything, so nothing was saved.', 'pf.taken.t': 'Code already used', 'pf.taken.m': 'Change the policy code, then save again.',
-    'pf.nf.t': 'Policy not found', 'pf.nf.m': 'This policy does not exist or cannot be changed from your context.'
+    'pf.nf.t': 'Policy not found', 'pf.nf.m': 'This policy does not exist or cannot be changed from your context.',
+    'cf.t': 'Contract-first', 'cf.m': 'This page\'s endpoint does not exist yet (planned for M05). The form is not connected to a server.', 'fp.title': 'Forgot password', 'fp.sub': 'Enter your account email. If the account exists, we will send a link to reset your password.', 'fp.submit': 'Send link', 'fp.back': 'Back to sign in', 'fp.sent.t': 'Check your email', 'fp.sent.m': 'If an account exists for that email, we have sent a link to reset the password. The link is short-lived and can be used only once.', 'fp.sent.h': 'Have not received the email? Check your spam folder and wait a few minutes.', 'fp.again': 'Use a different email', 'al.fpdone.t': 'You can try again', 'al.fpdone.m': 'You can request a link again.'
   }
 };
